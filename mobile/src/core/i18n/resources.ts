@@ -3,6 +3,7 @@
 import tr_common from './locales/tr/common.json';
 import tr_auth from './locales/tr/auth.json';
 import tr_field_tasks from './locales/tr/field_tasks.json';
+import tr_inspections from './locales/tr/inspections.json';
 import tr_nav from './locales/tr/nav.json';
 import tr_settings from './locales/tr/settings.json';
 import tr_today from './locales/tr/today.json';
@@ -17,6 +18,7 @@ import tr_vehicle_records from '../../../../frontend/src/locales/tr/vehicle_reco
 import en_common from './locales/en/common.json';
 import en_auth from './locales/en/auth.json';
 import en_field_tasks from './locales/en/field_tasks.json';
+import en_inspections from './locales/en/inspections.json';
 import en_nav from './locales/en/nav.json';
 import en_settings from './locales/en/settings.json';
 import en_today from './locales/en/today.json';
@@ -29,9 +31,9 @@ import en_vehicles from '../../../../frontend/src/locales/en/vehicles.json';
 import en_vehicle_blocks from '../../../../frontend/src/locales/en/vehicle_blocks.json';
 import en_vehicle_records from '../../../../frontend/src/locales/en/vehicle_records.json';
 
-export const NAMESPACES = ['common', 'auth', 'field_tasks', 'nav', 'settings', 'today', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'vehicles', 'vehicle_blocks', 'vehicle_records'] as const;
+export const NAMESPACES = ['common', 'auth', 'field_tasks', 'inspections', 'nav', 'settings', 'today', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'vehicles', 'vehicle_blocks', 'vehicle_records'] as const;
 
 export const resources = {
-  tr: { common: tr_common, auth: tr_auth, field_tasks: tr_field_tasks, nav: tr_nav, settings: tr_settings, today: tr_today, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records },
-  en: { common: en_common, auth: en_auth, field_tasks: en_field_tasks, nav: en_nav, settings: en_settings, today: en_today, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records },
+  tr: { common: tr_common, auth: tr_auth, field_tasks: tr_field_tasks, inspections: tr_inspections, nav: tr_nav, settings: tr_settings, today: tr_today, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records },
+  en: { common: en_common, auth: en_auth, field_tasks: en_field_tasks, inspections: en_inspections, nav: en_nav, settings: en_settings, today: en_today, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records },
 };

@@ -1,5 +1,3 @@
-import { FieldStubScreen } from '@/features/today/summary-screens';
+import { HandoverWizardScreen } from '@/features/inspections/handover-screen';
 
-export default function HandoverScreen() {
-  return <FieldStubScreen kind="handover" />;
-}
+export default HandoverWizardScreen;
