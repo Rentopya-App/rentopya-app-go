@@ -8,6 +8,7 @@ import { type Language, LANGUAGES, setLanguage } from '@/core/i18n';
 import { type ThemePreference, usePreferences } from '@/core/preferences';
 import { useSelectedBranch } from '@/core/tenant';
 import { signOutGoogle } from '@/features/auth/social';
+import { UploadQueueRow } from '@/features/uploads/queue-row';
 import { Chips } from '@/ui/chips';
 import { List, ListRow, SectionHeader } from '@/ui/list';
 import { Screen } from '@/ui/screen';
@@ -100,6 +101,7 @@ export function MenuScreen() {
                 subtitle={me.user.email}
               />
             ) : null}
+            <UploadQueueRow />
             <ListRow icon="signOut" title={t('sign_out')} tone="danger" onPress={() => confirmSignOut(t)} last />
           </List>
         </View>
