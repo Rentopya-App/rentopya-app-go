@@ -32,5 +32,6 @@
   "duration_minutes": "{{count}} dk",
   "clear_date": "Tarihi temizle",
   "reason": "Neden",
-  "reason_hint": "En az 3 karakter; kayıtta görünür."
+  "reason_hint": "En az 3 karakter; kayıtta görünür.",
+  "codes.NETWORK_ERROR": "Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin."
 }
