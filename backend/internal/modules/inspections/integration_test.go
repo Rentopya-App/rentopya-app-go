@@ -65,7 +65,7 @@ type fx struct {
 	driver    ref
 	plate     int
 	clockMu   sync.Mutex
-	shift     time.Duration
+	clock     time.Time
 }
 
 type ref struct {
@@ -99,7 +99,11 @@ func newFx(t *testing.T) *fx {
 		t.Fatal(err)
 	}
 	q := db.New(pool)
-	f := &fx{t: t, pool: pool, q: q, suffix: strings.ReplaceAll(uuid.NewString()[:8], "-", ""), store: storage.NewMemory()}
+	f := &fx{t: t, pool: pool, q: q, suffix: strings.ReplaceAll(uuid.NewString()[:8], "-", ""), store: storage.NewMemory(),
+		// One fixed instant on a whole minute: the services' clock only
+		// moves through advance, so minute counts (late minutes, fees) do
+		// not depend on the second the test starts.
+		clock: time.Now().Truncate(time.Minute)}
 	org, err := q.CreateOrganization(ctx, db.CreateOrganizationParams{Slug: "ins-" + f.suffix, Name: "Ins " + f.suffix})
 	if err != nil {
 		t.Fatal(err)
@@ -184,12 +188,12 @@ func (f *fx) must(err error) {
 func (f *fx) now() time.Time {
 	f.clockMu.Lock()
 	defer f.clockMu.Unlock()
-	return time.Now().Add(f.shift)
+	return f.clock
 }
 
 func (f *fx) advance(d time.Duration) {
 	f.clockMu.Lock()
-	f.shift += d
+	f.clock = f.clock.Add(d)
 	f.clockMu.Unlock()
 }
 
