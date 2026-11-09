@@ -1,0 +1,47 @@
+# Local build override for compose.prod.yml. Production pulls the images CI
+# publishes to GHCR; this file adds the build sections back so the same stack
+# can be built on this machine (smoke tests, the legacy scripts/server-sync.sh
+# cron until Dokploy pulls). Contexts mirror deploy/images.json.
+#
+#   make prod-build      (docker compose -f compose.prod.yml -f compose.build.yml build)
+#   make prod-up-build   (… up -d --build)
+#
+# The built images get the same names as the GHCR ones
+# (${IMAGE_REPO}-<service>:${IMAGE_TAG}); pick a tag that cannot be mistaken
+# for a release, e.g. IMAGE_TAG=local. pull_policy: build never pulls them.
+services:
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  site:
+    build:
+      context: ./site
+      dockerfile: Dockerfile
+    pull_policy: build
+
+  backup:
+    build:
+      context: .
+      dockerfile: deploy/backup/Dockerfile
+    pull_policy: build

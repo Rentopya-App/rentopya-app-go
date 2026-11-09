@@ -13,23 +13,29 @@
 # like `backend` could resolve to another stack's container on dokploy-network.
 name: ${COMPOSE_PROJECT_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-prod}
 
+# App images are built and published by CI (.github/workflows/ci.yml) from
+# deploy/images.json; the server does NOT build them. Each one is
+# ${IMAGE_REPO}-<service>:${IMAGE_TAG}, the <service> suffix matching
+# images.json exactly (backend: also migrate and worker; frontend; site;
+# backup). IMAGE_TAG has no default: Dokploy sets it to the release tag v0.N
+# (or a :sha-<short> of main). IMAGE_PULL_POLICY defaults to "always" so a
+# redeploy fetches the tag. Build on the host instead (smoke tests, the legacy
+# server-sync cron): add -f compose.build.yml (make prod-build).
 x-backend-image: &backend-image
-  image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
-  build:
-    context: ./backend
-    dockerfile: Dockerfile
+  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-backend:${IMAGE_TAG:?IMAGE_TAG is required (v0.N)}
+  pull_policy: ${IMAGE_PULL_POLICY:-always}
 
 x-frontend-image: &frontend-image
-  image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
-  build:
-    context: ./frontend
-    dockerfile: Dockerfile
+  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-frontend:${IMAGE_TAG:?IMAGE_TAG is required (v0.N)}
+  pull_policy: ${IMAGE_PULL_POLICY:-always}
 
 x-site-image: &site-image
-  image: ${SITE_IMAGE:?SITE_IMAGE is required}
-  build:
-    context: ./site
-    dockerfile: Dockerfile
+  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-site:${IMAGE_TAG:?IMAGE_TAG is required (v0.N)}
+  pull_policy: ${IMAGE_PULL_POLICY:-always}
+
+x-backup-image: &backup-image
+  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-backup:${IMAGE_TAG:?IMAGE_TAG is required (v0.N)}
+  pull_policy: ${IMAGE_PULL_POLICY:-always}
 
 x-backend-environment: &backend-environment
   APP_NAME: ${APP_NAME:-api}
@@ -468,10 +474,7 @@ services:
   # Docker socket (root-equivalent on the host): never attach it to
   # dokploy-network or publish a port.
   backup:
-    image: ${NAME_PREFIX:?NAME_PREFIX is required}-backup:latest
-    build:
-      context: .
-      dockerfile: deploy/backup/Dockerfile
+    <<: *backup-image
     container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-backup
     profiles: ["backup"]
     command: ["schedule"]
