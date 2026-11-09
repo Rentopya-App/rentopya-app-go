@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/storage"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/pkg/rentaltime"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -165,7 +167,19 @@ func TestTenantIsolationRT_A01(t *testing.T) {
 		logOut = os.Stderr
 	}
 	log := slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv, err := New(cfg, log, Deps{DB: pool, Queries: q, Storage: mem})
+	// The reports compute against "now" (vehicle profitability's
+	// available days end at now). The clock runs until B is snapshotted,
+	// then stays at the end of that Istanbul day, so B's report figures
+	// stay comparable across A's actions while everything dated today
+	// still falls inside the report window.
+	var reportNow atomic.Pointer[time.Time]
+	reportClock := func() time.Time {
+		if p := reportNow.Load(); p != nil {
+			return *p
+		}
+		return time.Now()
+	}
+	srv, err := New(cfg, log, Deps{DB: pool, Queries: q, Storage: mem, ReportClock: reportClock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -892,6 +906,8 @@ func TestTenantIsolationRT_A01(t *testing.T) {
 		}
 		return out
 	}
+	frozen := rentaltime.LocalDate(time.Now()).AddDays(1).StartIn().Add(-time.Second)
+	reportNow.Store(&frozen)
 	before := snapshot()
 
 	covered := map[string]string{}
