@@ -8,6 +8,7 @@ Most product work is **organization-scoped**: data a rental company owns, shown 
 | Platform list resource | `.agents/skills/add-platform-resource` | `users`, `roles` |
 | External provider / integration job kind | `.agents/skills/integration-adapter` | Netgsm SMS, KABİS |
 | Table, column, seed, permission slug, query | `.agents/skills/db-migration` | |
+| Mobile API types, mobile CI / release | `.agents/skills/mobile-ci` | |
 
 Before a domain feature, read its design doc in `docs/design/` (one per area: reservations, pricing, rentals, payments, …) and the module's package comment.
 
@@ -18,7 +19,7 @@ Before a domain feature, read its design doc in `docs/design/` (one per area: re
    - Tenant routes: `Authenticate` → `RequireOrganization(resolver)` → `RequireTenantPermission("tenant.<plural>.<action>")`; the handler reads `orgctx.Must(ctx).ID` and every query filters `organization_id` (and the branch scope for branch-bound data). A nil resolver (tenancy off) mounts nothing.
    - Platform routes: `Authenticate` → `RequirePermission("platform.<plural>.<action>")`.
 3. SQL: `make -C backend migrate-create NAME=…` → write up + down → `make -C backend migrate-up` → `make -C backend sqlc`.
-4. Update `backend/docs/openapi.yaml` in the **same** change (RT-A01 cross-checks every `/v1/tenant` route against it).
+4. Update `backend/docs/openapi.yaml` in the **same** change (RT-A01 cross-checks every `/v1/tenant` route against it), then regenerate both clients: `cd frontend && pnpm api:generate`, `cd mobile && npm run api:generate`.
 5. Lists use `pkg/apiquery` (`limit`, `offset`, `q`, `sort`). Envelope via `pkg/response`. See [backend/API_CONVENTIONS.md](../backend/API_CONVENTIONS.md).
 6. If the resource is listed, add `GET /v1/{platform|tenant}/<plural>/meta` via `internal/platform/resourcemeta` and register `/meta` **before** `/{uuid}`.
 7. Side effects: publish on `internal/platform/events`, `notifications.Service.Enqueue`, the notification engine (customer messages) or the integration job runner (provider work). Never SMTP, SMS or a provider call from a handler.
@@ -33,6 +34,16 @@ Before a domain feature, read its design doc in `docs/design/` (one per area: re
 4. Call the BFF (`/api/v1/...`), not the Go host, from the browser.
 5. Dates: shared `DatePicker` / `AppDatePicker` — see `.agents/skills/admin-date-picker`.
 6. After OpenAPI changes: `cd frontend && pnpm api:generate`.
+
+## Mobile screen
+
+The Expo app (`mobile/`) uses the same `/v1` API as the panel; it has no BFF. Read `mobile/AGENTS.md` first.
+
+1. Route file under `mobile/src/app/` (one line), screen and hooks under `mobile/src/features/<name>/`.
+2. Company data goes through `/v1/tenant/*` with `X-Organization` from the picked membership. Business rules stay in the API.
+3. Permission checks use the slugs copied by `npm run permissions:gen` from `frontend/src/config/permissions.ts`.
+4. Text in both `src/core/i18n/locales/tr` and `en` (`npm run i18n:check`).
+5. After OpenAPI changes: `npm run api:generate` and commit `src/core/api/schema.d.ts`.
 
 ## Sidebar (nav-engine)
 

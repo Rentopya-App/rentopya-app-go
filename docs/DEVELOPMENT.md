@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Go (version in `backend/go.mod`, currently 1.26)
-- Node (version in `frontend/.nvmrc` / `site/.nvmrc`, currently 22) and pnpm
+- Node (version in `frontend/.nvmrc` / `site/.nvmrc`, currently 22) and pnpm; npm for `mobile/`
 - Docker + Compose
 - golang-migrate, sqlc, air, golangci-lint, gofumpt — see [backend/TOOLCHAIN.md](../backend/TOOLCHAIN.md)
 
@@ -99,9 +99,14 @@ Optional frontend public vars (root `.env`): `NEXT_PUBLIC_BFF_BASE_URL`, `NEXT_P
 
 ## Production / Dokploy
 
-1. `make prod-env`: asks only for the public app URL (e.g. `https://panel.example.com`), derives every URL from it and generates all secrets into `.env.server` (mode 600). Centrifugo gets `realtime.<app host>`; edit `REALTIME_HOST` and the two Centrifugo URLs if you want another host. Company sites answer on `{subdomain}.<host of SITE_BASE_URL>` (default: the app host).
-2. `make prod-config` then `make prod-up`. On Dokploy, paste `.env.server` into the compose app's environment and point the frontend domain at port 3000, the Centrifugo domain at port 8000 and the wildcard site domain (`*.<app host>`) at the `site` service, port 3000.
+Production never starts from a copy of `.env.example`. The env comes from `deploy/env/schema` ([design/env-core.md](./design/env-core.md)).
+
+1. `make prod-env`: asks only for the public app URL (e.g. `https://panel.example.com`), derives every URL from it and generates all secrets and the VAPID pair into `.env.server` (mode 600). Centrifugo gets `realtime.<app host>`; edit `REALTIME_HOST` and the two Centrifugo URLs if you want another host. Company sites answer on `{subdomain}.<host of SITE_BASE_URL>` (default: the app host).
+   Fill `SMTP_*` yourself. TEC-1165 adds `SMTP_TLS` (`auto`: implicit TLS on port 465, STARTTLS required on any other port; `starttls` / `implicit` force one; `none` is refused in production) and `SMTP_TIMEOUT` (default `10s`). Leave `TRUSTED_PROXIES` empty behind Traefik on the docker networks (loopback + private ranges are trusted); list your proxies' CIDRs if another proxy sits in front, or `none` to ignore `X-Forwarded-For`.
+2. `make prod-env-check`, then `make prod-config` and `make prod-up`. On Dokploy, paste `.env.server` into the compose app's environment and point the frontend domain at port 3000, the Centrifugo domain at port 8000 and the wildcard site domain (`*.<app host>`) at the `site` service, port 3000.
 3. Plain Docker host only (Dokploy creates it for you): `docker network create dokploy-network` once
+
+Images are built on the server today (`*_IMAGE` = `{NAME_PREFIX}-*:latest`). Prebuilt GHCR images with `v0.N` tag deploys come with the CI/CD port (İP-9 in [BOILERPLATE_SYNC.md](./BOILERPLATE_SYNC.md)); this section changes then.
 
 ### Plain Docker host with automatic updates
 
@@ -167,13 +172,29 @@ There are no default credentials (the old `admin@example.com` / `Password1` is g
 
 Production (pull-only host, no source tree): `make prod-super-admin SA_EMAIL=you@example.com`, or directly `docker compose --env-file .env.server -f compose.prod.yml exec backend /app/create-super-admin -email you@example.com -generate-password`.
 
+## Mobile app
+
+`mobile/` is the Expo app (SDK 58) for the company panel. It calls the Go API directly (`EXPO_PUBLIC_API_URL` + `/v1/*`, no `/v1` in the variable) with its own Bearer token pair, and sends the picked organization in `X-Organization` on `/v1/tenant/*`.
+
+```sh
+cd mobile
+cp .env.example .env.local      # EXPO_PUBLIC_API_URL=http://localhost:8080
+npm install
+npx expo start
+```
+
+`make local-dev` gives it the API on `:8080`. Native modules need a development build (`npx expo run:ios` / `run:android`); `ios/` and `android/` are generated and never committed. Commands, variables and rules: [mobile/README.md](../mobile/README.md) and [mobile/AGENTS.md](../mobile/AGENTS.md). CI and release: `.agents/skills/mobile-ci`.
+
 ## After a backend contract change
 
 ```sh
 make -C backend sqlc
 make -C backend openapi-lint
 cd frontend && pnpm api:generate && pnpm typecheck
+cd ../mobile && npm run api:generate && npm run api:check   # commit src/core/api/schema.d.ts
 ```
+
+Any `backend/docs/openapi.yaml` change (descriptions too) regenerates the mobile types; `npm run api:check` fails on stale ones.
 
 ## CI
 
@@ -183,3 +204,9 @@ cd frontend && pnpm api:generate && pnpm typecheck
 - `commit-policy` always runs; `acceptance` runs the Go acceptance scenarios when backend or frontend ran.
 - `ci` is the single required status check: it fails if any needed job failed or was cancelled and treats skipped jobs as passed.
 - Caches: Go modules/build (`setup-go`), the pnpm store (frontend, site), npm (mobile) and golangci-lint's own cache.
+
+Shipping: push a feature branch and open a PR. The `auto-pr` job is disabled (`if: false`), so nothing merges by itself; the owner merges. Commit messages carry the Linear id and no AI attribution (`commit-policy`).
+
+## Boilerplate sync
+
+Rentopya shares no git history with the boilerplate. Changes are read and re-applied by hand. Base SHA, inventory and work packages: [BOILERPLATE_SYNC.md](./BOILERPLATE_SYNC.md).
