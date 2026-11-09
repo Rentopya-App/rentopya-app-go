@@ -1,0 +1,77 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+/*
+ * Brand tokens mirror frontend/src/styles/theme.css (same names; oklch
+ * converted to hex because React Native does not parse oklch) and
+ * docs/brand.md. Change both together. The light screen is a slate-50 canvas
+ * (#F8FAFC) so white cards lift off it; success / warning follow the web's
+ * status badges (emerald / amber 600 light, 400 dark).
+ */
+@layer theme {
+  :root {
+    @variant light {
+      --color-background: #f8fafc;
+      --color-foreground: #141527;
+      --color-card: #ffffff;
+      --color-card-foreground: #141527;
+      --color-primary: #2e358c;
+      --color-primary-foreground: #ffffff;
+      --color-secondary: #f1f5f9;
+      --color-secondary-foreground: #141527;
+      --color-muted: #f1f5f9;
+      --color-muted-foreground: #62748e;
+      --color-accent: #ecedf8;
+      --color-accent-foreground: #2e358c;
+      --color-destructive: #e7000b;
+      --color-border: #e2e8f0;
+      --color-ring: #5a62c4;
+      --color-success: #009966;
+      --color-warning: #e17100;
+      /* Wordmark letters (ink on light, white on dark). */
+      --color-brand-glyph: #141527;
+    }
+
+    @variant dark {
+      --color-background: #020618;
+      --color-foreground: #f8fafc;
+      --color-card: #0f172b;
+      --color-card-foreground: #f8fafc;
+      --color-primary: #8e95ec;
+      --color-primary-foreground: #141527;
+      --color-secondary: #1d293d;
+      --color-secondary-foreground: #f8fafc;
+      --color-muted: #1d293d;
+      --color-muted-foreground: #90a1b9;
+      --color-accent: #22264a;
+      --color-accent-foreground: #c7caf6;
+      --color-destructive: #ff6467;
+      --color-border: #ffffff1a;
+      --color-ring: #7c83e0;
+      --color-success: #00d492;
+      --color-warning: #ffb900;
+      --color-brand-glyph: #ffffff;
+    }
+  }
+}
+
+@theme {
+  /* Brand indigo and ink, the same in both modes (docs/brand.md). */
+  --color-brand: #2e358c;
+  --color-brand-light: #8e95ec;
+  /* The panel sidebar's ink card: hero cards keep it in both modes. */
+  --color-ink: #141527;
+  --color-ink-accent: #22264a;
+  --color-ink-foreground: #c7caf6;
+  /* Panel radius is 1.125rem (18 px) for cards; controls a step tighter. */
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-sheet: 24px;
+  /* Plus Jakarta Sans, one family per weight (src/core/fonts.ts loads them). */
+  --font-sans: 'PlusJakartaSans_400Regular';
+  --font-sans-medium: 'PlusJakartaSans_500Medium';
+  --font-sans-semibold: 'PlusJakartaSans_600SemiBold';
+  --font-sans-bold: 'PlusJakartaSans_700Bold';
+}
