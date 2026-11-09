@@ -7,6 +7,7 @@ import tr_nav from './locales/tr/nav.json';
 import tr_settings from './locales/tr/settings.json';
 import tr_today from './locales/tr/today.json';
 import tr_update from './locales/tr/update.json';
+import tr_uploads from './locales/tr/uploads.json';
 import tr_errors from '../../../../frontend/src/locales/tr/errors.json';
 import en_common from './locales/en/common.json';
 import en_auth from './locales/en/auth.json';
@@ -15,11 +16,12 @@ import en_nav from './locales/en/nav.json';
 import en_settings from './locales/en/settings.json';
 import en_today from './locales/en/today.json';
 import en_update from './locales/en/update.json';
+import en_uploads from './locales/en/uploads.json';
 import en_errors from '../../../../frontend/src/locales/en/errors.json';
 
-export const NAMESPACES = ['common', 'auth', 'field_tasks', 'nav', 'settings', 'today', 'update', 'errors'] as const;
+export const NAMESPACES = ['common', 'auth', 'field_tasks', 'nav', 'settings', 'today', 'update', 'uploads', 'errors'] as const;
 
 export const resources = {
-  tr: { common: tr_common, auth: tr_auth, field_tasks: tr_field_tasks, nav: tr_nav, settings: tr_settings, today: tr_today, update: tr_update, errors: tr_errors },
-  en: { common: en_common, auth: en_auth, field_tasks: en_field_tasks, nav: en_nav, settings: en_settings, today: en_today, update: en_update, errors: en_errors },
+  tr: { common: tr_common, auth: tr_auth, field_tasks: tr_field_tasks, nav: tr_nav, settings: tr_settings, today: tr_today, update: tr_update, uploads: tr_uploads, errors: tr_errors },
+  en: { common: en_common, auth: en_auth, field_tasks: en_field_tasks, nav: en_nav, settings: en_settings, today: en_today, update: en_update, uploads: en_uploads, errors: en_errors },
 };

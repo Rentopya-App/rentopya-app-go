@@ -152,8 +152,10 @@ export function createAuthFetch(d: AuthFetchDeps) {
     const noRetry = NO_RETRY_PATHS.some((p) => path.startsWith(p));
     const retry = noRetry ? null : request.clone();
     // The organization of this call, fixed before any await so a switch mid-flight
-    // never sends one organization's request with another's header.
-    const organization = d.getOrganization();
+    // never sends one organization's request with another's header. A caller that names
+    // its organization keeps it (the upload queue sends each job for the organization it was
+    // captured in); typed calls name the picked one through `orgHeader()`.
+    const organization = request.headers.get('X-Organization') || d.getOrganization();
 
     const t = d.getTokens();
     if (t && !noRetry && t.accessExpiresAt - now() < REFRESH_MARGIN_MS) await refreshTokens();

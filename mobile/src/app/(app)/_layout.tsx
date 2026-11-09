@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSession } from '@/core/auth/session';
+import { useUploadWorker } from '@/features/uploads';
 import { toast } from '@/ui/toast';
 
 /**
@@ -16,6 +17,7 @@ export default function AppLayout() {
   const { t } = useTranslation();
   const hasOrganization = useSession((s) => !!s.organization);
   const lost = useSession((s) => s.lostOrganization);
+  useUploadWorker();
 
   useQuery({
     queryKey: ['me'],
