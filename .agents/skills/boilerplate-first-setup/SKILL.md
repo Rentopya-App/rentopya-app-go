@@ -109,7 +109,7 @@ Browser must **never** assemble S3 URLs from object keys. Use API-returned `publ
 
 ## 7. Production / Dokploy
 
-1. `make prod-env` (asks the app URL, generates every secret into `.env.server`), or fill it by hand from `.env.server.example`; every `${VAR:?…}` in `compose.prod.yml` is required
+1. `make prod-env` (asks the app URL, generates every secret into `.env.server`), `.env.server.example` (generated from the schema, never hand-edited) lists every key; `make prod-env-check` verifies the file; every `${VAR:?…}` in `compose.prod.yml` is required
 2. `make prod-config` then `make prod-up`
 3. Plain Docker host only: `docker network create dokploy-network` (once; Dokploy creates it itself)
 

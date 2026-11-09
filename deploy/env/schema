@@ -1,22 +1,36 @@
-# Production env schema, read by scripts/prod-env.sh.
-#
-# One managed key per line:  KEY | rule
-#   ask:APP_URL         asked once (the only question); everything else derives from it
-#   derive:<template>   {APP_HOST} (host of APP_URL) and {KEY} of any key above it are substituted
-#   const:<value>       fixed default
-#   secret:<kind>:<n>   random value; kind = hex (n bytes), alnum (n chars), b64 (n bytes)
-#   vapid:public / vapid:private   Web Push key pair (generated together)
-#   empty               optional, left blank for the operator to fill in
-#
-# Upgrades keep every existing value. Only missing keys are generated, so
-# secrets (DB_PASSWORD, APP_ENCRYPTION_KEY, ...) never change once deployed.
-#
-# Schema changes:
-#   bump @version, add new keys at the end of their section,
-#   rename with  @rename OLD NEW <version>,  retire with  @remove KEY <version>.
-#   Never change the rule of an existing secret: running installs keep theirs anyway.
+## deploy/env/schema — single source of truth for the production env (.env.server).
+## Tooling: scripts/prod-env.sh init | upgrade | check | example. Design: docs/design/env-core.md.
+##
+## "##" lines are schema-only notes. "# ---" lines start a section; other "#"
+## lines are operator notes copied into generated files (.env.server and
+## .env.server.example), so write them for operators.
+##
+## One managed key per line:  KEY | rule
+##   ask:APP_URL         asked once (the only question); everything else derives from it
+##   derive:<template>   {APP_HOST} (host of APP_URL) and {KEY} of any key above it are substituted
+##   const:<value>       fixed default
+##   secret:<kind>:<n>   random value; kind = hex (n bytes), alnum (n chars), b64 (n bytes)
+##   vapid:public / vapid:private   Web Push key pair (generated together)
+##   empty               optional, left blank for the operator to fill in
+##
+## Upgrades keep every existing value. Only missing keys are generated, so
+## secrets (DB_PASSWORD, APP_ENCRYPTION_KEY, ...) never change once deployed.
+##
+## Schema changes (docs/EXTENDING.md → "Environment variables"):
+##   bump @version, add new keys at the end of their section,
+##   rename with  @rename OLD NEW <version>,  retire with  @remove KEY <version>.
+##   Never change the rule of an existing secret: running installs keep theirs anyway.
+##   Then regenerate: scripts/prod-env.sh example > .env.server.example, and
+##   give the key a local default in .env.example (make env-check verifies both).
+##   A new backend `secret:` key also needs a row in backend/internal/config/guard.go.
+##
+## Keys left out here keep their compose.prod.yml defaults (tunables such as
+## LOG_FORMAT, QUEUE_CONCURRENCY, TENANCY_CACHE_TTL); .env.example documents them.
+## Provider credentials (iyzico, Netgsm, e-invoice integrator, KABİS, HGS,
+## Yolcu360, Obilet, WhatsApp sessions) are per organization, sealed in the
+## integration vault: never add env keys for them.
 
-@version 10
+@version 11
 
 # --- Identity / Docker ---
 NAME_PREFIX | const:rentopia
@@ -88,6 +102,8 @@ FRONTEND_SENTRY_DSN | empty
 SITE_SENTRY_DSN | empty
 SENTRY_ENVIRONMENT | empty
 SENTRY_RELEASE | empty
+# Share of backend HTTP requests sent as performance transactions (0 = off).
+SENTRY_TRACES_SAMPLE_RATE | const:0
 
 # --- Payments (TEC-707; merchant keys are per organization, in the panel) ---
 IYZICO_SANDBOX_BASE_URL | const:https://sandbox-api.iyzipay.com
@@ -114,6 +130,8 @@ ALERT_EMAIL | empty
 WUZAPI_IMAGE | const:asternic/wuzapi:latest
 WUZAPI_ADMIN_TOKEN | secret:hex:32
 WUZAPI_ENCRYPTION_KEY | secret:alnum:32
+# Device name shown in the linked-devices list of each organization's phone.
+WUZAPI_DEVICE_NAME | const:Rentopya
 
 # --- Verified custom site domains (TEC-731) ---
 SITE_DOMAIN_TARGET_HOST | empty
@@ -142,3 +160,18 @@ BACKUP_OFFSITE_REGION | empty
 BACKUP_OFFSITE_BUCKET | empty
 BACKUP_OFFSITE_ACCESS_KEY | empty
 BACKUP_OFFSITE_SECRET_KEY | empty
+
+# --- Mobile app (all optional; empty = feature off) ---
+# AUTH_REVIEW_ACCOUNTS=email:code,... fixed sign-in codes for App Store / Play review.
+AUTH_REVIEW_ACCOUNTS | empty
+AUTH_APPLE_NATIVE_CLIENT_IDS | empty
+AUTH_GOOGLE_NATIVE_CLIENT_IDS | empty
+# Sign in with Apple key fallback; prefer uploading the .p8 in Platform → Integrations → Apple.
+AUTH_APPLE_TEAM_ID | empty
+AUTH_APPLE_KEY_ID | empty
+AUTH_APPLE_PRIVATE_KEY | empty
+# QR sign-in location: trust edge geo headers only behind Cloudflare; optional GeoLite2 .mmdb path.
+AUTH_QR_TRUST_GEO_HEADERS | const:false
+AUTH_QR_GEOIP_DB | empty
+# Expo Push Service token (only with Expo "enhanced push security").
+EXPO_ACCESS_TOKEN | empty

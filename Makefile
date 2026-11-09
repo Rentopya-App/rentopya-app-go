@@ -19,7 +19,7 @@ endef
 FRONTEND_PORT ?= 3000
 
 .PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev site-dev local-dev \
-	free-dev-ports prod-env prod-env-upgrade prod-env-check prod-sync prod-super-admin prod-config prod-up prod-down \
+	free-dev-ports prod-env prod-env-upgrade prod-env-check env-check compose-env-check prod-sync prod-super-admin prod-config prod-up prod-down \
 	prod-backup prod-backup-status tools create-super-admin search-reindex check-i18n \
 	messaging-reconcile prod-messaging-reconcile integration-jobs-reconcile prod-integration-jobs-reconcile \
 	acceptance acceptance-backend acceptance-e2e acceptance-stack-up acceptance-stack-down
@@ -119,6 +119,7 @@ local-dev: infra
 	$(MAKE) frontend-dev & \
 	wait
 
+# Production env from deploy/env/schema (docs/design/env-core.md).
 prod-env:
 	scripts/prod-env.sh init -o $(PROD_ENV_FILE)
 
@@ -127,6 +128,18 @@ prod-env-upgrade:
 
 prod-env-check:
 	scripts/prod-env.sh check $(PROD_ENV_FILE)
+
+# CI check (job `env`): .env.server.example matches the schema, .env.example has
+# every schema key and documents every compose.prod.yml variable, prod-env tests
+# pass. Fix drift: scripts/prod-env.sh example > .env.server.example
+env-check: compose-env-check
+	scripts/check-env-sync.sh
+
+# CI check: every env var the backend reads reaches the backend/worker
+# containers in compose.prod.yml, or has a decision in deploy/env/compose-env.allow.
+compose-env-check:
+	scripts/check-compose-env.sh
+	scripts/check-compose-env.test.sh
 
 prod-sync:
 	scripts/server-sync.sh
