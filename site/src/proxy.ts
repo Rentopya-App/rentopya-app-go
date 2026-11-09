@@ -17,7 +17,7 @@ import {
   previewCookieOptions,
   previewToken,
 } from "@/lib/preview";
-import { PATH_HEADER, clientIpFrom } from "@/lib/request";
+import { PATH_HEADER, forwardedForFrom } from "@/lib/request";
 import { resolveSite } from "@/lib/resolve";
 import {
   SESSION_COOKIE,
@@ -60,7 +60,7 @@ const plainPage = (status: number, title: string, body: string) => {
  * renders the draft instead; only the panel may frame such a page.
  */
 export async function proxy(request: NextRequest) {
-  const ip = clientIpFrom(request.headers);
+  const ip = forwardedForFrom(request.headers);
   const embed =
     request.nextUrl.pathname === "/embed" ||
     request.nextUrl.pathname.startsWith("/embed/");

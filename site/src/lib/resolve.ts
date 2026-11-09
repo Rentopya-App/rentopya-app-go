@@ -26,12 +26,12 @@ export function hostKey(raw: string | null | undefined): string {
  */
 export async function resolveSite(
   rawHost: string | null | undefined,
-  clientIp?: string,
+  forwardedFor?: string,
   preview?: string,
 ): Promise<Site | null> {
   const host = hostKey(rawHost);
   if (!host) return null;
-  if (preview) return resolvePreview(host, preview, clientIp);
+  if (preview) return resolvePreview(host, preview, forwardedFor);
   const now = Date.now();
   const hit = cache.get(host);
   if (hit && hit.expires > now) return hit.site;
@@ -40,7 +40,7 @@ export async function resolveSite(
   try {
     site = await apiFetch<Site>(
       `/v1/public/site/resolve?host=${encodeURIComponent(host)}`,
-      { clientIp },
+      { forwardedFor },
     );
   } catch (err) {
     if (
@@ -73,12 +73,12 @@ export async function resolveSite(
 async function resolvePreview(
   host: string,
   token: string,
-  clientIp?: string,
+  forwardedFor?: string,
 ): Promise<Site | null> {
   try {
     return await apiFetch<Site>(
       `/v1/public/site/resolve?host=${encodeURIComponent(host)}&preview=${encodeURIComponent(token)}`,
-      { clientIp },
+      { forwardedFor },
     );
   } catch (err) {
     if (err instanceof ApiError && (err.status === 404 || err.status === 400)) {

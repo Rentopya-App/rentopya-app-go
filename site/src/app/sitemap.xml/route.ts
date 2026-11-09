@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { ApiError, apiFetch } from "@/lib/api";
-import { clientIpFrom } from "@/lib/request";
+import { forwardedForFrom } from "@/lib/request";
 import { resolveSite } from "@/lib/resolve";
 import { buildSitemapXml, type SitemapEntry } from "@/lib/sitemap";
 
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * origin. Unknown hosts and unpublished sites answer 404.
  */
 export async function GET(request: NextRequest) {
-  const ip = clientIpFrom(request.headers);
+  const ip = forwardedForFrom(request.headers);
   const site = await resolveSite(request.headers.get("host"), ip).catch(
     () => null,
   );
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     entries = await apiFetch<SitemapEntry[]>(
       `/v1/public/site/sitemap?host=${encodeURIComponent(site.host)}`,
-      { clientIp: ip },
+      { forwardedFor: ip },
     );
   } catch (err) {
     return new Response(null, {

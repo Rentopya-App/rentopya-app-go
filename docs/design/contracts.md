@@ -192,7 +192,7 @@ GET  /v1/public/documents/{token}/pdf        the approval PDF of this link's app
   4. The verified challenge must belong to the link's number (`phone_hash`) and be newer than the link.
   5. One transaction locks the document and the link (`FOR UPDATE`) and checks that the version is still current and the link still pending. A version superseded between page load and verify answers 409 `CONTENT_CHANGED`. Then:
      - the version is approved (conditional on the hash);
-     - the `remote_sms` approval is inserted: verified number, person, version and hash, time, IP from `X-Forwarded-For`, user agent;
+     - the `remote_sms` approval is inserted: verified number, person, version and hash, time, client IP (resolved by `platform/clientip`: `X-Forwarded-For` only behind a trusted proxy), user agent;
      - the link becomes `approved` and the document `approved`;
      - the reservation and rental timelines get `document_approved` (or `terms_approved`).
   6. Activity `documents.remote_approved` is written, with the IP and user agent in the event columns.
@@ -242,4 +242,4 @@ RT-A01 (`httpserver/isolation_test.go`) seeds a revoked link and an in-person ap
 
 - The click and signature-pad methods and a qualified e-signature (NES) integration are not built.
 - Notification templates could send the link automatically; today staff send it.
-- The recorded IP is the first `X-Forwarded-For` hop, which the BFF sets. Behind other proxies, configure them to pass the client address.
+- The recorded IP is resolved by `platform/clientip`: `X-Forwarded-For` is believed only when the direct peer is a trusted proxy (`TRUSTED_PROXIES`, default loopback + private ranges) and the right-most untrusted hop wins. The BFF forwards the chain it received from Traefik. Behind other proxies, add them to `TRUSTED_PROXIES`.

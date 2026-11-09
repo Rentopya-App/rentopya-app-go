@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	orgusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/organizations/usecase"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/authctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/bulkengine"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/clientip"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/resourceevents"
@@ -298,11 +298,10 @@ func (h *Handler) recordAccepted(r *http.Request, actor *int64, result orgmodel.
 	}
 }
 
+// clientIP is the address resolved by clientip.Middleware; the raw
+// RemoteAddr would be the BFF's (one shared register bucket).
 func clientIP(r *http.Request) string {
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		return host
-	}
-	return r.RemoteAddr
+	return clientip.From(r)
 }
 
 // --- organization profile (name + logo) ---------------------------------------
