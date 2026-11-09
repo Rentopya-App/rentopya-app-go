@@ -22,10 +22,7 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": [
-              "CA92.1",
-              "1C8F.1"
-            ]
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1", "1C8F.1"]
           }
         ]
       }
@@ -65,23 +62,28 @@
       [
         "expo-localization",
         {
-          "supportedLocales": [
-            "tr",
-            "en"
-          ]
+          "supportedLocales": ["tr", "en"]
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Rentopya uses the camera to scan vehicle QR labels and plates.",
+          "cameraPermission": "Rentopya uses the camera to scan vehicle QR labels and plates and to photograph the vehicle and its damage at handover and return.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
       ],
       "expo-sqlite",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Rentopya uses the camera to scan vehicle QR labels and plates and to photograph the vehicle and its damage at handover and return.",
+          "photosPermission": "Rentopya uses your photo library to attach vehicle photos taken earlier to a handover or return form.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
