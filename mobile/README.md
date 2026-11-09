@@ -9,7 +9,7 @@ taken from.
 
 So far: sign-in (e-mail + password, 2FA code, Sign in with Apple and Google
 when configured), the organization picker, the branch filter, permission
-checks, a placeholder home tab and the menu (company, branch, account,
+checks, the "Bugün" home tab (today's handovers, returns, overdue returns and KPIs from `/v1/tenant/overview`, with read-only rental and reservation summaries) and the menu (company, branch, account,
 language, appearance, version). Module screens come next.
 
 The app calls the Go API directly: `<EXPO_PUBLIC_API_URL>/v1/*` with its own
@@ -68,7 +68,7 @@ src/
     (app)/             signed in: organizations (picker), (org)/(tabs) once one is picked
   core/                no UI: config, i18n, storage, preferences, query client, formatting, OTA,
                        api/ (typed client, refresh, errors), auth/ (tokens, session, permissions), tenant, branch
-  features/            screens, one folder per area (shell, home, settings, auth)
+  features/            screens, one folder per area (shell, today, settings, auth)
   ui/                  design system (tokens in src/global.css mirror the panel theme)
 app-intents/  modules/  plugins/  patches/  targets/   native scaffolds, empty for now (README in each)
 ```
