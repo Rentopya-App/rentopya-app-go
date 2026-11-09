@@ -83,7 +83,8 @@
           "photosPermission": "Rentopya uses your photo library to attach vehicle photos taken earlier to a handover or return form.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "./plugins/with-xcode-cloud"
     ],
     "experiments": {
       "typedRoutes": true,

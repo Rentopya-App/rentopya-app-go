@@ -19,6 +19,7 @@ index at `https://docs.expo.dev/llms.txt`).
 - Tokens only in `expo-secure-store` (`core/auth/tokens.ts`); never AsyncStorage, sqlite or logs.
 - New text: a key in both `src/core/i18n/locales/tr` and `en` (`npm run i18n:check`, also covered by `npm test`).
 - New icon: `sf`, `md` and `lucide` in `src/ui/icons.ts`, then `npm run icons:gen`.
-- Never run `eas init`, `eas build`, `eas submit` or `eas update`; the owner does (README → Owner TODO).
+- Never run `eas init`, `eas build`, `eas submit` or `eas update`, and never push `ios-build-*` tags; CI or the owner does (`docs/OTA.md`).
+- Release: store values live in `release.env` (shared by the release job, EAS and Xcode Cloud). Xcode Cloud scripts are edited in `scripts/xcode-cloud/` and copied to `ios/ci_scripts/` (the only tracked part of `ios/`); `../scripts/ci/mobile-release.test.sh` checks both.
 - Before saying done: `npm run typecheck && npm run lint && npm run i18n:check && npm test && npm run api:check && npx expo-doctor`.
 - No AI attribution in commits, PRs, comments or docs (same as the root rules).

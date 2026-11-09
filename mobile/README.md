@@ -118,22 +118,20 @@ Rules (the same as the Takwim app):
 
 ## Release
 
-Store builds run on EAS (`eas.json`: `development`, `preview`, `production`
-profiles, a channel each, build numbers on EAS with `appVersionSource:
-remote`). Versions: `version` in `app.json` is the marketing version. OTA:
-JS-only changes ship with `eas update --channel <profile>`; the runtime
-version uses the `fingerprint` policy.
+Full flow, required secrets and the owner checklist: [`docs/OTA.md`](docs/OTA.md).
+
+- Profiles in `eas.json`: `development`, `preview` and `production`, one channel each. Build numbers live on EAS (`appVersionSource: remote`). `version` in `app.json` is the marketing version. The runtime version uses the `fingerprint` policy.
+- **CI ships it.** On a green `main` push that changed `mobile/`, the `mobile-release` job looks at the native fingerprint. If it is unchanged, the job sends an OTA (`eas update --channel production`). If it changed, the job starts an Android EAS build with auto submit to Play internal (draft), and pushes the tag `ios-build-<hash12>` so that Xcode Cloud builds iOS for TestFlight. The job is skipped until the repo variable `MOBILE_RELEASE_ENABLED` is `true`. Manual run, dry run by default: Actions → Mobile release.
+- Store values (`EXPO_PUBLIC_APP_ENV`, `EXPO_PUBLIC_API_MODE`, the native sign-in switches) live in `release.env`. The release job, the EAS `production` environment and Xcode Cloud (`ios/ci_scripts`, source `scripts/xcode-cloud/`) must all have these same values, and the release refuses to ship otherwise.
 
 ### Owner TODO (once, needs the Expo and store accounts)
 
-1. `npx eas-cli@latest init` in `mobile/`: writes `extra.eas.projectId` into
-   `app.json`. Then `npx eas-cli@latest update:configure` (writes `updates.url`).
-2. EAS environment variables per profile (`eas env:create`):
-   `EXPO_PUBLIC_API_URL=https://<api host>` and `EXPO_PUBLIC_WEB_URL=https://<panel host>`.
-3. iOS: create the identifier `com.rentopya.app` (team `N5T7KH96U3`) and the
-   App Store Connect record, put its `ascAppId` under `submit.production.ios`
-   in `eas.json`, and let `eas credentials -p ios` create the certificate and
-   an ASC API key.
-4. Android: create the Play Console app `com.rentopya.app` and upload a
-   service account key with `eas credentials -p android`. The first Android
-   upload is done by hand in Play Console; after that `eas submit` works.
+Summary; the details are in `docs/OTA.md` → Owner checklist.
+
+1. `npx eas-cli@latest init` in `mobile/`. It writes `extra.eas.projectId` into `app.json`; commit it. `app.config.js` derives the update URL from it.
+2. Repo secret `EXPO_TOKEN` (Expo robot token).
+3. EAS `production` environment, as plain text or sensitive values: `EXPO_PUBLIC_APP_ENV=production`, `EXPO_PUBLIC_API_MODE=live`, `EXPO_PUBLIC_API_URL=https://<api host>`, `EXPO_PUBLIC_WEB_URL=https://<panel host>`, plus the sign-in values, which must equal `release.env`.
+4. iOS: the identifier `com.rentopya.app` (team `N5T7KH96U3`) and the App Store Connect record. Put its `ascAppId` under `submit.production.ios` in `eas.json`.
+5. Xcode Cloud workflow on `mobile/ios`: start condition **Tag Changes** `ios-build-*`, Archive, then TestFlight. Environment `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WEB_URL`, the same values as in EAS.
+6. Android: the Play Console app `com.rentopya.app`, and a service account key uploaded with `eas credentials -p android`. Upload the first build by hand.
+7. Repo variable `MOBILE_RELEASE_ENABLED=true` once Xcode Cloud listens for the tags.

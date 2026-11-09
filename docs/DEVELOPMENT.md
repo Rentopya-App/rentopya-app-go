@@ -200,8 +200,9 @@ Any `backend/docs/openapi.yaml` change (descriptions too) regenerates the mobile
 
 `.github/workflows/ci.yml` runs on every branch push (and by hand via `workflow_dispatch`). All jobs run on `ubuntu-24.04`.
 
-- `changes` diffs the branch against its merge-base with `main` and decides which area jobs run: `backend` (sqlc up to date, `go vet`, golangci-lint v2, migrations + `go test` against Postgres, OpenAPI lint), `frontend`, `site`, `env` + `prod-env`, `mobile` (only on `mobile/**`). Docs and `*.md` changes run nothing heavy. Everything runs on a `main` push, a manual run, a change under `.github/workflows/`, or a head commit message containing `[ci-full]`.
+- `changes` diffs the branch against its merge-base with `main` and decides which area jobs run: `backend` (sqlc up to date, `go vet`, golangci-lint v2, migrations + `go test` against Postgres, OpenAPI lint), `frontend`, `site`, `env` + `prod-env`, `mobile` (on `mobile/**`, `backend/docs/openapi.yaml` and the release scripts: typecheck, lint, tests, `npm run api:check` so stale mobile API types fail, expo-doctor, `scripts/ci/mobile-release.test.sh`). Docs and `*.md` changes run nothing heavy. Everything runs on a `main` push, a manual run, a change under `.github/workflows/`, or a head commit message containing `[ci-full]`.
 - `commit-policy` always runs; `acceptance` runs the Go acceptance scenarios when backend or frontend ran.
+- `mobile-release` calls `.github/workflows/mobile-release.yml` (OTA or store build) only on a green `main` push that changed `mobile/` and only while the repo variable `MOBILE_RELEASE_ENABLED` is `true`; everywhere else it is skipped. Owner setup: `mobile/docs/OTA.md`.
 - `ci` is the single required status check: it fails if any needed job failed or was cancelled and treats skipped jobs as passed.
 - Caches: Go modules/build (`setup-go`), the pnpm store (frontend, site), npm (mobile) and golangci-lint's own cache.
 
