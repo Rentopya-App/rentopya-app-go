@@ -174,3 +174,12 @@ make -C backend sqlc
 make -C backend openapi-lint
 cd frontend && pnpm api:generate && pnpm typecheck
 ```
+
+## CI
+
+`.github/workflows/ci.yml` runs on every branch push (and by hand via `workflow_dispatch`). All jobs run on `ubuntu-24.04`.
+
+- `changes` diffs the branch against its merge-base with `main` and decides which area jobs run: `backend` (sqlc up to date, `go vet`, golangci-lint v2, migrations + `go test` against Postgres, OpenAPI lint), `frontend`, `site`, `env` + `prod-env`, `mobile` (only on `mobile/**`). Docs and `*.md` changes run nothing heavy. Everything runs on a `main` push, a manual run, a change under `.github/workflows/`, or a head commit message containing `[ci-full]`.
+- `commit-policy` always runs; `acceptance` runs the Go acceptance scenarios when backend or frontend ran.
+- `ci` is the single required status check: it fails if any needed job failed or was cancelled and treats skipped jobs as passed.
+- Caches: Go modules/build (`setup-go`), the pnpm store (frontend, site), npm (mobile) and golangci-lint's own cache.
