@@ -42,6 +42,8 @@ export const MATERIAL_SYMBOLS: Record<string, number> = {
   open_in_new: 0xe89e,
   person: 0xe7fd,
   qr_code_scanner: 0xf206,
+  photo_camera: 0xe412,
+  photo_library: 0xe413,
   refresh: 0xe5d5,
   remove: 0xe15b,
   schedule: 0xe8b5,
