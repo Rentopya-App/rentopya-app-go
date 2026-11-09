@@ -1,0 +1,13 @@
+{
+  "title": "Menu",
+  "section_account": "Account",
+  "sign_in": "Sign in",
+  "section_app": "App",
+  "language": "Language",
+  "theme": "Appearance",
+  "theme_system": "System",
+  "theme_light": "Light",
+  "theme_dark": "Dark",
+  "section_about": "About",
+  "version": "Version"
+}
