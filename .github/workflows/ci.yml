@@ -7,7 +7,7 @@ on:
   push:
     branches: ["**"]
   # Manual run of the acceptance job with the Playwright scenarios
-  # (docs/acceptance/beta.md); the other jobs run as on a push.
+  # (docs/acceptance/beta.md); every other job runs as on a full push.
   workflow_dispatch:
     inputs:
       e2e:
@@ -17,12 +17,129 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Feature branches: newest push wins. main: never cancel mid-run.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Path filter. Plain `git diff` (no third-party action) decides which area
+  # jobs run; the outputs gate every job below except commit-policy.
+  #
+  # Diff base: a feature branch is diffed as a whole against its merge-base
+  # with main (not the previous push), so a docs-only push after a red one
+  # still re-tests the branch. Everything runs on: a main push, a
+  # workflow_dispatch, a head commit carrying [ci-full], a change under
+  # .github/workflows/, or when the merge-base cannot be found.
+  #
+  # Mapping (first match wins; case globs, `*` spans '/'):
+  #   backend/docs/openapi.yaml          -> backend, frontend, env
+  #   backend/**  (non-.md)              -> backend, env (env reads)
+  #   frontend/**, scripts/check-i18n.mjs-> frontend
+  #   site/**                            -> site
+  #   mobile/**                          -> mobile
+  #   deploy/**, compose.*.yml, .env*.example, scripts/{prod-env,check-*env*}
+  #                                      -> env
+  #   Makefile                           -> backend (acceptance targets)
+  #   docs/**, *.md, .agents/**, .claude/**, other .github/**, landing-video/**,
+  #   llms.txt, .gitignore, .mcp.json    -> nothing
+  #   anything else                      -> backend, frontend, site, env
+  # ---------------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      backend: ${{ steps.f.outputs.backend }}
+      frontend: ${{ steps.f.outputs.frontend }}
+      site: ${{ steps.f.outputs.site }}
+      env: ${{ steps.f.outputs.env }}
+      mobile: ${{ steps.f.outputs.mobile }}
+      workflows: ${{ steps.f.outputs.workflows }}
+      full: ${{ steps.f.outputs.full }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: f
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          backend=false; frontend=false; site=false; env=false
+          mobile=false; workflows=false; full=false
+          files=""
+
+          if [ "$EVENT" != "push" ] || [ "$REF" = "refs/heads/main" ]; then
+            full=true
+          elif grep -qF '[ci-full]' <<<"$HEAD_MSG"; then
+            echo "[ci-full] in the head commit message: running everything."
+            full=true
+          else
+            base=""
+            if git fetch --no-tags --quiet origin main 2>/dev/null; then
+              base="$(git merge-base FETCH_HEAD "$SHA" 2>/dev/null || true)"
+            fi
+            if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              echo "No merge-base with main: running everything."
+              full=true
+            else
+              files="$(git diff --name-only "$base" "$SHA")"
+              echo "Changed files since ${base::7}:"
+              printf '%s\n' "$files"
+            fi
+          fi
+
+          if [ -n "$files" ]; then
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              case "$file" in
+                .github/workflows/*) workflows=true; full=true ;;
+              esac
+            done <<< "$files"
+          fi
+
+          if [ "$full" != "true" ] && [ -n "$files" ]; then
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              case "$file" in
+                backend/docs/openapi.yaml)           backend=true; frontend=true; env=true ;;
+                docs/*|*.md|.agents/*|.claude/*|.github/*|landing-video/*|llms.txt|.gitignore|.mcp.json)
+                                                     : ;;   # nothing (before app dirs: backend/*.md is docs)
+                backend/*)                           backend=true; env=true ;;
+                frontend/*|scripts/check-i18n.mjs)   frontend=true ;;
+                site/*)                              site=true ;;
+                mobile/*)                            mobile=true ;;
+                deploy/*|compose.*.yml|.env*.example|scripts/prod-env*|scripts/check-env-sync.sh|scripts/check-compose-env*)
+                                                     env=true ;;
+                Makefile)                            backend=true ;;
+                *)                                   backend=true; frontend=true; site=true; env=true ;;
+              esac
+            done <<< "$files"
+          fi
+
+          if [ "$full" = "true" ]; then
+            backend=true; frontend=true; site=true; env=true; mobile=true
+          fi
+
+          {
+            echo "backend=$backend"
+            echo "frontend=$frontend"
+            echo "site=$site"
+            echo "env=$env"
+            echo "mobile=$mobile"
+            echo "workflows=$workflows"
+            echo "full=$full"
+          } >> "$GITHUB_OUTPUT"
+          echo "backend=$backend frontend=$frontend site=$site env=$env mobile=$mobile workflows=$workflows full=$full" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   # Project rule (AGENTS.md): no AI attribution in commit messages.
   commit-policy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Reject AI attribution in pushed commit messages
         env:
@@ -35,7 +152,9 @@ jobs:
 
   # deploy/env/schema must produce a complete env for compose.prod.yml.
   prod-env:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.env == 'true'
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Generate env from schema and validate prod compose
@@ -49,7 +168,9 @@ jobs:
   # every env var the backend reads reaches compose.prod.yml (or has a decision
   # in deploy/env/compose-env.allow). Local: make env-check
   env:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.env == 'true'
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Env schema sync
@@ -60,15 +181,17 @@ jobs:
           scripts/check-compose-env.test.sh
 
   backend:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
-    # Database tests (tenant isolation, module integration tests) skip without
-    # TEST_DATABASE_URL. They expect an already migrated database; tests that
-    # need a private copy (dbtest.FreshDatabase) create one on the same server,
-    # so the role needs CREATEDB (the image's POSTGRES_USER is a superuser).
-    # Same Postgres major as compose.prod.yml.
+    # Database tests (tenant isolation RT-A01, module integration tests) skip
+    # without TEST_DATABASE_URL. They expect an already migrated database;
+    # tests that need a private copy (dbtest.FreshDatabase) create one on the
+    # same server, so the role needs CREATEDB (the image's POSTGRES_USER is a
+    # superuser). Same Postgres major as compose.prod.yml.
     services:
       postgres:
         image: postgres:18-alpine
@@ -98,12 +221,21 @@ jobs:
       - uses: sqlc-dev/setup-sqlc@v5
         with:
           sqlc-version: "1.31.1"
-      - name: sqlc generate
-        run: sqlc generate
+      - name: sqlc generate is up to date
+        run: |
+          sqlc generate
+          if ! git diff --exit-code -- . || [ -n "$(git status --porcelain -- .)" ]; then
+            echo "::error title=Stale sqlc output::Run 'sqlc generate' in backend/ and commit internal/database/db."
+            exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      # Pinned to the version `latest` resolved to before (keeps lint results
+      # stable); bump deliberately. The action caches its own results.
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.15.0
           working-directory: backend
       # Same golang-migrate image and version as backend/Dockerfile (prod's
       # migrate role); keep the two in step.
@@ -113,13 +245,17 @@ jobs:
           -v "$PWD/migrations:/migrations:ro"
           migrate/migrate:v4.19.1
           -path /migrations -database "$TEST_DATABASE_URL" up
+      # Includes the query isolation guard, the OpenAPI route check
+      # (internal/httpserver/docs_test.go) and RT-A01.
       - name: Test
         run: go test ./...
       - name: OpenAPI lint
         run: npx --yes @redocly/cli@1 lint docs/openapi.yaml
 
   frontend:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -148,7 +284,9 @@ jobs:
   # Branded site app (TEC-729): its own image (site/Dockerfile), built by
   # Dokploy from compose.prod.yml like backend and frontend.
   site:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: site
@@ -175,14 +313,66 @@ jobs:
       - name: Build
         run: pnpm build
 
+  # Expo app (mobile/). Verification only: no secrets, never a release.
+  # Skips green until mobile/package.json exists.
+  mobile:
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+      - id: guard
+        working-directory: .
+        run: |
+          if [ -f mobile/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Mobile CI skipped: \`mobile/package.json\` does not exist yet." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: steps.guard.outputs.present == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ hashFiles('mobile/.nvmrc') != '' && 'mobile/.nvmrc' || 'frontend/.nvmrc' }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install
+        if: steps.guard.outputs.present == 'true'
+        run: npm ci
+      - name: Typecheck
+        if: steps.guard.outputs.present == 'true'
+        run: npx tsc --noEmit
+      - name: Lint
+        if: steps.guard.outputs.present == 'true'
+        run: npm run lint
+      - name: Test
+        if: steps.guard.outputs.present == 'true'
+        run: npm test
+      - name: Expo doctor
+        if: steps.guard.outputs.present == 'true'
+        run: npx expo-doctor
+      # TODO(TEC-1139): once the pinned OpenAPI client generator exists, add an
+      # "api:generate is up to date" diff check on the committed mobile types.
+
   # Acceptance suite RT-A01…A32 (TEC-740, docs/acceptance/beta.md). The Go
-  # scenarios run on every push against the same Postgres as the backend
-  # job; the Playwright scenarios need the whole stack (containers, API,
-  # panel, site) and run on a manual dispatch only. Not a dependency of
-  # auto-pr: a red acceptance run is reported, it does not block merging.
+  # scenarios run against the same Postgres setup as the backend job whenever
+  # backend or frontend ran and neither failed; the Playwright scenarios need
+  # the whole stack (containers, API, panel, site) and run on a manual
+  # dispatch only. Part of the `ci` gate.
   acceptance:
-    needs: [backend, frontend]
-    runs-on: ubuntu-latest
+    needs: [changes, backend, frontend]
+    if: >-
+      always() &&
+      needs.changes.result == 'success' &&
+      ( needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' ) &&
+      needs.backend.result != 'failure' &&
+      needs.backend.result != 'cancelled' &&
+      needs.frontend.result != 'failure' &&
+      needs.frontend.result != 'cancelled'
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
       postgres:
@@ -226,6 +416,10 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.e2e
         with:
           node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: |
+            frontend/pnpm-lock.yaml
+            site/pnpm-lock.yaml
       - name: Install panel and site, Chromium
         if: github.event_name == 'workflow_dispatch' && inputs.e2e
         run: |
@@ -258,9 +452,9 @@ jobs:
             frontend/e2e/evidence/
             ${{ runner.temp }}/rentopya-e2e/playwright/report/
 
-  # Feature branch pushed and both test jobs green → open (or reuse) a PR into
-  # main and turn on auto-merge. GitHub merges once main's required checks pass.
-  # Opt out per push by putting [no-automerge] in the head commit message.
+  # Feature branch pushed and the `ci` gate green → open (or reuse) a PR into
+  # main and merge the tested commit. Opt out per push by putting
+  # [no-automerge] in the head commit message. Not part of the `ci` gate.
   # Token: repo secret AUTO_PR_TOKEN (fine-grained PAT: contents + pull
   # requests read/write) when set — merges made with it also trigger CI on
   # main. Otherwise GITHUB_TOKEN, which needs Settings → Actions → General →
@@ -276,9 +470,9 @@ jobs:
   #     github.ref_name != 'master' &&
   #     !contains(github.event.head_commit.message, '[no-automerge]')
   auto-pr:
-    needs: [commit-policy, prod-env, env, backend, frontend, site]
+    needs: [ci]
     if: false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -314,7 +508,7 @@ jobs:
       - name: Merge
         if: steps.pr.outputs.number != ''
         run: |
-          # This job only runs after backend + frontend passed, so merge right away
+          # This job only runs after the ci gate passed, so merge right away
           # (no --auto: that needs branch protection). Only merge the commit this
           # run tested: a later push (or a re-run of an older run) must never
           # merge an untested branch head.
@@ -324,3 +518,25 @@ jobs:
             exit 1
           fi
           echo "$out"
+
+  # Single required status check. Passes when every gated job is success or
+  # skipped; fails if any failed or was cancelled. Make THIS the required check
+  # in branch protection (not the individual jobs, which skip by design).
+  ci:
+    if: always()
+    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, mobile, acceptance]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Gate
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "Needed job results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error title=CI gate failed::A required job reported '$r'."; exit 1 ;;
+            esac
+          done
+          echo "All required jobs passed or were skipped."
