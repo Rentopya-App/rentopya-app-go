@@ -32,11 +32,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isApiError } from "@/lib/api";
 import { datetime } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { authService, type PasskeySummary } from "@/services/auth.service";
+import { appToast } from "@/providers/toast-provider";
 
 function PasskeyDeviceGlyph({
   deviceType,
@@ -269,11 +269,7 @@ export function PasskeyManager() {
         const list = await authService.listPasskeys();
         return list.items ?? [];
       } catch (error) {
-        toast.error(
-          isApiError(error)
-            ? error.message || t("common.error_generic")
-            : t("common.error_generic"),
-        );
+        appToast.apiError(error, t("common.error_generic"));
         throw error;
       }
     },
@@ -307,11 +303,7 @@ export function PasskeyManager() {
       toast.success(t("auth.passkey.rename_success"));
       await passkeysQuery.refetch();
     } catch (error) {
-      if (isApiError(error)) {
-        toast.error(error.message || t("common.error_generic"));
-      } else {
-        toast.error(t("common.error_generic"));
-      }
+      appToast.apiError(error, t("common.error_generic"));
     }
   };
 
@@ -322,11 +314,7 @@ export function PasskeyManager() {
       toast.success(t("auth.passkey.delete_success"));
       await passkeysQuery.refetch();
     } catch (error) {
-      if (isApiError(error)) {
-        toast.error(error.message || t("common.error_generic"));
-      } else {
-        toast.error(t("common.error_generic"));
-      }
+      appToast.apiError(error, t("common.error_generic"));
     } finally {
       setDeletingId(null);
     }

@@ -10,7 +10,6 @@ import { permissions } from "@/config/permissions";
 import { AuthSettingsForm } from "@/features/auth-settings/components/auth-settings-form";
 import type { AuthSettingsFormValues } from "@/features/auth-settings/schemas/auth-settings-form";
 import { authSettingsService } from "@/features/auth-settings/services/auth-settings.service";
-import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 import { appToast } from "@/providers/toast-provider";
@@ -44,11 +43,7 @@ export function AuthSettingsPage() {
       appToast.success(t("auth.settings.toast.saved"));
     },
     onError: (error) => {
-      if (isApiError(error)) {
-        appToast.error(error.message);
-        return;
-      }
-      appToast.error(t("auth.settings.toast.failed"));
+      appToast.apiError(error, t("auth.settings.toast.failed"));
     },
   });
 

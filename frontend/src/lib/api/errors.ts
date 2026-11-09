@@ -127,14 +127,10 @@ function localizedMessage(
   return translate(locale, httpKey);
 }
 
-export type ErrorHandler = (error: ApiError) => void;
-
-let globalErrorHandler: ErrorHandler | null = null;
-
-export function setGlobalApiErrorHandler(handler: ErrorHandler | null) {
-  globalErrorHandler = handler;
-}
-
-export function emitApiError(error: ApiError) {
-  globalErrorHandler?.(error);
-}
+export {
+  emitApiError,
+  markApiErrorShown,
+  setGlobalApiErrorHandler,
+  wasApiErrorShown,
+  type ErrorHandler,
+} from "./error-emitter";

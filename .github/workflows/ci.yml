@@ -139,6 +139,8 @@ jobs:
         run: pnpm typecheck
       - name: Lint
         run: pnpm lint
+      - name: Unit tests
+        run: pnpm test
       - name: i18n
         working-directory: .
         run: node scripts/check-i18n.mjs

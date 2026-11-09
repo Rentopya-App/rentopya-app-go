@@ -9,6 +9,7 @@ import Passkey from "next-auth/providers/passkey";
 import { NextResponse } from "next/server";
 
 import { routes } from "@/config/routes";
+import { authUrlIsHttps, usesSecureCookies } from "@/lib/auth-cookie";
 import { credentialsErrorFor } from "@/lib/auth/credentials-errors";
 import { goAdapter } from "@/lib/auth/go-adapter";
 import {
@@ -354,8 +355,9 @@ async function buildProviders(): Promise<Provider[]> {
 // request, so the state/PKCE/nonce check cookies were missing and Apple
 // sign-in failed with InvalidCheck. Over https those three cookies are
 // SameSite=None (which requires Secure). Fixed names keep them independent of
-// the proxy's http/https detection; the session cookie is left untouched.
-const secureOrigin = (process.env.AUTH_URL ?? "").startsWith("https://");
+// the proxy's http/https detection; the session cookie follows
+// `useSecureCookies` below.
+const secureOrigin = authUrlIsHttps();
 const crossSiteCheckCookie = (name: string, maxAge?: number) => ({
   name,
   options: {
@@ -381,6 +383,9 @@ const authHandlers = NextAuth(async () => ({
   adapter: goAdapter({ pendingGitHubLogins }),
   trustHost: process.env.AUTH_TRUST_HOST === "true",
   session: { strategy: "jwt" },
+  // Same rule as the BFF (lib/server/auth-tokens.ts): the session cookie name
+  // and JWT salt follow the AUTH_URL scheme on both sides.
+  useSecureCookies: usesSecureCookies(),
   ...(oauthCheckCookies ? { cookies: oauthCheckCookies } : {}),
   logger: { error: logAuthError },
   providers: await buildProviders(),

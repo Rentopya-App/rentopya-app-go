@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "i18n:check": "node ../scripts/check-i18n.mjs",
+    "test": "node --test --experimental-strip-types \"src/**/*.test.ts\"",
     "api:generate": "openapi-typescript ../backend/docs/openapi.yaml -o src/generated/api.d.ts",
     "e2e": "playwright test -c e2e/playwright.config.ts"
   },

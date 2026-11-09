@@ -20,9 +20,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
 import { authService } from "@/services/auth.service";
+import { appToast } from "@/providers/toast-provider";
 
 type SetupState = {
   secret: string;
@@ -45,9 +45,7 @@ export function TotpManager() {
       try {
         return await authService.getTOTPStatus();
       } catch (error) {
-        toast.error(
-          isApiError(error) ? error.message : t("auth.totp.error.load"),
-        );
+        appToast.apiError(error, t("auth.totp.error.load"));
         throw error;
       }
     },
@@ -68,9 +66,7 @@ export function TotpManager() {
       setConfirmCode("");
       setRecoveryCodes(null);
     } catch (error) {
-      toast.error(
-        isApiError(error) ? error.message : t("auth.totp.error.setup"),
-      );
+      appToast.apiError(error, t("auth.totp.error.setup"));
     } finally {
       setPending(false);
     }
@@ -86,9 +82,7 @@ export function TotpManager() {
       await statusQuery.refetch();
       toast.success(t("auth.totp.confirm_success"));
     } catch (error) {
-      toast.error(
-        isApiError(error) ? error.message : t("auth.totp.error.confirm"),
-      );
+      appToast.apiError(error, t("auth.totp.error.confirm"));
     } finally {
       setPending(false);
     }
@@ -105,9 +99,7 @@ export function TotpManager() {
       await statusQuery.refetch();
       toast.success(t("auth.totp.disable_success"));
     } catch (error) {
-      toast.error(
-        isApiError(error) ? error.message : t("auth.totp.error.disable"),
-      );
+      appToast.apiError(error, t("auth.totp.error.disable"));
     } finally {
       setPending(false);
     }
