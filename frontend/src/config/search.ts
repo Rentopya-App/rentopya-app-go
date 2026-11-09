@@ -1,0 +1,32 @@
+import { LayoutDashboard } from "lucide-react";
+
+import { branchesSearchSpec } from "@/features/branches/search";
+import { customersSearchSpec } from "@/features/customers/search";
+import { suppliersSearchSpec } from "@/features/suppliers/search";
+import { rentalProductsSearchSpec } from "@/features/fleet/search";
+import { vehiclesSearchSpec } from "@/features/vehicles/search";
+import {
+  defineSearchCatalog,
+  defineSearchSpec,
+} from "@/features/search-engine/define";
+
+/**
+ * Local command-palette specs. Remote record specs come from
+ * GET /v1/search/specs (platform) or GET /v1/tenant/search/specs (organization).
+ */
+export const searchCatalog = defineSearchCatalog({
+  id: "app",
+  specs: [
+    defineSearchSpec({
+      id: "pages",
+      labelKey: "search.specs_pages",
+      icon: LayoutDashboard,
+      local: true,
+    }),
+    branchesSearchSpec,
+    rentalProductsSearchSpec,
+    vehiclesSearchSpec,
+    customersSearchSpec,
+    suppliersSearchSpec,
+  ],
+});

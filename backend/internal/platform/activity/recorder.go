@@ -1,0 +1,104 @@
+package activity
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+	"net"
+	"net/http"
+	"net/netip"
+
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/authctx"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+// Recorder persists audit events.
+type Recorder struct {
+	q   *db.Queries
+	log *slog.Logger
+}
+
+// NewRecorder creates an activity recorder.
+func NewRecorder(q *db.Queries, log *slog.Logger) *Recorder {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &Recorder{q: q, log: log}
+}
+
+// Record writes an activity event (fail-soft).
+func (r *Recorder) Record(ctx context.Context, actorID *int64, action, resource string, resourceUUID *uuid.UUID, payload map[string]any, rreq *http.Request) {
+	if r == nil || r.q == nil {
+		return
+	}
+	payload = withSupportContext(ctx, payload)
+	body, err := json.Marshal(payload)
+	if err != nil || payload == nil {
+		body = []byte("{}")
+	}
+	var ru pgtype.UUID
+	if resourceUUID != nil {
+		ru = pgtype.UUID{Bytes: *resourceUUID, Valid: true}
+	}
+	var ip *netip.Addr
+	var ua pgtype.Text
+	if rreq != nil {
+		if host, _, err := net.SplitHostPort(rreq.RemoteAddr); err == nil {
+			if parsed, err := netip.ParseAddr(host); err == nil {
+				ip = &parsed
+			}
+		}
+		if rreq.UserAgent() != "" {
+			ua = pgtype.Text{String: rreq.UserAgent(), Valid: true}
+		}
+	}
+	// Tenant requests and organization-scoped jobs stamp the organization so
+	// the event shows up in that organization's activity only.
+	var orgID pgtype.Int8
+	if id, ok := orgctx.OrganizationID(ctx); ok {
+		orgID = pgtype.Int8{Int64: id, Valid: true}
+	}
+	_, err = r.q.InsertActivityEvent(ctx, db.InsertActivityEventParams{
+		OrganizationID: orgID,
+		ActorUserID:    pgtypeInt8(actorID),
+		Action:         action,
+		Resource:       resource,
+		ResourceUuid:   ru,
+		Payload:        body,
+		IpAddress:      ip,
+		UserAgent:      ua,
+	})
+	if err != nil {
+		r.log.Warn("activity_record_failed", "action", action, "error", err)
+	}
+}
+
+// withSupportContext tags events of impersonated sessions (TEC-678): imp is
+// the impersonating platform user, support_grant_uuid the organization's
+// support access grant the request ran under. The caller's map is not
+// modified.
+func withSupportContext(ctx context.Context, payload map[string]any) map[string]any {
+	p, ok := authctx.PrincipalFrom(ctx)
+	if !ok || p.ImpersonatorUserID == nil {
+		return payload
+	}
+	out := make(map[string]any, len(payload)+2)
+	for k, v := range payload {
+		out[k] = v
+	}
+	out["imp"] = p.ImpersonatorUserID.String()
+	if s, ok := orgctx.From(ctx); ok && s.SupportGrant != nil {
+		out["support_grant_uuid"] = s.SupportGrant.UUID.String()
+	}
+	return out
+}
+
+func pgtypeInt8(id *int64) pgtype.Int8 {
+	if id == nil {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: *id, Valid: true}
+}

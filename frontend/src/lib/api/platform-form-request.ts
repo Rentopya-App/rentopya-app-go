@@ -1,0 +1,67 @@
+import { apiConfig } from "@/config/api";
+import { unwrap } from "@/lib/api";
+import { parseContentDispositionFilename } from "@/lib/api/content-disposition";
+
+/** Multipart BFF fetch for platform endpoints not yet in generated OpenAPI paths. */
+export async function platformFormRequest<T>(
+  method: string,
+  path: string,
+  formData: FormData,
+): Promise<T> {
+  const base = apiConfig.baseUrl.replace(/\/$/, "");
+  const pathname = path.startsWith("/") ? path : `/${path}`;
+  const url = `${base}${pathname}`;
+
+  const response = await fetch(url, {
+    method,
+    credentials: "include",
+    body: formData,
+  });
+
+  const payload = await response.json().catch(() => undefined);
+  return unwrap<T>({ data: payload, response });
+}
+
+/** Binary download via BFF (export sample / completed job). */
+export async function platformDownloadRequest(
+  path: string,
+  query?: Record<string, string | undefined>,
+): Promise<Blob> {
+  const { blob } = await platformDownloadFile(path, query);
+  return blob;
+}
+
+/** Download binary file with filename from Content-Disposition when available. */
+export async function platformDownloadFile(
+  path: string,
+  query?: Record<string, string | undefined>,
+): Promise<{ blob: Blob; filename: string | null }> {
+  const base = apiConfig.baseUrl.replace(/\/$/, "");
+  let url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  if (query) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value) params.set(key, value);
+    }
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+  }
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  const filename = parseContentDispositionFilename(
+    response.headers.get("Content-Disposition"),
+  );
+  return { blob, filename };
+}
+
+export function triggerBrowserDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

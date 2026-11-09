@@ -1,0 +1,388 @@
+package usecase
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
+	notifmodel "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifications/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/activity"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/i18n"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ioengine"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/storage"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/queue"
+	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+var (
+	ErrNotFound       = errors.New("not found")
+	ErrForbidden      = errors.New("forbidden")
+	ErrInvalidRequest = errors.New("invalid request")
+)
+
+// Notifier enqueues in-app notifications.
+type Notifier interface {
+	Enqueue(ctx context.Context, in notifmodel.EnqueueInput) ([]notifmodel.Notification, error)
+}
+
+// Enqueuer schedules background tasks.
+type Enqueuer interface {
+	Enqueue(task *asynq.Task, opts ...asynq.Option) (*asynq.TaskInfo, error)
+}
+
+// Service orchestrates export jobs.
+type Service struct {
+	q        *db.Queries
+	storage  storage.Driver
+	registry *ioengine.Registry
+	queue    Enqueuer
+	notifier Notifier
+	activity *activity.Recorder
+	log      *slog.Logger
+	syncMode bool
+	// scopes re-resolves the requester's membership for tenant jobs
+	// (permissions and branch scope); see orgctx.WithJobScope.
+	scopes orgctx.JobScopeLoader
+}
+
+// SetJobScopeLoader makes tenant jobs run with the requester's current
+// organization scope (branch scope included) instead of the bare
+// organization id.
+func (s *Service) SetJobScopeLoader(l orgctx.JobScopeLoader) {
+	s.scopes = l
+}
+
+// New creates an export service.
+func New(
+	q *db.Queries,
+	store storage.Driver,
+	reg *ioengine.Registry,
+	enq Enqueuer,
+	notifier Notifier,
+	rec *activity.Recorder,
+	log *slog.Logger,
+) *Service {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &Service{
+		q: q, storage: store, registry: reg, queue: enq, notifier: notifier,
+		activity: rec, log: log, syncMode: enq == nil,
+	}
+}
+
+// ExportJobView is API projection.
+type ExportJobView struct {
+	UUID      uuid.UUID `json:"uuid"`
+	Resource  string    `json:"resource"`
+	Format    string    `json:"format"`
+	Status    string    `json:"status"`
+	RowCount  int32     `json:"row_count"`
+	Error     *string   `json:"error,omitempty"`
+	Download  *string   `json:"download_url,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// RequestExport queues an export job.
+func (s *Service) RequestExport(
+	ctx context.Context,
+	actorID int64,
+	resource string,
+	format ioengine.ExportFormat,
+	query ioengine.ExportQuery,
+	locale string,
+) (ExportJobView, error) {
+	adapter, err := s.registry.Get(resource)
+	if err != nil {
+		return ExportJobView{}, fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+	}
+	_ = adapter
+	orgID, err := orgctx.EngineScope(ctx, resource)
+	if err != nil {
+		return ExportJobView{}, fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+	}
+	if format != ioengine.ExportPDF && format != ioengine.ExportXLSX && format != ioengine.ExportCSV && format != ioengine.ExportJSON {
+		return ExportJobView{}, fmt.Errorf("%w: invalid format", ErrInvalidRequest)
+	}
+	qb, _ := json.Marshal(query)
+	expires := time.Now().UTC().Add(7 * 24 * time.Hour)
+	row, err := s.q.CreateExportJob(ctx, db.CreateExportJobParams{
+		Resource: resource, ActorID: actorID, Format: string(format),
+		QueryJson: qb, Locale: locale, ExpiresAt: pgtype.Timestamptz{Time: expires, Valid: true},
+		OrganizationID: orgID,
+	})
+	if err != nil {
+		return ExportJobView{}, err
+	}
+	if s.activity != nil {
+		uid := actorID
+		s.activity.Record(ctx, &uid, "export.requested", resource, &row.Uuid, map[string]any{
+			"format": format, "query": query,
+		}, nil)
+	}
+	if s.syncMode {
+		if err := s.ProcessExport(ctx, row.ID); err != nil {
+			return ExportJobView{}, err
+		}
+		updated, _ := s.q.GetExportJobByID(ctx, row.ID)
+		return mapExportJob(updated), nil
+	}
+	task, err := queue.NewExportProcessTask(row.ID)
+	if err != nil {
+		return ExportJobView{}, err
+	}
+	if _, err := s.queue.Enqueue(task, asynq.Queue(queue.QueueExports)); err != nil {
+		return ExportJobView{}, err
+	}
+	return mapExportJob(row), nil
+}
+
+// ProcessExport runs export worker logic.
+func (s *Service) ProcessExport(ctx context.Context, jobID int64) error {
+	job, err := s.q.MarkExportJobProcessing(ctx, jobID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Not queued any more: another run took the job or it is final. A
+		// task that runs twice (Asynq retry, recovery of an active task
+		// after a restore) does nothing the second time (TEC-962).
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if job.OrganizationID.Valid {
+		// Tenant job: adapters read the organization (and the requester's
+		// branch scope) from the context.
+		scoped, err := orgctx.WithJobScope(ctx, s.scopes, job.OrganizationID.Int64, job.ActorID)
+		if err != nil {
+			return s.fail(ctx, jobID, err.Error())
+		}
+		ctx = scoped
+	}
+	adapter, err := s.registry.Get(job.Resource)
+	if err != nil {
+		return s.fail(ctx, jobID, err.Error())
+	}
+	var query ioengine.ExportQuery
+	_ = json.Unmarshal(job.QueryJson, &query)
+	ds, err := adapter.Export(ctx, query, i18n.Normalize(job.Locale))
+	if err != nil {
+		return s.fail(ctx, jobID, err.Error())
+	}
+	settings, err := s.q.GetAppSettings(ctx)
+	if err != nil {
+		return s.fail(ctx, jobID, err.Error())
+	}
+	lh, err := ioengine.LoadLetterheadLogo(ctx, s.storage, settings)
+	if err != nil {
+		s.log.Warn("export_letterhead_logo_failed", "error", err)
+		lh = ioengine.LetterheadFromSettings(settings)
+	}
+	title := ioengine.ExportTitle(job.Locale, job.Resource)
+	data, err := ioengine.EncodeExport(ioengine.ExportFormat(job.Format), ds, job.Locale, &lh, title)
+	if err != nil {
+		return s.fail(ctx, jobID, err.Error())
+	}
+	ext := ioengine.FileExtForExport(ioengine.ExportFormat(job.Format))
+	key, err := s.objectKey(ctx, job, ext)
+	if err != nil {
+		return s.fail(ctx, jobID, err.Error())
+	}
+	filename := ioengine.ExportDownloadFilename(job.Resource, ioengine.ExportFormat(job.Format), job.CreatedAt.Time)
+	if err := s.storage.Upload(ctx, storage.File{
+		Body: bytes.NewReader(data), Size: int64(len(data)),
+		ContentType: ioengine.ContentTypeForExport(ioengine.ExportFormat(job.Format)),
+		Filename:    filename,
+	}, key); err != nil {
+		return s.fail(ctx, jobID, err.Error())
+	}
+	completed, err := s.q.MarkExportJobCompleted(ctx, db.MarkExportJobCompletedParams{
+		ID: jobID, FileKey: pgtype.Text{String: key, Valid: true}, RowCount: int32(len(ds.Rows)),
+	})
+	if err != nil {
+		return err
+	}
+	if s.notifier != nil {
+		dl := s.downloadLink(ctx, job)
+		uid := job.ActorID
+		loc := i18n.Normalize(job.Locale)
+		_, _ = s.notifier.Enqueue(ctx, notifmodel.EnqueueInput{
+			UserID: &uid, Channels: []string{notifmodel.ChannelInapp},
+			OrganizationID: jobOrganization(job.OrganizationID),
+			TemplateCode:   "exports.ready", Language: job.Locale,
+			ActionURL: dl,
+			TemplateVars: map[string]string{
+				"resource": i18n.ResourceLabel(loc, job.Resource),
+				"format":   i18n.ExportFormatLabel(loc, job.Format),
+			},
+			SourceEvent: "exports.ready",
+		})
+	}
+	_ = completed
+	return nil
+}
+
+// downloadLink is the action link of the "export ready" notification.
+// Platform exports download straight from the API. Tenant downloads need the
+// X-Organization header, which a link cannot carry, so they point at the
+// tenant shell page /t/{slug}/exports/{uuid}/download: it downloads the file
+// through /v1/tenant/exports/{uuid}/download with the organization of the URL
+// and works the same from the inbox, a live card or a push notification.
+func (s *Service) downloadLink(ctx context.Context, job db.ExportJob) *string {
+	if !job.OrganizationID.Valid {
+		u := fmt.Sprintf("/v1/platform/exports/%s/download", job.Uuid.String())
+		return &u
+	}
+	org, err := s.q.GetOrganizationByID(ctx, job.OrganizationID.Int64)
+	if err != nil {
+		s.log.Warn("export_notification_organization_failed", "error", err)
+		return nil
+	}
+	u := TenantDownloadPath(org.Slug, job.Uuid)
+	return &u
+}
+
+// TenantDownloadPath is the tenant shell page that downloads a finished
+// export of an organization.
+func TenantDownloadPath(orgSlug string, jobUUID uuid.UUID) string {
+	return "/t/" + url.PathEscape(orgSlug) + "/exports/" + jobUUID.String() + "/download"
+}
+
+// jobOrganization stamps job notifications with the job's organization.
+func jobOrganization(id pgtype.Int8) *int64 {
+	if !id.Valid {
+		return nil
+	}
+	v := id.Int64
+	return &v
+}
+
+func (s *Service) fail(ctx context.Context, jobID int64, msg string) error {
+	_, _ = s.q.MarkExportJobFailed(ctx, db.MarkExportJobFailedParams{ID: jobID, Error: pgtype.Text{String: msg, Valid: true}})
+	return errors.New(msg)
+}
+
+// GetJob returns a job if actor may access it.
+func (s *Service) GetJob(ctx context.Context, jobUUID uuid.UUID, actorID int64, admin bool) (ExportJobView, error) {
+	row, err := s.q.GetExportJobByUUID(ctx, jobUUID)
+	if err != nil || !orgctx.SameEngineScope(ctx, row.OrganizationID) {
+		return ExportJobView{}, ErrNotFound
+	}
+	if !admin && row.ActorID != actorID {
+		return ExportJobView{}, ErrForbidden
+	}
+	return mapExportJob(row), nil
+}
+
+// ListJobs lists export jobs for actor or all if admin.
+func (s *Service) ListJobs(ctx context.Context, actorID int64, admin bool, limit, offset int32) ([]ExportJobView, int64, error) {
+	var rows []db.ExportJob
+	var total int64
+	var err error
+	if admin {
+		rows, err = s.q.ListAllExportJobs(ctx, db.ListAllExportJobsParams{LimitCount: limit, OffsetCount: offset})
+		total, _ = s.q.CountAllExportJobs(ctx)
+	} else {
+		rows, err = s.q.ListExportJobsForActor(ctx, db.ListExportJobsForActorParams{
+			ActorID: actorID, LimitCount: limit, OffsetCount: offset,
+		})
+		total, _ = s.q.CountExportJobsForActor(ctx, actorID)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]ExportJobView, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, mapExportJob(r))
+	}
+	return out, total, nil
+}
+
+// Download opens export file stream.
+func (s *Service) Download(ctx context.Context, jobUUID uuid.UUID, actorID int64, admin bool) (io.ReadCloser, string, string, error) {
+	row, err := s.q.GetExportJobByUUID(ctx, jobUUID)
+	if err != nil || !orgctx.SameEngineScope(ctx, row.OrganizationID) {
+		return nil, "", "", ErrNotFound
+	}
+	if !admin && row.ActorID != actorID {
+		return nil, "", "", ErrForbidden
+	}
+	if !row.FileKey.Valid || row.Status != "completed" {
+		return nil, "", "", ErrNotFound
+	}
+	if !s.ownsFile(ctx, row) {
+		s.log.Error("export_file_outside_scope", "job", row.Uuid.String(), "key", row.FileKey.String)
+		return nil, "", "", ErrNotFound
+	}
+	rc, _, err := s.storage.Download(ctx, row.FileKey.String)
+	if err != nil {
+		return nil, "", "", err
+	}
+	format := ioengine.ExportFormat(row.Format)
+	filename := ioengine.ExportDownloadFilename(row.Resource, format, row.CreatedAt.Time)
+	return rc, ioengine.ContentTypeForExport(format), filename, nil
+}
+
+// objectKey is where a job's file is stored: tenant exports live under
+// their organization (organizations/{org_uuid}/exports/...), platform
+// exports under exports/.
+func (s *Service) objectKey(ctx context.Context, job db.ExportJob, ext string) (string, error) {
+	if !job.OrganizationID.Valid {
+		return storage.ExportObjectKey(job.Uuid.String(), ext), nil
+	}
+	org, err := s.q.GetOrganizationByID(ctx, job.OrganizationID.Int64)
+	if err != nil {
+		return "", fmt.Errorf("export organization: %w", err)
+	}
+	return storage.OrganizationExportObjectKey(org.Uuid.String(), job.Uuid.String(), ext), nil
+}
+
+// ownsFile reports whether the stored file key belongs to the job's scope:
+// a tenant job's file under its organization's prefix (or the job's own
+// pre-prefix key, exports/{job_uuid}/), a platform job's file outside every
+// organization.
+func (s *Service) ownsFile(ctx context.Context, row db.ExportJob) bool {
+	key := row.FileKey.String
+	if !row.OrganizationID.Valid {
+		return !strings.HasPrefix(key, storage.OrganizationsRoot)
+	}
+	if strings.HasPrefix(key, "exports/"+row.Uuid.String()+"/") {
+		return true
+	}
+	org, err := s.q.GetOrganizationByID(ctx, row.OrganizationID.Int64)
+	if err != nil {
+		return false
+	}
+	return storage.OrganizationOwnsKey(key, org.Uuid.String())
+}
+
+func mapExportJob(row db.ExportJob) ExportJobView {
+	var errMsg *string
+	if row.Error.Valid {
+		errMsg = &row.Error.String
+	}
+	var dl *string
+	if row.Status == "completed" {
+		prefix := "/v1/platform/exports/"
+		if row.OrganizationID.Valid {
+			prefix = "/v1/tenant/exports/"
+		}
+		u := prefix + row.Uuid.String() + "/download"
+		dl = &u
+	}
+	return ExportJobView{
+		UUID: row.Uuid, Resource: row.Resource, Format: row.Format, Status: row.Status,
+		RowCount: row.RowCount, Error: errMsg, Download: dl, CreatedAt: row.CreatedAt.Time,
+	}
+}

@@ -1,0 +1,303 @@
+name: CI
+
+# Push covers every branch; a pull_request trigger only duplicated those runs
+# and, for PRs opened by the auto-pr job (github-actions bot), produced empty
+# "failure"/"action_required" runs that showed as red X's.
+on:
+  push:
+    branches: ["**"]
+  # Manual run of the acceptance job with the Playwright scenarios
+  # (docs/acceptance/beta.md); the other jobs run as on a push.
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: "Run the Playwright acceptance scenarios (full stack)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Project rule (AGENTS.md): no AI attribution in commit messages.
+  commit-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject AI attribution in pushed commit messages
+        env:
+          MESSAGES: ${{ toJSON(github.event.commits.*.message) }}
+        run: |
+          if grep -Eiq 'co-authored-by:[^"]*claude|claude-session|claude\.ai/code|generated with \[?claude' <<<"$MESSAGES"; then
+            echo "::error title=Commit policy::A pushed commit message contains AI attribution. Remove it (git commit --amend / rebase on your own branch)."
+            exit 1
+          fi
+
+  # deploy/env/schema must produce a complete env for compose.prod.yml.
+  prod-env:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Generate env from schema and validate prod compose
+        run: |
+          scripts/prod-env.sh init -o "$RUNNER_TEMP/prod.env" --app-url https://ci.example.com
+          docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q
+          scripts/prod-env.sh check "$RUNNER_TEMP/prod.env"
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # Database tests (tenant isolation, module integration tests) skip without
+    # TEST_DATABASE_URL. They expect an already migrated database; tests that
+    # need a private copy (dbtest.FreshDatabase) create one on the same server,
+    # so the role needs CREATEDB (the image's POSTGRES_USER is a superuser).
+    # Same Postgres major as compose.prod.yml.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d app_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://app:app@localhost:5432/app_test?sslmode=disable
+      CATALOG_TEST_DATABASE_URL: postgres://app:app@localhost:5432/app_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+      - uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: "1.31.1"
+      - name: sqlc generate
+        run: sqlc generate
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: backend
+      # Same golang-migrate image and version as backend/Dockerfile (prod's
+      # migrate role); keep the two in step.
+      - name: Migrate test database
+        run: >-
+          docker run --rm --network host
+          -v "$PWD/migrations:/migrations:ro"
+          migrate/migrate:v4.19.1
+          -path /migrations -database "$TEST_DATABASE_URL" up
+      - name: Test
+        run: go test ./...
+      - name: OpenAPI lint
+        run: npx --yes @redocly/cli@1 lint docs/openapi.yaml
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: i18n
+        working-directory: .
+        run: node scripts/check-i18n.mjs
+
+  # Branded site app (TEC-729): its own image (site/Dockerfile), built by
+  # Dokploy from compose.prod.yml like backend and frontend.
+  site:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: site/.nvmrc
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Format
+        run: pnpm format:check
+      - name: Unit tests
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+
+  # Acceptance suite RT-A01…A32 (TEC-740, docs/acceptance/beta.md). The Go
+  # scenarios run on every push against the same Postgres as the backend
+  # job; the Playwright scenarios need the whole stack (containers, API,
+  # panel, site) and run on a manual dispatch only. Not a dependency of
+  # auto-pr: a red acceptance run is reported, it does not block merging.
+  acceptance:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d app_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://app:app@localhost:5432/app_test?sslmode=disable
+      CATALOG_TEST_DATABASE_URL: postgres://app:app@localhost:5432/app_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Migrate test database
+        run: >-
+          docker run --rm --network host
+          -v "$PWD/backend/migrations:/migrations:ro"
+          migrate/migrate:v4.19.1
+          -path /migrations -database "$TEST_DATABASE_URL" up
+      - name: Go acceptance scenarios
+        run: |
+          set -o pipefail
+          make acceptance-backend 2>&1 | tee "$RUNNER_TEMP/rt-go.log"
+      - name: Playwright dependencies
+        if: github.event_name == 'workflow_dispatch' && inputs.e2e
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        if: github.event_name == 'workflow_dispatch' && inputs.e2e
+        with:
+          node-version-file: frontend/.nvmrc
+      - name: Install panel and site, Chromium
+        if: github.event_name == 'workflow_dispatch' && inputs.e2e
+        run: |
+          (cd frontend && pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium)
+          (cd site && pnpm install --frozen-lockfile)
+      - name: Playwright acceptance scenarios
+        if: github.event_name == 'workflow_dispatch' && inputs.e2e
+        timeout-minutes: 30
+        env:
+          E2E_STATE: ${{ runner.temp }}/rentopya-e2e
+        run: |
+          set -o pipefail
+          status=0
+          frontend/e2e/stack/up.sh || status=$?
+          if [ "$status" = 0 ]; then
+            (cd frontend && pnpm e2e) 2>&1 | tee "$RUNNER_TEMP/rt-e2e.log" || status=$?
+          fi
+          frontend/e2e/stack/down.sh
+          exit "$status"
+      - name: Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-evidence
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/rt-go.log
+            ${{ runner.temp }}/rt-e2e.log
+            ${{ runner.temp }}/rentopya-e2e/*.log
+            frontend/e2e/evidence/
+            ${{ runner.temp }}/rentopya-e2e/playwright/report/
+
+  # Feature branch pushed and both test jobs green → open (or reuse) a PR into
+  # main and turn on auto-merge. GitHub merges once main's required checks pass.
+  # Opt out per push by putting [no-automerge] in the head commit message.
+  # Token: repo secret AUTO_PR_TOKEN (fine-grained PAT: contents + pull
+  # requests read/write) when set — merges made with it also trigger CI on
+  # main. Otherwise GITHUB_TOKEN, which needs Settings → Actions → General →
+  # "Allow GitHub Actions to create and approve pull requests".
+  auto-pr:
+    needs: [commit-policy, prod-env, backend, frontend, site]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_name != 'main' &&
+      github.ref_name != 'master' &&
+      !contains(github.event.head_commit.message, '[no-automerge]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.AUTO_PR_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+      BASE: main
+    steps:
+      - name: Open or reuse pull request
+        id: pr
+        run: |
+          ahead="$(gh api "repos/$GH_REPO/compare/$BASE...$GITHUB_SHA" --jq '.ahead_by')"
+          if [ "$ahead" = "0" ]; then
+            echo "Branch has nothing that is not already in $BASE; skipping."
+            echo "number=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          number="$(gh pr list --head "$BRANCH" --base "$BASE" --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            title="$(gh api "repos/$GH_REPO/commits/$GITHUB_SHA" --jq '.commit.message | split("\n")[0]')"
+            if ! url="$(gh pr create --base "$BASE" --head "$BRANCH" --title "$title" \
+              --body "Otomatik açıldı: \`$BRANCH\` dalında CI (backend + frontend) başarılı. Zorunlu kontroller geçince auto-merge ile \`$BASE\`'e birleşir." 2>&1)"; then
+              echo "$url"
+              if grep -q "not permitted to create or approve pull requests" <<<"$url"; then
+                echo "::error title=Auto PR disabled::Enable Settings → Actions → General → 'Allow GitHub Actions to create and approve pull requests', or add an AUTO_PR_TOKEN repo secret (fine-grained PAT with Contents + Pull requests: read/write)."
+              fi
+              exit 1
+            fi
+            number="${url##*/}"
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+      - name: Merge
+        if: steps.pr.outputs.number != ''
+        run: |
+          # This job only runs after backend + frontend passed, so merge right away
+          # (no --auto: that needs branch protection). Only merge the commit this
+          # run tested: a later push (or a re-run of an older run) must never
+          # merge an untested branch head.
+          if ! out="$(gh pr merge "${{ steps.pr.outputs.number }}" --merge --match-head-commit "$GITHUB_SHA" 2>&1)"; then
+            echo "$out"
+            echo "::error title=Merge failed::PR could not be merged (head moved, conflict, or merge not permitted for this token)."
+            exit 1
+          fi
+          echo "$out"

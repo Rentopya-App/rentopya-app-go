@@ -1,0 +1,125 @@
+import type { IoResource } from "@/features/io/types";
+
+const RESOURCE_LABEL_KEYS: Record<IoResource, string> = {
+  "platform.users": "users.title",
+  "platform.roles": "roles.title",
+  "platform.notifications": "notifications.title",
+  "platform.activity": "activity.title",
+  "platform.organizations": "organizations.title",
+  "tenant.branches": "branches.title",
+  "tenant.segments": "fleet.segments.title",
+  "tenant.rental_groups": "fleet.groups.title",
+  "tenant.rental_products": "fleet.products.title",
+  "tenant.vehicles": "vehicles.title",
+  "tenant.vehicle_documents": "vehicle_records.documents.title",
+  "tenant.vehicle_maintenance": "vehicle_records.maintenance.title",
+  "tenant.transfers": "transfers.title",
+  "tenant.one_way_rules": "one_way_rules.title",
+  "tenant.rate_plans": "pricing.plans.title",
+  "tenant.date_rules": "pricing.rules.title",
+  "tenant.customers": "customers.title",
+  "tenant.extras": "extras.title",
+  "tenant.campaigns": "campaigns.title",
+  "tenant.reservations": "reservations.title",
+  "tenant.rentals": "rentals.title",
+  "tenant.agreements": "agreements.title",
+  "tenant.finance_accounts": "finance.accounts.title",
+  "tenant.ledger_entries": "finance.entries.title",
+  "tenant.cash_accounts": "finance.cash.title",
+  "tenant.cash_movements": "finance.movements.title",
+  "tenant.expenses": "finance.expenses.title",
+  "tenant.security_deposits": "deposits.title",
+  "tenant.toll_passes": "tolls.title",
+  "tenant.suppliers": "suppliers.title",
+  "tenant.supplier_invoices": "suppliers.invoices.title",
+  "tenant.supplier_payments": "suppliers.payments.title",
+  "tenant.finance_collections": "finance.collections.title",
+  "tenant.invoices": "invoices.title",
+  "tenant.vehicle_profitability": "profitability.title",
+  "tenant.report_occupancy": "reports.occupancy.title",
+  "tenant.report_income_expense": "reports.income_expense.title",
+  "tenant.report_channels": "reports.channels.title",
+  "tenant.report_aging": "reports.aging.title",
+  "tenant.report_branches": "reports.branches.title",
+};
+
+export function resourceLabelKey(resource: string): string | null {
+  const key = RESOURCE_LABEL_KEYS[resource as IoResource];
+  return key ? `resources.${resource}` : null;
+}
+
+/** Activity log resource slug → activity.resources.* i18n path. */
+export function activityResourceLabelKey(resource: string): string {
+  return `resources.${resource}`;
+}
+
+export function formatActivityResource(
+  t: (key: string) => string,
+  resource: string,
+): string {
+  const key = `activity.${activityResourceLabelKey(resource)}`;
+  const label = t(key);
+  return label === key ? resource : label;
+}
+
+export function formatImportStatus(
+  t: (key: string) => string,
+  status: string,
+): string {
+  const key = `imports.status.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
+}
+
+export function formatExportStatus(
+  t: (key: string) => string,
+  status: string,
+): string {
+  const key = `exports.status.${status}`;
+  const translated = t(key);
+  return translated === key ? status : translated;
+}
+
+export function formatImportFormat(
+  t: (key: string) => string,
+  format: string,
+): string {
+  const key = `imports.formats.${format.toLowerCase()}`;
+  const translated = t(key);
+  return translated === key ? format.toUpperCase() : translated;
+}
+
+export function formatExportFormat(
+  t: (key: string) => string,
+  format: string,
+): string {
+  const key = `exports.formats.${format.toLowerCase()}`;
+  const translated = t(key);
+  return translated === key ? format.toUpperCase() : translated;
+}
+
+export function rollbackWindowOpen(
+  rollbackUntil: string | null | undefined,
+  nowMs: number,
+): boolean {
+  return Boolean(rollbackUntil && Date.parse(rollbackUntil) > nowMs);
+}
+
+/** Client-side fallback when Content-Disposition is missing. */
+export function exportDownloadFilename(
+  resource: string,
+  format: string,
+  at?: Date,
+): string {
+  const slug = resource.includes(".") ? resource.split(".").pop()! : resource;
+  const ext =
+    format.toLowerCase() === "pdf"
+      ? "pdf"
+      : format.toLowerCase() === "xlsx"
+        ? "xlsx"
+        : format.toLowerCase() === "json"
+          ? "json"
+          : "csv";
+  const date = (at ?? new Date()).toISOString().slice(0, 10).replace(/-/g, "");
+  return `${slug}_${date}.${ext}`;
+}

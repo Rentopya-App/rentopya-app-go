@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/*
+ * Theme tokens come from the organization's site settings at render time
+ * (lib/theme.ts writes :root). These defaults only apply before that. The
+ * corner variables (--radius-card / -control / -image) are deliberately not
+ * defaulted: without them each theme keeps its own radii (`soft`).
+ */
+:root {
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --accent: #f59e0b;
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --border: #e2e8f0;
+  --radius: 0.5rem;
+  --font-brand: system-ui, sans-serif;
+  --font-heading: var(--font-brand);
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --font-sans: var(--font-brand);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    @apply bg-background text-foreground min-h-svh font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Theme-independent page frame (every theme root shares it). */
+@layer components {
+  .rt-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+    overflow-x: clip;
+  }
+  .rt-body--embed {
+    min-height: 0;
+    min-width: 0;
+  }
+  .rt-main {
+    flex: 1;
+    min-width: 0;
+    outline: none;
+  }
+  .rt-body--embed .rt-main {
+    flex: none;
+  }
+  .rt-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  /* The bot trap of the lead forms: off-screen, never focusable. */
+  .rt-hp {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .rt-skip {
+    position: fixed;
+    left: 16px;
+    top: -80px;
+    z-index: 130;
+    padding: 12px 18px;
+    border-radius: 8px;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 700;
+  }
+  .rt-skip:focus {
+    top: 16px;
+  }
+}
