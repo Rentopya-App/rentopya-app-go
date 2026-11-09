@@ -95,17 +95,17 @@ migrate-create:
 health:
 	curl -sS http://127.0.0.1:8080/healthz && echo && curl -sS http://127.0.0.1:8080/readyz && echo
 
-SA_EMAIL    ?= admin@example.com
-SA_PASSWORD ?= Password1
+# Bootstrap platform super_admin. No default credentials: SA_EMAIL is required;
+# without SA_PASSWORD a strong password is generated and printed once.
+# SA_RESET_PASSWORD=true overwrites the password of an existing user.
 SA_NAME     ?= Platform
 SA_SURNAME  ?= Admin
 
 create-super-admin:
-	@$(load_env) go run ./cmd/create-super-admin \
-		-email "$(SA_EMAIL)" \
-		-password "$(SA_PASSWORD)" \
-		-name "$(SA_NAME)" \
-		-surname "$(SA_SURNAME)"
+	@test -n "$(SA_EMAIL)" || (echo "Usage: make create-super-admin SA_EMAIL=you@example.com [SA_PASSWORD=...] [SA_RESET_PASSWORD=true]"; exit 1)
+	@$(load_env) SA_EMAIL="$(SA_EMAIL)" SA_PASSWORD="$(SA_PASSWORD)" SA_RESET_PASSWORD="$(SA_RESET_PASSWORD)" \
+		SA_NAME="$(SA_NAME)" SA_SURNAME="$(SA_SURNAME)" \
+		go run ./cmd/create-super-admin $(if $(SA_PASSWORD),,-generate-password)
 
 openapi-lint:
 	npx --yes @redocly/cli@1 lint docs/openapi.yaml
