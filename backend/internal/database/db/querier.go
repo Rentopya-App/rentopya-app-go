@@ -2112,6 +2112,9 @@ type Querier interface {
 	LockInvitationByTokenHash(ctx context.Context, tokenHash string) (OrganizationInvitation, error)
 	LockNotificationDispatch(ctx context.Context, arg LockNotificationDispatchParams) (NotificationDispatch, error)
 	LockNotificationDispatchWait(ctx context.Context, arg LockNotificationDispatchWaitParams) (NotificationDispatch, error)
+	// The open invitations a re-invite would revoke, so the caller's grant
+	// rules can be checked against each of them first.
+	LockOpenInvitationsForEmail(ctx context.Context, arg LockOpenInvitationsForEmailParams) ([]LockOpenInvitationsForEmailRow, error)
 	// Serialises opening accounts of one organization (per-organization code
 	// sequence) for the rest of the transaction.
 	LockOrganizationAccountCodes(ctx context.Context, organizationID int64) error
