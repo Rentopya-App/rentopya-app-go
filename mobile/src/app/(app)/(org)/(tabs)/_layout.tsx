@@ -19,6 +19,10 @@ export default function Tabs() {
         <NativeTabs.Trigger.Icon sf="checklist" md="checklist" />
         <NativeTabs.Trigger.Label>{t('field_tasks:tab')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="vehicles" hidden={!can(Permission.TenantVehiclesRead)}>
+        <NativeTabs.Trigger.Icon sf="car.fill" md="directions_car" />
+        <NativeTabs.Trigger.Label>{t('vehicles_app:tab')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="menu">
         <NativeTabs.Trigger.Icon sf="line.3.horizontal" md="menu" />
         <NativeTabs.Trigger.Label>{t('menu')}</NativeTabs.Trigger.Label>

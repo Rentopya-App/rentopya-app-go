@@ -3,6 +3,9 @@ import { useTranslation } from 'react-i18next';
 
 import { useTenantContext } from '@/core/tenant';
 
+// A deep link (`rentopya://vehicle/{uuid}`) opens on top of the tabs, so back leads home.
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
 /**
  * Company panel screens of the picked organization: the tabs, and later the
  * pushed detail screens of each module. Loads `/v1/tenant/context` (roles,

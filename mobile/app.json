@@ -71,6 +71,14 @@
           ]
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Rentopya uses the camera to scan vehicle QR labels and plates.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-sqlite",
       "expo-secure-store",
       "expo-web-browser"
