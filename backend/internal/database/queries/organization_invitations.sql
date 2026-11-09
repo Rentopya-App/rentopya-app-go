@@ -28,6 +28,17 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND email = sqlc.arg(email)
   AND accepted_at IS NULL AND revoked_at IS NULL;
 
+-- name: LockOpenInvitationsForEmail :many
+-- The open invitations a re-invite would revoke, so the caller's grant
+-- rules can be checked against each of them first.
+SELECT id, branch_scope
+FROM organization_invitations
+WHERE organization_id = sqlc.arg(organization_id)
+  AND email = sqlc.arg(email)
+  AND accepted_at IS NULL AND revoked_at IS NULL
+ORDER BY id
+FOR UPDATE;
+
 -- name: GetInvitationByUUID :one
 SELECT * FROM organization_invitations
 WHERE organization_id = sqlc.arg(organization_id) AND uuid = sqlc.arg(uuid);

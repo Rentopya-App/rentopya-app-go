@@ -319,6 +319,9 @@ func (s *Service) RemoveTenantMember(ctx context.Context, scope orgctx.Scope, us
 		if err != nil {
 			return mapRepoNotFound(err, ErrMemberNotFound)
 		}
+		if err := s.revokeInvitationsOf(ctx, q, scope.ID, member.Email); err != nil {
+			return err
+		}
 		return s.repo.DeleteOrganizationMember(ctx, q, scope.ID, member.UserID)
 	})
 	if err != nil {

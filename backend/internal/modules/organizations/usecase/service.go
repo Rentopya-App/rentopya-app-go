@@ -77,6 +77,9 @@ type Repository interface {
 	ListOrganizationMembershipsByUser(ctx context.Context, userID int64) ([]db.ListOrganizationMembershipsByUserRow, error)
 	UpdateOrganizationMemberRole(ctx context.Context, q *db.Queries, params db.UpdateOrganizationMemberRoleParams) error
 	DeleteOrganizationMember(ctx context.Context, q *db.Queries, orgID, userID int64) error
+	// RevokeOpenInvitationsForEmail closes the address's open invitations
+	// (member removal: a pending invitation must not undo it).
+	RevokeOpenInvitationsForEmail(ctx context.Context, q *db.Queries, orgID int64, email string, by *int64) error
 	CountOrganizationOwners(ctx context.Context, q *db.Queries, orgID int64) (int64, error)
 	ResolveOrganizationScopeBySlug(ctx context.Context, slug string, userID int64) (db.ResolveOrganizationScopeBySlugRow, error)
 	ResolveOrganizationScopeByUUID(ctx context.Context, id uuid.UUID, userID int64) (db.ResolveOrganizationScopeByUUIDRow, error)
@@ -391,6 +394,11 @@ func (s *Service) AddMember(ctx context.Context, orgUUID, userUUID uuid.UUID, ro
 }
 
 func (s *Service) ChangeMemberRole(ctx context.Context, orgUUID, userUUID uuid.UUID, roleKey string) (orgmodel.Member, error) {
+	// normalizeRole defaults to member, which is right when adding someone
+	// but would silently demote here.
+	if strings.TrimSpace(roleKey) == "" {
+		return orgmodel.Member{}, ErrInvalidRequest
+	}
 	org, user, err := s.loadOrgUser(ctx, orgUUID, userUUID)
 	if err != nil {
 		return orgmodel.Member{}, err
@@ -450,6 +458,9 @@ func (s *Service) RemoveMember(ctx context.Context, orgUUID, userUUID uuid.UUID)
 				return err
 			}
 		}
+		if err := s.revokeInvitationsOf(ctx, q, org.ID, user.Email); err != nil {
+			return err
+		}
 		return s.repo.DeleteOrganizationMember(ctx, q, org.ID, user.ID)
 	})
 	if err != nil {
@@ -457,6 +468,16 @@ func (s *Service) RemoveMember(ctx context.Context, orgUUID, userUUID uuid.UUID)
 	}
 	_ = orgctx.Invalidate(ctx, s.invalidator, org.ID)
 	return nil
+}
+
+// revokeInvitationsOf closes the open invitations of a removed member's
+// address in the organization, so an old link cannot undo the removal.
+func (s *Service) revokeInvitationsOf(ctx context.Context, q *db.Queries, orgID int64, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return nil
+	}
+	return s.repo.RevokeOpenInvitationsForEmail(ctx, q, orgID, email, nil)
 }
 
 func (s *Service) GetMember(ctx context.Context, orgID int64, userUUID uuid.UUID) (orgmodel.Member, error) {

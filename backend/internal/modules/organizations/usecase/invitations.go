@@ -60,6 +60,7 @@ type ManagementRepository interface {
 	AddInvitationRoles(ctx context.Context, q *db.Queries, orgID, invitationID int64, roleIDs []int64) error
 	AddInvitationBranches(ctx context.Context, q *db.Queries, orgID, invitationID int64, branchIDs []int64) error
 	RevokeOpenInvitationsForEmail(ctx context.Context, q *db.Queries, orgID int64, email string, by *int64) error
+	LockOpenInvitationsForEmail(ctx context.Context, q *db.Queries, orgID int64, email string) ([]db.LockOpenInvitationsForEmailRow, error)
 	GetInvitationByUUID(ctx context.Context, orgID int64, id uuid.UUID) (db.OrganizationInvitation, error)
 	GetInvitationPreview(ctx context.Context, tokenHash string) (db.GetInvitationPreviewByTokenHashRow, error)
 	LockInvitationByTokenHash(ctx context.Context, q *db.Queries, tokenHash string) (db.OrganizationInvitation, error)
@@ -268,6 +269,12 @@ func (m *Management) CreateInvitation(ctx context.Context, scope orgctx.Scope, a
 	err = m.orgs.repo.WithTx(ctx, func(ctx context.Context, q *db.Queries, _ pgx.Tx) error {
 		if err := m.orgs.repo.LockOrganizationRow(ctx, q, scope.ID); err != nil {
 			return mapRepoNotFound(err, ErrNotFound)
+		}
+		// Re-inviting revokes the address's open invitations: the caller
+		// must be allowed to revoke each of them (an admin cannot drop an
+		// owner invitation by inviting the same address as member).
+		if err := m.guardReplacedInvitations(ctx, q, scope, grant.email); err != nil {
+			return err
 		}
 		row, token, err = m.insertInvitation(ctx, q, scope.ID, actor, grant)
 		return err
@@ -546,37 +553,48 @@ func (m *Management) ResendInvitation(ctx context.Context, scope orgctx.Scope, a
 
 // guardInvitation applies the grant rules to an existing invitation.
 func (m *Management) guardInvitation(ctx context.Context, scope orgctx.Scope, inv orgmodel.Invitation) error {
+	return m.guardInvitationGrant(ctx, nil, scope, inv.ID, inv.BranchScope)
+}
+
+// guardReplacedInvitations applies the grant rules to every open invitation
+// of email (locked FOR UPDATE inside the caller's transaction) before a new
+// invitation replaces them.
+func (m *Management) guardReplacedInvitations(ctx context.Context, q *db.Queries, scope orgctx.Scope, email string) error {
+	open, err := m.repo.LockOpenInvitationsForEmail(ctx, q, scope.ID, email)
+	if err != nil {
+		return err
+	}
+	for _, row := range open {
+		if err := m.guardInvitationGrant(ctx, q, scope, row.ID, row.BranchScope); err != nil {
+			return fmt.Errorf("%w (an open invitation for this address grants more than you can)", err)
+		}
+	}
+	return nil
+}
+
+// guardInvitationGrant checks that the caller could have granted an
+// invitation: every role it carries (multi-role, custom roles: checkGrant)
+// and its branch access.
+func (m *Management) guardInvitationGrant(ctx context.Context, q *db.Queries, scope orgctx.Scope, invitationID int64, branchScope string) error {
 	if !scope.AllBranches() {
-		if inv.BranchScope != orgctx.BranchScopeSelected {
+		if branchScope != orgctx.BranchScopeSelected {
 			return fmt.Errorf("%w: invitation grants every branch", ErrForbidden)
 		}
-		ids, err := m.invitationBranchIDs(ctx, scope.ID, inv.ID)
+		rows, err := m.repo.ListInvitationBranches(ctx, q, scope.ID, []int64{invitationID})
 		if err != nil {
 			return err
 		}
-		for _, id := range ids {
-			if !scope.AllowsBranch(id) {
+		for _, b := range rows {
+			if !scope.AllowsBranch(b.ID) {
 				return fmt.Errorf("%w: invitation grants branches outside your scope", ErrForbidden)
 			}
 		}
 	}
-	rows, err := m.repo.ListInvitationRoles(ctx, nil, scope.ID, []int64{inv.ID})
+	rows, err := m.repo.ListInvitationRoles(ctx, q, scope.ID, []int64{invitationID})
 	if err != nil {
 		return err
 	}
 	return m.orgs.checkGrant(ctx, scope, invitationRoleRows(rows))
-}
-
-func (m *Management) invitationBranchIDs(ctx context.Context, orgID, invitationID int64) ([]int64, error) {
-	rows, err := m.repo.ListInvitationBranches(ctx, nil, orgID, []int64{invitationID})
-	if err != nil {
-		return nil, err
-	}
-	out := make([]int64, 0, len(rows))
-	for _, b := range rows {
-		out = append(out, b.ID)
-	}
-	return out, nil
 }
 
 func (m *Management) enrichInvitations(ctx context.Context, orgID int64, rows []db.ListInvitationsRow) ([]orgmodel.Invitation, error) {
