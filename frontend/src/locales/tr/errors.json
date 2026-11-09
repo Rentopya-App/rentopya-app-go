@@ -12,6 +12,7 @@
   "codes.INVALID_LINK_TICKET": "Giriş oturumunun süresi doldu. Lütfen tekrar giriş yapın.",
   "codes.OAUTH_PROVIDER_DISABLED": "Bu giriş yöntemi etkin değil.",
   "codes.LAST_SIGN_IN_METHOD": "Son giriş yönteminizi kaldırmadan önce bir şifre belirleyin veya geçiş anahtarı ekleyin.",
+  "codes.PAYLOAD_TOO_LARGE": "Dosya izin verilen en büyük boyutu aşıyor.",
   "codes.VALIDATION_ERROR": "Girilen bilgiler geçersiz. Lütfen alanları kontrol edin.",
   "codes.UNAUTHENTICATED": "Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.",
   "codes.FORBIDDEN": "Bu işlem için yetkiniz yok.",
