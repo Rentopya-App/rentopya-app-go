@@ -1859,7 +1859,9 @@ export interface paths {
          * Email an account-deletion confirmation code
          * @description Sends a 6-digit confirmation code (10 minutes) to the caller's email.
          *     Intended for passwordless accounts (Apple / Google / email code) that
-         *     cannot complete a password / passkey / TOTP step-up.
+         *     cannot complete a password / passkey / TOTP step-up. The only open
+         *     owner of an organization gets `409 LAST_ORGANIZATION_OWNER` (no code
+         *     is sent; see `/v1/auth/account/deactivate`).
          */
         post: operations["postAuthAccountDeactivateRequest"];
         delete?: never;
@@ -1878,20 +1880,60 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Delete (deactivate) own account
-         * @description Account deletion keeps all data: the user becomes `disabled` with
-         *     `deactivated_at`, every refresh session is revoked, stored Apple
-         *     refresh tokens are revoked via Apple `/auth/revoke` (best effort), and
-         *     every sign-in path returns `403 ACCOUNT_DEACTIVATED` afterwards.
+         * Delete own account (30-day restore window)
+         * @description Self-service account deletion (App Store 5.1.1(v), KVKK m.7;
+         *     docs/design/account-deletion.md). The user becomes `disabled` with
+         *     `deactivated_at` and `deletion_due_at` = now + 30 days; every refresh
+         *     session, mobile push device and browser push subscription is removed,
+         *     stored Apple refresh tokens are revoked via Apple `/auth/revoke` (best
+         *     effort), and every sign-in path returns `403 ACCOUNT_DEACTIVATED`.
+         *     The confirmation e-mail carries a restore link
+         *     (`<FRONTEND_URL>/platform/restore-account#<token>`, see
+         *     `/v1/auth/account/restore`); only the token's SHA-256 is stored and
+         *     the stored e-mail copy drops the link once delivered. After the
+         *     window the worker erases the account: sign-in methods, sessions,
+         *     devices, inbox and organization memberships are deleted and the user
+         *     row is anonymised (rental, contract, finance and audit records keep
+         *     referencing it as "Silinmiş kullanıcı").
          *
          *     Confirm with either a recent step-up grant (`/v1/auth/step-up/*`,
          *     send `{}`) or `code` from `/v1/auth/account/deactivate/request`.
          *     Without either → `403 STEP_UP_REQUIRED`. Wrong code →
          *     `400 INVALID_EMAIL_CODE`. The last super admin gets `409 CONFLICT`.
-         *     Refused while impersonating (`403 FORBIDDEN`). A platform admin can
-         *     reactivate the user by setting status `active`.
+         *     The only open owner (template `owner` role; owners whose own deletion
+         *     is pending do not count) of a live organization gets
+         *     `409 LAST_ORGANIZATION_OWNER`, with one `details[]` entry per
+         *     organization (`field = organization`, `message` = name, `code` =
+         *     slug): hand over ownership first. Refused while impersonating
+         *     (`403 FORBIDDEN`). A platform admin can reactivate the user before
+         *     the purge by setting status `active`.
          */
         post: operations["postAuthAccountDeactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/account/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a deleted account with the e-mailed link
+         * @description Public. The token from the deletion e-mail's restore link reopens the
+         *     account (`active`, deletion date and token cleared) while its 30-day
+         *     window is open, and sends `auth.account_restored`. The user then
+         *     signs in as usual (sessions and push devices were removed at
+         *     deletion). Unknown, used or late tokens → `400 INVALID_RESTORE_LINK`.
+         *     Rate limited per IP (`429 RATE_LIMITED`).
+         */
+        post: operations["postAuthAccountRestore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -19895,6 +19937,8 @@ export interface components {
              * @example RATE_LIMITED
              * @example STEP_UP_REQUIRED
              * @example ACCOUNT_DEACTIVATED
+             * @example INVALID_RESTORE_LINK
+             * @example LAST_ORGANIZATION_OWNER
              * @example INVALID_EMAIL_CODE
              * @example INVALID_ID_TOKEN
              * @example OAUTH_ACCOUNT_NOT_LINKED
@@ -20355,6 +20399,10 @@ export interface components {
         AccountDeactivateRequest: {
             /** @description Code from `/v1/auth/account/deactivate/request`; omit to use a step-up grant */
             code?: string;
+        };
+        AccountRestoreRequest: {
+            /** @description Token after `#` in the deletion e-mail's restore link */
+            token: string;
         };
         ForgotPasswordRequest: {
             /** Format: email */
@@ -35563,6 +35611,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
         };
@@ -35593,6 +35642,33 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postAuthAccountRestore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountRestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Restored (`data.status = restored`) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
         };
