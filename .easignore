@@ -1,0 +1,46 @@
+# EAS uploads from the git root and skips every .gitignore once this file exists,
+# so it repeats what mobile/.gitignore hides and drops the rest of the monorepo.
+# Keep backend/docs/openapi.yaml out too: the committed mobile/src/core/api/schema.d.ts
+# is what the app builds from.
+.agents/
+.claude/
+.github/
+.playwright-mcp/
+backend/
+deploy/
+docs/
+# The app bundles the panel's translations (frontend/src/locales, metro watchFolders).
+frontend/*
+!frontend/src/
+frontend/src/*
+!frontend/src/locales/
+landing-video/
+scripts/
+site/
+tmp/
+.env
+.env.*
+compose.*.yml
+Makefile
+
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/expo-env.d.ts
+mobile/.kotlin/
+mobile/ios/
+mobile/android/
+mobile/.env
+mobile/.env*.local
+mobile/targets/*/Assets.xcassets
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+*.tsbuildinfo
+.metro-health-check*
+.DS_Store
