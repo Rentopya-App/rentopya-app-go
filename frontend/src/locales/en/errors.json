@@ -12,6 +12,7 @@
   "codes.INVALID_LINK_TICKET": "The sign-in session expired. Please sign in again.",
   "codes.OAUTH_PROVIDER_DISABLED": "This sign-in method is not enabled.",
   "codes.LAST_SIGN_IN_METHOD": "Set a password or add a passkey before removing your last sign-in method.",
+  "codes.PAYLOAD_TOO_LARGE": "The file exceeds the maximum allowed size.",
   "codes.VALIDATION_ERROR": "Some fields are invalid. Please check them.",
   "codes.UNAUTHENTICATED": "Your session has expired. Please sign in again.",
   "codes.FORBIDDEN": "You don't have permission for this action.",

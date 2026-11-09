@@ -1193,7 +1193,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	searchmodule.RegisterTenantRoutes(mux, searchH, tokens, loader, tenantResolver)
 	storagemodule.RegisterRoutes(
 		mux,
-		storagehandler.New(storageusecase.New(deps.Storage, deps.Queries, log)),
+		storagehandler.New(storageusecase.New(deps.Storage, deps.Queries, log), cfg.Storage.MaxBytes),
 		tokens,
 		loader,
 	)
