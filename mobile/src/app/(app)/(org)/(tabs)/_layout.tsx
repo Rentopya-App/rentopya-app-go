@@ -23,6 +23,10 @@ export default function Tabs() {
         <NativeTabs.Trigger.Icon sf="car.fill" md="directions_car" />
         <NativeTabs.Trigger.Label>{t('vehicles_app:tab')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="rentals" hidden={!can(Permission.TenantRentalsRead)}>
+        <NativeTabs.Trigger.Icon sf="key.fill" md="car_rental" />
+        <NativeTabs.Trigger.Label>{t('rentals_app:tab')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="menu">
         <NativeTabs.Trigger.Icon sf="line.3.horizontal" md="menu" />
         <NativeTabs.Trigger.Label>{t('menu')}</NativeTabs.Trigger.Label>

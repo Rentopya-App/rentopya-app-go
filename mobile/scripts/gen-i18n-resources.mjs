@@ -23,6 +23,8 @@ const WEB = {
   vehicles: 'vehicles',
   vehicle_blocks: 'vehicle_blocks',
   vehicle_records: 'vehicle_records',
+  rentals: 'rentals',
+  inspections: 'inspections_web',
 };
 const WEB_NS = Object.values(WEB);
 
