@@ -88,9 +88,5 @@
   "detail.no_vehicle": "Araç atanmadı",
   "detail.summary_note": "Özet görünüm. Tüm ayrıntılar ve diğer işlemler panelde.",
   "action.handover": "Teslim et",
-  "action.return": "İade al",
-  "field.handover_title": "Araç teslimi",
-  "field.return_title": "Araç iadesi",
-  "field.soon_title": "Yakında",
-  "field.soon_body": "Mobil teslim ve iade adımları (kontrol, fotoğraf, imza) bir sonraki sürümde burada olacak. Şimdilik paneli kullanın."
+  "action.return": "İade al"
 }
