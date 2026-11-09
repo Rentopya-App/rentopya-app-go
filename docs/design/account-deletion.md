@@ -24,4 +24,5 @@ Accounts deactivated before migration 000139 were told that deactivation keeps t
 ## Notes
 
 - One-time codes in security e-mails (login, password reset, e-mail verification, account deletion, OAuth link) are enqueued with `SecretVars: ["code"]`, so the stored notification drops the code once delivered.
+- Since TEC-1166 every security e-mail (the templates above, the deletion / restore notices and invitations) is sealed: its row holds `title` = template code and `body` = `[redacted]` from the first write and the real content lives encrypted in `sealed_content` until delivered (`backend/docs/auth.md` → Security e-mails). `SecretVars` still redacts rows of other channels; on a sealed row the stored copy is the redacted stand-in, and `ForgetRecipient` still drops the address once the row is final.
 - Tests: usecase (`internal/modules/auth/usecase/account_deletion_test.go`), handler (`auth_flows_test.go`), notification redaction (`notifications/usecase/redact_test.go`), repository against Postgres (`internal/modules/auth/repository/account_deletion_db_test.go`, needs `TEST_DATABASE_URL`).

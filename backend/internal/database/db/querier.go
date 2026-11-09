@@ -1672,6 +1672,8 @@ type Querier interface {
 	// Notification engine (TEC-733, docs/design/notification-engine.md).
 	// Rules -----------------------------------------------------------------
 	ListNotificationRules(ctx context.Context, organizationID int64) ([]NotificationRule, error)
+	// E-mail rows stay out of the inbox: their bodies carry one-time codes and
+	// links that must only reach the mailbox, not the account holder.
 	ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]Notification, error)
 	// Customer accounts with an open (positive) balance and a debit falling
 	// due within the window: the earliest such due date per account.

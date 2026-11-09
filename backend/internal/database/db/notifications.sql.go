@@ -15,6 +15,7 @@ import (
 const countNotificationsForUser = `-- name: CountNotificationsForUser :one
 SELECT COUNT(*)::bigint FROM notifications
 WHERE user_id = $1
+  AND channel <> 'email'
   -- Inbox scope: un-stamped rows always; organization rows only inside
   -- that organization (NULL organization_id param = platform shell).
   AND (organization_id IS NULL OR organization_id = $2::bigint)
@@ -116,14 +117,14 @@ const createNotification = `-- name: CreateNotification :one
 INSERT INTO notifications (
     user_id, channel, status, priority,
     title, body, payload, action_url, recipient, template_code, source_event,
-    scheduled_at, max_attempts, organization_id, idempotency_key
+    scheduled_at, max_attempts, organization_id, idempotency_key, sealed_content
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6, $7, $8, $9, $10, $11,
-    $12, $13, $14, $15
+    $12, $13, $14, $15, $16
 )
 ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
-RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key
+RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content
 `
 
 type CreateNotificationParams struct {
@@ -142,6 +143,7 @@ type CreateNotificationParams struct {
 	MaxAttempts    int32              `json:"max_attempts"`
 	OrganizationID pgtype.Int8        `json:"organization_id"`
 	IdempotencyKey pgtype.Text        `json:"idempotency_key"`
+	SealedContent  pgtype.Text        `json:"sealed_content"`
 }
 
 // A notification whose idempotency key exists already inserts nothing (no
@@ -163,6 +165,7 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 		arg.MaxAttempts,
 		arg.OrganizationID,
 		arg.IdempotencyKey,
+		arg.SealedContent,
 	)
 	var i Notification
 	err := row.Scan(
@@ -194,6 +197,7 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }
@@ -214,7 +218,7 @@ func (q *Queries) DeletePushSubscription(ctx context.Context, arg DeletePushSubs
 }
 
 const getNotificationByID = `-- name: GetNotificationByID :one
-SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key FROM notifications WHERE id = $1
+SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content FROM notifications WHERE id = $1
 `
 
 func (q *Queries) GetNotificationByID(ctx context.Context, id int64) (Notification, error) {
@@ -249,12 +253,13 @@ func (q *Queries) GetNotificationByID(ctx context.Context, id int64) (Notificati
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }
 
 const getNotificationByIdempotencyKey = `-- name: GetNotificationByIdempotencyKey :one
-SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key FROM notifications WHERE idempotency_key = $1
+SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content FROM notifications WHERE idempotency_key = $1
 `
 
 func (q *Queries) GetNotificationByIdempotencyKey(ctx context.Context, idempotencyKey pgtype.Text) (Notification, error) {
@@ -289,12 +294,13 @@ func (q *Queries) GetNotificationByIdempotencyKey(ctx context.Context, idempoten
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }
 
 const getNotificationByUUID = `-- name: GetNotificationByUUID :one
-SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key FROM notifications WHERE uuid = $1
+SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content FROM notifications WHERE uuid = $1
 `
 
 func (q *Queries) GetNotificationByUUID(ctx context.Context, argUuid uuid.UUID) (Notification, error) {
@@ -329,6 +335,7 @@ func (q *Queries) GetNotificationByUUID(ctx context.Context, argUuid uuid.UUID) 
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }
@@ -414,8 +421,9 @@ func (q *Queries) InsertNotificationHistory(ctx context.Context, arg InsertNotif
 }
 
 const listNotificationsForUser = `-- name: ListNotificationsForUser :many
-SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key FROM notifications
+SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content FROM notifications
 WHERE user_id = $1
+  AND channel <> 'email'
   -- Inbox scope: un-stamped rows always; organization rows only inside
   -- that organization (NULL organization_id param = platform shell).
   AND (organization_id IS NULL OR organization_id = $2::bigint)
@@ -448,6 +456,8 @@ type ListNotificationsForUserParams struct {
 	LimitCount     int32       `json:"limit_count"`
 }
 
+// E-mail rows stay out of the inbox: their bodies carry one-time codes and
+// links that must only reach the mailbox, not the account holder.
 func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]Notification, error) {
 	rows, err := q.db.Query(ctx, listNotificationsForUser,
 		arg.UserID,
@@ -495,6 +505,7 @@ func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotifica
 			&i.UpdatedAt,
 			&i.OrganizationID,
 			&i.IdempotencyKey,
+			&i.SealedContent,
 		); err != nil {
 			return nil, err
 		}
@@ -507,7 +518,7 @@ func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotifica
 }
 
 const listPlatformNotifications = `-- name: ListPlatformNotifications :many
-SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key FROM notifications
+SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content FROM notifications
 WHERE organization_id IS NULL
   AND ($1::text IS NULL OR status = $1)
   AND ($2::text IS NULL OR channel = $2)
@@ -577,6 +588,7 @@ func (q *Queries) ListPlatformNotifications(ctx context.Context, arg ListPlatfor
 			&i.UpdatedAt,
 			&i.OrganizationID,
 			&i.IdempotencyKey,
+			&i.SealedContent,
 		); err != nil {
 			return nil, err
 		}
@@ -589,7 +601,7 @@ func (q *Queries) ListPlatformNotifications(ctx context.Context, arg ListPlatfor
 }
 
 const listPlatformNotificationsForExport = `-- name: ListPlatformNotificationsForExport :many
-SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key FROM notifications
+SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content FROM notifications
 WHERE organization_id IS NULL
   AND ($1::text IS NULL OR status = $1)
   AND ($2::text IS NULL OR channel = $2)
@@ -652,6 +664,7 @@ func (q *Queries) ListPlatformNotificationsForExport(ctx context.Context, arg Li
 			&i.UpdatedAt,
 			&i.OrganizationID,
 			&i.IdempotencyKey,
+			&i.SealedContent,
 		); err != nil {
 			return nil, err
 		}
@@ -791,7 +804,7 @@ SET status = 'failed',
     failed_at = NOW(),
     last_error = $2
 WHERE id = $1
-RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key
+RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content
 `
 
 type MarkNotificationFailedParams struct {
@@ -831,6 +844,7 @@ func (q *Queries) MarkNotificationFailed(ctx context.Context, arg MarkNotificati
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }
@@ -841,7 +855,7 @@ SET status = 'processing',
     attempt_count = attempt_count + 1
 WHERE id = $1
   AND status IN ('queued', 'failed')
-RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key
+RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content
 `
 
 func (q *Queries) MarkNotificationProcessing(ctx context.Context, id int64) (Notification, error) {
@@ -876,6 +890,7 @@ func (q *Queries) MarkNotificationProcessing(ctx context.Context, id int64) (Not
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }
@@ -887,7 +902,7 @@ SET status = 'read',
 WHERE uuid = $1
   AND user_id = $2
   AND channel = 'inapp'
-RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key
+RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content
 `
 
 type MarkNotificationReadParams struct {
@@ -927,6 +942,7 @@ func (q *Queries) MarkNotificationRead(ctx context.Context, arg MarkNotification
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }
@@ -941,9 +957,11 @@ SET status = $1::varchar,
     END,
     provider = $2,
     provider_reference = $3,
-    last_error = NULL
+    last_error = NULL,
+    -- A delivered security e-mail drops its encrypted content.
+    sealed_content = NULL
 WHERE id = $4
-RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key
+RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content
 `
 
 type MarkNotificationSentParams struct {
@@ -993,6 +1011,7 @@ func (q *Queries) MarkNotificationSent(ctx context.Context, arg MarkNotification
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }
@@ -1003,7 +1022,7 @@ SET attempt_count = attempt_count + 1
 WHERE id = $1
   AND status = 'processing'
   AND updated_at < NOW() - make_interval(mins => $2::int)
-RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key
+RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, idempotency_key, sealed_content
 `
 
 type ReclaimProcessingNotificationParams struct {
@@ -1045,6 +1064,7 @@ func (q *Queries) ReclaimProcessingNotification(ctx context.Context, arg Reclaim
 		&i.UpdatedAt,
 		&i.OrganizationID,
 		&i.IdempotencyKey,
+		&i.SealedContent,
 	)
 	return i, err
 }

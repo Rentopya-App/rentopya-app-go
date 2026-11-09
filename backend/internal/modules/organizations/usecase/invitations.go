@@ -430,6 +430,9 @@ func (m *Management) sendInvitation(ctx context.Context, orgID int64, actor Acto
 		Channels: []string{notifmodel.ChannelEmail}, Recipient: &email,
 		TemplateCode: invitationTemplate, SourceEvent: invitationTemplate, Language: lang,
 		ActionURL: &link, Priority: notifmodel.PriorityHigh,
+		// Delivered whatever the invitee's preferences, and the link stays
+		// sealed on the row: it must only be readable from the mailbox.
+		SecurityEmail: true,
 		TemplateVars: map[string]string{
 			"organization": org.Name, "inviter": inviter, "roles": strings.Join(roleNames, ", "),
 			"link": link, "expires_at": expires, "email": inv.Email,
