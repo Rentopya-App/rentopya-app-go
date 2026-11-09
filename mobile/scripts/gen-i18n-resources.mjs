@@ -19,6 +19,10 @@ const out = path.join(root, 'src/core/i18n/resources.ts');
 /** Panel catalog file → namespace in the app (the app's own `common` stays separate from the panel's). */
 const WEB = {
   errors: 'errors',
+  activity: 'activity',
+  vehicles: 'vehicles',
+  vehicle_blocks: 'vehicle_blocks',
+  vehicle_records: 'vehicle_records',
 };
 const WEB_NS = Object.values(WEB);
 
