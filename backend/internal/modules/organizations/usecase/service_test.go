@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -116,6 +117,44 @@ func TestLastOwnerGuard(t *testing.T) {
 	}
 }
 
+func TestRemoveMemberRevokesOpenInvitations(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	f := newFakeRepo(now)
+	org := f.addOrg("acme", "active", now.Add(-time.Hour), nil)
+	f.users[10] = db.User{ID: 10, Uuid: uuid.New(), Email: "owner@example.test", Status: "active"}
+	staffUUID := uuid.New()
+	f.users[11] = db.User{ID: 11, Uuid: staffUUID, Email: "Staff@Example.test", Status: "active"}
+	f.addMembership(org.ID, 10, "owner")
+	f.addMembership(org.ID, 11, "member")
+	svc := New(f, nil)
+
+	if err := svc.RemoveMember(context.Background(), org.Uuid, staffUUID); err != nil {
+		t.Fatalf("remove member: %v", err)
+	}
+	want := fmt.Sprintf("%d|staff@example.test", org.ID)
+	if len(f.revokedInvs) != 1 || f.revokedInvs[0] != want {
+		t.Fatalf("revoked invitations = %v, want [%s]", f.revokedInvs, want)
+	}
+}
+
+func TestChangeMemberRoleRejectsEmptyRole(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	f := newFakeRepo(now)
+	org := f.addOrg("acme", "active", now.Add(-time.Hour), nil)
+	userUUID := uuid.New()
+	f.users[10] = db.User{ID: 10, Uuid: userUUID, Email: "a@example.test", Status: "active"}
+	f.addMembership(org.ID, 10, "admin")
+	svc := New(f, nil)
+	if _, err := svc.ChangeMemberRole(context.Background(), org.Uuid, userUUID, " "); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("err = %v, want ErrInvalidRequest", err)
+	}
+	if got := f.memberships[org.ID][10]; got != "admin" {
+		t.Fatalf("role changed to %q", got)
+	}
+}
+
 func TestAddMemberRejectsExistingMember(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
@@ -160,6 +199,8 @@ type fakeRepo struct {
 	perms         map[string][]string
 	extraRoles    map[int64][]string
 	branches      map[int64][]int64
+	revokedInvs   []string
+	rolePerms     map[int64][]string
 }
 
 // fakeMemberID derives a stable member id from organization and user.
@@ -340,6 +381,11 @@ func (f *fakeRepo) DeleteOrganizationMember(_ context.Context, _ *db.Queries, or
 	return nil
 }
 
+func (f *fakeRepo) RevokeOpenInvitationsForEmail(_ context.Context, _ *db.Queries, orgID int64, email string, _ *int64) error {
+	f.revokedInvs = append(f.revokedInvs, fmt.Sprintf("%d|%s", orgID, email))
+	return nil
+}
+
 func (f *fakeRepo) CountOrganizationOwners(_ context.Context, _ *db.Queries, orgID int64) (int64, error) {
 	var n int64
 	for _, role := range f.memberships[orgID] {
@@ -489,8 +535,14 @@ func (f *fakeRepo) GetTenantRoleByUUID(context.Context, *db.Queries, int64, uuid
 	return repository.TenantRoleRow{}, repository.ErrNotFound
 }
 
-func (f *fakeRepo) ListRolePermissionSlugs(context.Context, []int64) (map[int64][]string, error) {
-	return map[int64][]string{}, nil
+func (f *fakeRepo) ListRolePermissionSlugs(_ context.Context, ids []int64) (map[int64][]string, error) {
+	out := map[int64][]string{}
+	for _, id := range ids {
+		if perms, ok := f.rolePerms[id]; ok {
+			out[id] = perms
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeRepo) ListTenantPermissions(context.Context) ([]db.ListTenantPermissionsRow, error) {

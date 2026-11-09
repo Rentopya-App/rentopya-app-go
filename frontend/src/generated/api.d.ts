@@ -2579,7 +2579,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a member from the organization
-         * @description `tenant.members.write`. Only owners remove an owner; the last owner cannot be removed (`409 LAST_ORGANIZATION_OWNER`).
+         * @description `tenant.members.write`. Only owners remove an owner; the last owner cannot be removed (`409 LAST_ORGANIZATION_OWNER`). Open invitations for the member's e-mail in this organization are revoked with the membership.
          */
         delete: operations["deleteTenantMember"];
         options?: never;
@@ -2641,8 +2641,10 @@ export interface paths {
          * @description `tenant.members.write`. E-mails a single-use link
          *     `${PUBLIC_FRONTEND_URL}/invite/{token}` valid for 7 days; the token
          *     (32 random bytes) is stored as its sha256 hash and never returned.
-         *     Re-inviting an e-mail revokes its open invitation; inviting a member
-         *     answers `409 ALREADY_MEMBER`.
+         *     Re-inviting an e-mail revokes its open invitation, so the caller must
+         *     also be allowed to grant every role and branch of that invitation
+         *     (`403 FORBIDDEN` otherwise: an admin cannot replace an owner
+         *     invitation); inviting a member answers `409 ALREADY_MEMBER`.
          *
          *     Same guards as member updates (`403 FORBIDDEN`): only owners invite
          *     owners; a non-owner can only grant roles whose permissions it holds;

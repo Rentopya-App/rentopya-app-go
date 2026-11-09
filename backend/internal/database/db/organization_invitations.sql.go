@@ -461,6 +461,48 @@ func (q *Queries) LockInvitationByTokenHash(ctx context.Context, tokenHash strin
 	return i, err
 }
 
+const lockOpenInvitationsForEmail = `-- name: LockOpenInvitationsForEmail :many
+SELECT id, branch_scope
+FROM organization_invitations
+WHERE organization_id = $1
+  AND email = $2
+  AND accepted_at IS NULL AND revoked_at IS NULL
+ORDER BY id
+FOR UPDATE
+`
+
+type LockOpenInvitationsForEmailParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	Email          string `json:"email"`
+}
+
+type LockOpenInvitationsForEmailRow struct {
+	ID          int64  `json:"id"`
+	BranchScope string `json:"branch_scope"`
+}
+
+// The open invitations a re-invite would revoke, so the caller's grant
+// rules can be checked against each of them first.
+func (q *Queries) LockOpenInvitationsForEmail(ctx context.Context, arg LockOpenInvitationsForEmailParams) ([]LockOpenInvitationsForEmailRow, error) {
+	rows, err := q.db.Query(ctx, lockOpenInvitationsForEmail, arg.OrganizationID, arg.Email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LockOpenInvitationsForEmailRow{}
+	for rows.Next() {
+		var i LockOpenInvitationsForEmailRow
+		if err := rows.Scan(&i.ID, &i.BranchScope); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markInvitationAccepted = `-- name: MarkInvitationAccepted :execrows
 UPDATE organization_invitations
 SET accepted_at = NOW(), accepted_by = $1
