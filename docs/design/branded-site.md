@@ -207,7 +207,7 @@ Common to all pages:
 | Key | Where | Notes |
 |-----|-------|-------|
 | `SITE_BASE_URL` | backend (`compose.prod.yml` backend env, `deploy/env/schema`) | Default `{APP_URL}`. |
-| `SITE_IMAGE` | compose | `{NAME_PREFIX}-site:latest` (`deploy/env/schema`). |
+| `IMAGE_REPO` / `IMAGE_TAG` | compose | The site runs `${IMAGE_REPO}-site:${IMAGE_TAG}`, pulled from GHCR (TEC-1133, `deploy/env/schema`). |
 | `API_URL` | site container | `http://backend.<app network>:8080/v1`. |
 
 Local: `make site-dev` serves the site on `http://{subdomain}.localhost:3100`; browsers resolve `*.localhost` to loopback. The public API accepts `http://*.localhost` origins for this.

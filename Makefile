@@ -19,7 +19,7 @@ endef
 FRONTEND_PORT ?= 3000
 
 .PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev site-dev local-dev \
-	free-dev-ports prod-env prod-env-upgrade prod-env-check env-check compose-env-check prod-sync prod-super-admin prod-config prod-up prod-down \
+	free-dev-ports prod-env prod-env-upgrade prod-env-check env-check compose-env-check prod-sync prod-super-admin prod-config prod-up prod-build prod-up-build prod-down \
 	prod-backup prod-backup-status tools create-super-admin search-reindex check-i18n \
 	messaging-reconcile prod-messaging-reconcile integration-jobs-reconcile prod-integration-jobs-reconcile \
 	acceptance acceptance-backend acceptance-e2e acceptance-stack-up acceptance-stack-down
@@ -156,8 +156,20 @@ prod-super-admin:
 prod-config:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml config
 
+# Prebuilt images (TEC-1133): CI publishes them to GHCR and the server pulls
+# ${IMAGE_REPO}-<service>:${IMAGE_TAG} (set IMAGE_TAG=v0.N in the env file);
+# nothing is built on the host.
 prod-up:
-	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml up -d --build
+	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml up -d
+
+# Local build of the same images (compose.build.yml adds the build sections
+# back; contexts as in deploy/images.json). For smoke tests and the legacy
+# server-sync cron; use a non-release IMAGE_TAG such as `local`.
+prod-build:
+	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml -f compose.build.yml build
+
+prod-up-build:
+	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml -f compose.build.yml up -d --build
 
 prod-down:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml down

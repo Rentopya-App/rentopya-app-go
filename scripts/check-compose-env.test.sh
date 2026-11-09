@@ -74,7 +74,7 @@ ok "'wire' keys warn with a KEY: \${KEY:-} snippet that grafts cleanly and clear
 # Wired tunables are behaviour-neutral: empty values resolve to the Go defaults.
 C=$ROOT/compose.prod.yml
 "$ROOT/scripts/prod-env.sh" init -o "$T/env" --app-url https://app.example.com </dev/null >/dev/null 2>&1
-docker compose --env-file "$T/env" -f "$C" config >"$T/resolved" 2>&1 || { cat "$T/resolved" >&2; fail "compose config on compose.prod.yml"; }
+IMAGE_TAG=v0.0 docker compose --env-file "$T/env" -f "$C" config >"$T/resolved" 2>&1 || { cat "$T/resolved" >&2; fail "compose config on compose.prod.yml"; }
 grep -q 'JWT_ACCESS_TTL: ""' "$T/resolved" || fail "wired tunables should resolve to an empty value when unset"
 ok "wired tunables resolve to empty when unset (config.go then uses its default)"
 

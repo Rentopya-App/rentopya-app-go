@@ -83,7 +83,7 @@ Script'e özel (env dosyasına yazılmaz): `BACKUP_RCLONE_IMAGE` (varsayılan `r
 
 İkisinden biri:
 
-**A. Compose servisi** (Dokploy'da da): env'e `COMPOSE_PROFILES=backup`, sonra `make prod-up` (Dokploy: redeploy). Servis `deploy/backup/Dockerfile` imajını kurar (alpine + bash, age, docker-cli) ve `backup.sh schedule` çalıştırır. Docker soketini bağlar: host'ta root yetkisine eşdeğerdir; servisi `dokploy-network`'e eklemeyin, port açmayın. Dokploy'un `COMPOSE_PROFILES`'ı env'den okuduğu doğrulanmadı; okumazsa B'yi kullanın.
+**A. Compose servisi** (Dokploy'da da): env'e `COMPOSE_PROFILES=backup`, sonra `make prod-up` (Dokploy: redeploy). Servis CI'ın GHCR'a yayımladığı `${IMAGE_REPO}-backup:${IMAGE_TAG}` imajını çeker (`deploy/backup/Dockerfile`: alpine + bash, age, docker-cli; yerel build: `make prod-build`) ve `backup.sh schedule` çalıştırır. Docker soketini bağlar: host'ta root yetkisine eşdeğerdir; servisi `dokploy-network`'e eklemeyin, port açmayın. Dokploy'un `COMPOSE_PROFILES`'ı env'den okuduğu doğrulanmadı; okumazsa B'yi kullanın.
 
 **B. Host cron** (`server-sync.sh` ile aynı düzen; host'ta bash 4+, docker, `age` gerekir: `apt install age`):
 
