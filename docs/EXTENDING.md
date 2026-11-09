@@ -156,6 +156,19 @@ Tenant resources (`tenant.<plural>`) are published on `org:{org_uuid}:resource:t
 
 Other scoped channels: `Broadcaster.AddResolver` returns another channel for chosen resources, `AuthUseCase.AddChannelRules` authorizes it, and the page passes `realtime: { resource, channel }`.
 
+## Environment variables
+
+`deploy/env/schema` is the source of truth for the production env; CI keeps the other files in line with it ([design](./design/env-core.md)). Adding a variable:
+
+1. **Read it** in `backend/internal/config/config.go` with a string-literal key (`getEnv("MY_KEY", "default")`); the checks below find reads by literal name.
+2. **Local default** in `.env.example` (local dev never needs a generator).
+3. **Production**, when prod needs a value: add a line to `deploy/env/schema` at the end of its section (`derive:`, `const:`, `secret:…`, `empty`; `#` notes above it are copied for operators), bump `@version`, then `scripts/prod-env.sh example > .env.server.example`. Renaming or dropping a key: `@rename OLD NEW <ver>` / `@remove KEY <ver>`, so `make prod-env-upgrade` migrates deployed files without losing values. Optional tuning knobs with a safe Go default can stay out of the schema (document them in `.env.example`).
+4. **Deliver it** to the containers: add it to `x-backend-environment` in `compose.prod.yml` (`MY_KEY: ${MY_KEY:-}` keeps the Go default when unset), or record why not in `deploy/env/compose-env.allow`. Frontend / site keys go into their service's `environment` by hand.
+5. **Secrets**: a backend secret gets a row in `managedSecrets` (`backend/internal/config/guard.go`) with its development value, so staging/production refuse it; a secret only another container reads goes into `unguardedSchemaSecrets` with a reason. A test fails until you do.
+6. `make env-check && (cd backend && go test ./internal/config/)`.
+
+Never add env keys for provider credentials (iyzico, Netgsm, e-invoice, KABİS, HGS, Yolcu360, Obilet, WhatsApp sessions): they are per organization in the integration vault (`integration-adapter` skill). Do not edit `.env.server.example` by hand, and never put real values in either example file.
+
 ## Do not
 
 - Put the organization in the JWT, add a workspace / dealer level, or a `/business` shell: organizations are resolved per request (`X-Organization`, `orgctx`)

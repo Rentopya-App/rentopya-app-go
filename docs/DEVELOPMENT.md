@@ -122,7 +122,7 @@ Rollback: `touch .sync-paused`, `git checkout <previous sha>`, `scripts/server-s
 - keys the schema does not know (your own additions) are kept under "Unmanaged";
 - the file is rewritten in place and the previous one is kept as `<file>.bak.<timestamp>`.
 
-`make prod-env-check` exits non-zero when the file is behind the schema. When a release needs a new env key, add it to `deploy/env/schema` and bump `@version` in the same change.
+`make prod-env-check` exits non-zero when the file is behind the schema, a secret or URL is blank, or a secret still holds its public `.env.example` value. The backend refuses to start outside development with a blank or development secret (`backend/internal/config/guard.go`) and with an unknown `APP_ENV`. `.env.server.example` is generated (`scripts/prod-env.sh example`); never edit it by hand. When a release needs a new env key, follow [EXTENDING.md](./EXTENDING.md) → Environment variables (schema line, `@version` bump, `make env-check`); design: [design/env-core.md](./design/env-core.md).
 
 Networks: Compose creates a private bridge network per app (`${APP_NETWORK_NAME:-${NAME_PREFIX}-app}`) and every service joins it. Only **frontend** (`:3000`), **site** (`:3000`) and **centrifugo** (`:8000`) also join the shared `dokploy-network`, so the proxy can route their domains. The backend is reached through the frontend's `/api` proxy (the site calls it on the private network), and SeaweedFS, Postgres, Redis, Meilisearch, wuzapi and the worker stay private (files reach browsers through API endpoints, never a bucket URL). No service publishes host ports.
 
