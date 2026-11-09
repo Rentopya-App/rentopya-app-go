@@ -2,6 +2,8 @@ import { getLocales } from 'expo-localization';
 import { createInstance } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
+import { errorKeys } from '@/core/api/error-keys';
+import { isApiError } from '@/core/api/errors';
 import { storage } from '@/core/storage';
 
 import { NAMESPACES, resources } from './resources';
@@ -49,8 +51,17 @@ export async function setLanguage(lang: Language) {
   await i18n.changeLanguage(lang);
 }
 
-/** Translates a backend error code with the web's errors catalog. */
-export function errorMessage(code: string | undefined, fallback?: string) {
-  const key = `errors:codes.${code ?? ''}`;
-  return code && i18n.exists(key) ? i18n.t(key) : (fallback ?? i18n.t('common:error_generic'));
+/**
+ * Translates a backend error code: the web's errors catalog, then the app's
+ * own codes (`common:codes.*`), then the HTTP status text, else `fallback`
+ * or the generic message. See `core/api/error-keys.ts`.
+ */
+export function errorMessage(code: string | undefined, fallback?: string, status?: number) {
+  const key = errorKeys(code, status).find((k) => i18n.exists(k));
+  return key ? i18n.t(key) : (fallback ?? i18n.t('common:error_generic'));
+}
+
+/** The message for anything a call threw (ApiError or not). */
+export function apiErrorMessage(e: unknown) {
+  return isApiError(e) ? errorMessage(e.code, undefined, e.status) : errorMessage(undefined);
 }

@@ -1,7 +1,6 @@
 {
   "title": "Menu",
   "section_account": "Account",
-  "sign_in": "Sign in",
   "section_app": "App",
   "language": "Language",
   "theme": "Appearance",
@@ -9,5 +8,15 @@
   "theme_light": "Light",
   "theme_dark": "Dark",
   "section_about": "About",
-  "version": "Version"
+  "version": "Version",
+  "section_company": "Company",
+  "organization": "Company",
+  "switch_organization": "Switch company",
+  "branch": "Branch",
+  "branch_all": "All branches",
+  "branch_hint": "Lists are filtered by this branch. Branches outside your access never show up anyway.",
+  "role": "Your role",
+  "sign_out": "Sign out",
+  "sign_out_confirm_title": "Sign out?",
+  "sign_out_confirm_body": "Your session on this device ends."
 }

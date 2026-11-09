@@ -32,5 +32,6 @@
   "duration_minutes": "{{count}} min",
   "clear_date": "Clear date",
   "reason": "Reason",
-  "reason_hint": "At least 3 characters; shown on the record."
+  "reason_hint": "At least 3 characters; shown on the record.",
+  "codes.NETWORK_ERROR": "The server could not be reached. Check your connection and try again."
 }

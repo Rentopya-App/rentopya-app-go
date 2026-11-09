@@ -7,9 +7,10 @@ and the brand tokens, in the panel's look (Plus Jakarta Sans, Rentopya indigo
 and ink; `docs/brand.md`). The structure follows the Takwim app this shell was
 taken from.
 
-This is the skeleton: a placeholder home tab, a menu tab (language,
-appearance, version) and a sign-in placeholder. The API client, session and
-organization picker come next; module screens after that.
+So far: sign-in (e-mail + password, 2FA code, Sign in with Apple and Google
+when configured), the organization picker, the branch filter, permission
+checks, a placeholder home tab and the menu (company, branch, account,
+language, appearance, version). Module screens come next.
 
 The app calls the Go API directly: `<EXPO_PUBLIC_API_URL>/v1/*` with its own
 Bearer token pair (`backend/docs/openapi.yaml`), the organization in
@@ -24,10 +25,12 @@ npm install
 npx expo start                  # then press i / a for a development build, w for web
 ```
 
-| Variable              | Meaning                                                                                                                             |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `EXPO_PUBLIC_API_URL` | Go API origin, no `/v1` (simulator `http://localhost:8080`, Android emulator `http://10.0.2.2:8080`, device `http://<LAN IP>:8080`) |
-| `EXPO_PUBLIC_WEB_URL` | Panel origin for links that open the web (forgot password, settings)                                                                |
+| Variable                                                                | Meaning                                                                                                                                                                   |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EXPO_PUBLIC_API_URL`                                                   | Go API origin, no `/v1` (simulator `http://localhost:8080`, Android emulator `http://10.0.2.2:8080`, device `http://<LAN IP>:8080`)                                       |
+| `EXPO_PUBLIC_WEB_URL`                                                   | Panel origin for links that open the web (forgot password, settings)                                                                                                      |
+| `EXPO_PUBLIC_APPLE_SIGN_IN`                                             | `1` shows Sign in with Apple (iOS) and adds the entitlement (`app.config.js`); the API lists the bundle id in `AUTH_APPLE_NATIVE_CLIENT_IDS`                              |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` / `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google sign-in (web id on both platforms, iOS id on iOS, which also adds the URL scheme plugin); the API lists them in `AUTH_GOOGLE_NATIVE_CLIENT_IDS`. Unset = no button |
 
 `make local-dev` at the repo root starts the API on `:8080`. SDK 58 needs a
 development build for native modules (`npx expo run:ios` / `run:android`);
@@ -36,16 +39,19 @@ native settings live in `app.json`.
 
 ## Commands
 
-| Command                 | What it does                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------ |
-| `npm run typecheck`     | `tsc --noEmit`                                                                       |
-| `npm run lint`          | `expo lint`                                                                          |
-| `npm test`              | `node --test` on `src/**/*.test.ts` (pure helpers, and tr/en catalogs key for key)   |
-| `npm run i18n:gen`      | Regenerates `src/core/i18n/resources.ts` after adding a namespace                    |
-| `npm run i18n:check`    | tr and en must match key for key, `{{params}}` too                                   |
-| `npm run icons:gen`     | Regenerates `src/ui/material-symbols.ts` after an icon is added to `src/ui/icons.ts` |
-| `npm run uniwind:types` | Regenerates `src/uniwind-types.d.ts` (Metro also does it on start)                   |
-| `npm run doctor`        | `expo-doctor`                                                                        |
+| Command                   | What it does                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run typecheck`       | `tsc --noEmit`                                                                                                                 |
+| `npm run lint`            | `expo lint`                                                                                                                    |
+| `npm test`                | `node --test` on `src/**/*.test.ts` (pure helpers, and tr/en catalogs key for key)                                             |
+| `npm run api:generate`    | Regenerates `src/core/api/schema.d.ts` from `../backend/docs/openapi.yaml` (commit it)                                         |
+| `npm run api:check`       | CI: `openapi-typescript` pinned to an exact version and `schema.d.ts` up to date                                               |
+| `npm run permissions:gen` | Copies the `tenant.*` / `auth.*` / `notifications.*` slugs from `frontend/src/config/permissions.ts` (a test fails when stale) |
+| `npm run i18n:gen`        | Regenerates `src/core/i18n/resources.ts` after adding a namespace                                                              |
+| `npm run i18n:check`      | tr and en must match key for key, `{{params}}` too                                                                             |
+| `npm run icons:gen`       | Regenerates `src/ui/material-symbols.ts` after an icon is added to `src/ui/icons.ts`                                           |
+| `npm run uniwind:types`   | Regenerates `src/uniwind-types.d.ts` (Metro also does it on start)                                                             |
+| `npm run doctor`          | `expo-doctor`                                                                                                                  |
 
 Brand art: `assets/images/*.png` (app icon, Android adaptive layers, splash,
 favicon) are generated from `assets/brand/rentopya-icon-colorful.svg` (a copy
@@ -58,8 +64,10 @@ of `frontend/src/assets/brand`) with
 src/
   app/                 expo-router routes, one-line files
     (app)/(tabs)/      Home, Menu (native tabs, a stack in each)
-    (public)/sign-in   sign-in placeholder
-  core/                no UI: config, i18n, storage, preferences, query client, formatting, OTA, API errors
+    (public)/          sign-in (index) and oauth-link (Apple relay e-mail: link or create)
+    (app)/             signed in: organizations (picker), (org)/(tabs) once one is picked
+  core/                no UI: config, i18n, storage, preferences, query client, formatting, OTA,
+                       api/ (typed client, refresh, errors), auth/ (tokens, session, permissions), tenant, branch
   features/            screens, one folder per area (shell, home, settings, auth)
   ui/                  design system (tokens in src/global.css mirror the panel theme)
 app-intents/  modules/  plugins/  patches/  targets/   native scaffolds, empty for now (README in each)
@@ -72,6 +80,20 @@ Rules (the same as the Takwim app):
 - Every string through i18n, Turkish first, English complete. API error codes
   come from the panel's catalog (`frontend/src/locales/*/errors.json`), so web
   and mobile say the same thing.
+- Session: the token pair lives in `expo-secure-store` only. Every call goes
+  through `core/api/auth-fetch.ts`: Bearer, refresh 30 s before expiry or on a
+  401 (one refresh at a time; the refresh token rotates), sign-out when the
+  refresh token is refused, `X-Organization: <slug>` on `/v1/tenant/*`, and back
+  to the picker when a tenant call says the membership is gone
+  (`NO_TENANT_MEMBERSHIP`, suspended, access expired).
+- Organization: picked from `/v1/auth/me` memberships, remembered on the
+  device, restored while still usable. Permissions come from
+  `/v1/tenant/context` (`usePermissions`, `useCan`, `<Can perm=…>`, slugs in
+  `src/core/auth/permission-slugs.ts`); the API enforces each one.
+- Branch: a filter only (`useSelectedBranch().branchUuid` as the list query
+  filter), kept per organization; never a header, the API applies the branch scope.
+- Not yet: native passkey sign-in (web only, like the Takwim app); push
+  registration on sign-in (TEC-1140).
 - Colors only through theme classes (`bg-card`, `text-muted-foreground`, ...).
 - Type is Plus Jakarta Sans, one family per weight: use `font-sans-medium`,
   `font-sans-semibold`, `font-sans-bold` (or a `Text` variant), never
