@@ -46,6 +46,12 @@ func (r *Postgres) RevokeOpenInvitationsForEmail(ctx context.Context, q *db.Quer
 	return err
 }
 
+func (r *Postgres) LockOpenInvitationsForEmail(ctx context.Context, q *db.Queries, orgID int64, email string) ([]db.LockOpenInvitationsForEmailRow, error) {
+	return r.queries(q).LockOpenInvitationsForEmail(ctx, db.LockOpenInvitationsForEmailParams{
+		OrganizationID: orgID, Email: email,
+	})
+}
+
 func (r *Postgres) GetInvitationByUUID(ctx context.Context, orgID int64, id uuid.UUID) (db.OrganizationInvitation, error) {
 	row, err := r.q.GetInvitationByUUID(ctx, db.GetInvitationByUUIDParams{OrganizationID: orgID, Uuid: id})
 	return row, mapErr(err)

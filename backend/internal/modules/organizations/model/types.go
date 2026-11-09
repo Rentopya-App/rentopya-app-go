@@ -31,7 +31,7 @@ type Organization struct {
 }
 
 type User struct {
-	ID      int64
+	ID      int64     `json:"-"`
 	UUID    uuid.UUID `json:"uuid"`
 	Email   string    `json:"email"`
 	Name    string    `json:"name"`

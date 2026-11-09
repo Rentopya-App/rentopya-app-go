@@ -106,7 +106,7 @@ Browser (/t/acme/...)            BFF (/api/v1/*)                 Go API
 ## 6. Membership flows
 
 - **Create organization**: platform admin (`POST /v1/platform/organizations`) or self-serve (`POST /v1/auth/organizations`, gated by a config flag + registration setting). Creator becomes `owner`. Slug allocated from the name with a reserved list.
-- **Invite**: `POST /v1/tenant/invitations {email, role}` → email with `/invite/{token}`. Accepting signs in (or registers through the normal flows) and creates the membership. Expiry 7 days, single use, revocable.
+- **Invite**: `POST /v1/tenant/invitations {email, role}` → email with `/invite/{token}`. Accepting signs in (or registers through the normal flows) and creates the membership. Expiry 7 days, single use, revocable. Accepting needs the signed-in account whose e-mail matches the invitation. Re-inviting an address revokes its open invitation, so the caller must be able to grant every role and branch of that invitation too (an admin cannot replace an owner invitation). Removing a member revokes the open invitations for that address in the organization (TEC-1167).
 - **Change role / remove member**: row lock on the org, "last owner" guard (`409 LAST_ORGANIZATION_OWNER`), cache version bump.
 - **Leave organization**: a member can leave unless they are the last owner.
 - **Account deletion** (already exists): memberships are removed; organizations where the user was the last owner are flagged for platform follow-up.
