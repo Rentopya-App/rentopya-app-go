@@ -101,11 +101,15 @@ type EnqueueInput struct {
 	TemplateVars   map[string]string
 	SourceEvent    string
 	Language       string
-	// SecurityEmail bypasses email preference (password reset / verification).
+	// SecurityEmail bypasses email preference (password reset / verification)
+	// and keeps the e-mail's subject, body and action URL off the row: they
+	// stay encrypted (sealed_content) until delivery succeeds, then are
+	// dropped. Templates in SecurityEmailTemplates are sealed even without it.
 	SecurityEmail bool
 	// SecretVars names template vars (restore links, the name of an erased
 	// account) that must not outlive the delivery: the stored title / body
-	// are re-rendered without them once the row is final.
+	// are re-rendered without them once the row is final. A sealed security
+	// e-mail never stores them in the first place.
 	SecretVars []string
 	// ForgetRecipient drops the stored recipient address once the row is
 	// final (the last e-mail to an erased account).
@@ -116,6 +120,27 @@ type EnqueueInput struct {
 	// under a unique index: a replayed event or a retried caller gets the
 	// existing row back and nothing is delivered twice (TEC-962).
 	IdempotencyKey string
+}
+
+// SecurityEmailTemplates are the e-mail templates whose content carries a
+// secret (one-time code, reset / verification / invitation / restore link)
+// or concerns the security of an account. Their rows are always sealed;
+// migration 000140 redacted the rows written before sealing with this list.
+var SecurityEmailTemplates = map[string]bool{
+	"auth.password_reset":            true,
+	"auth.email_verification":        true,
+	"auth.login_code":                true,
+	"auth.oauth_link_code":           true,
+	"auth.account_deactivation_code": true,
+	"auth.account_deactivated":       true,
+	"auth.account_restored":          true,
+	"auth.account_deleted":           true,
+	"organizations.invitation":       true,
+}
+
+// IsSecurityEmail reports whether in's e-mail row must be sealed.
+func (in EnqueueInput) IsSecurityEmail() bool {
+	return in.SecurityEmail || SecurityEmailTemplates[in.TemplateCode]
 }
 
 // EventKey is the idempotency key of what one domain event notifies one

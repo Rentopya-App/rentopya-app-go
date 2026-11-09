@@ -2,6 +2,7 @@ package notifyengine_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifyengine/catalog"
 	engine "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifyengine/usecase"
 	smsusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/sms/usecase"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/crypto"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/msgreconcile"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/sms"
 	"github.com/google/uuid"
@@ -224,6 +226,15 @@ func TestRestoreReconcilePendingBeforeCutoff(t *testing.T) {
 	})
 	sink := &taskSink{}
 	notif := notifusecase.New(e.q, sink, []providers.Provider{providers.InappProvider{}}, nil)
+	fc, err := crypto.NewFieldCipher(strings.Repeat("n", 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealer, err := fc.Sealer(notifusecase.SealPurpose)
+	if err != nil {
+		t.Fatal(err)
+	}
+	notif.WithSealer(sealer)
 
 	// Waiting at backup time: a due e-mail dispatch, a queued SMS, a queued
 	// e-mail notification.
