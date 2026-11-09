@@ -248,13 +248,19 @@ jobs:
   # requests read/write) when set — merges made with it also trigger CI on
   # main. Otherwise GITHUB_TOKEN, which needs Settings → Actions → General →
   # "Allow GitHub Actions to create and approve pull requests".
+  #
+  # DISABLED: this job opens and merges a PR from every feature branch into
+  # main. During the org migration all work lands on cc-collective-branch via
+  # PRs and only the owner merges into main, so the job is turned off.
+  # To restore, replace `if: false` with the original condition:
+  #   if: >-
+  #     github.event_name == 'push' &&
+  #     github.ref_name != 'main' &&
+  #     github.ref_name != 'master' &&
+  #     !contains(github.event.head_commit.message, '[no-automerge]')
   auto-pr:
     needs: [commit-policy, prod-env, backend, frontend, site]
-    if: >-
-      github.event_name == 'push' &&
-      github.ref_name != 'main' &&
-      github.ref_name != 'master' &&
-      !contains(github.event.head_commit.message, '[no-automerge]')
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
