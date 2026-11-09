@@ -209,6 +209,14 @@ func main() {
 		log.Error("field_encryption_init_failed", "error", err)
 		exit(1)
 	}
+	// Security e-mails: delivery opens the sealed content, the worker's own
+	// enqueues (account deletion notices) seal it.
+	notifSealer, err := fieldCipher.Sealer(notifusecase.SealPurpose)
+	if err != nil {
+		log.Error("notification_sealer_init_failed", "error", err)
+		exit(1)
+	}
+	notifSvc.WithSealer(notifSealer)
 	customerSvc := customerusecase.New(customerrepository.NewPostgres(pool, queries), fieldCipher, store, nil, log)
 	pricingSvc := pricingusecase.New(
 		pricingrepository.NewPostgres(pool, queries),

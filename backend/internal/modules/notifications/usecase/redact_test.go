@@ -12,8 +12,9 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifications/providers"
 )
 
-// Security e-mails with SecretVars keep a secret-free copy for after the
-// delivery, and the delivery applies it (docs/design/account-deletion.md).
+// Rows with SecretVars that are not sealed (any channel but a security
+// e-mail, see seal_test.go) keep a secret-free copy for after the delivery,
+// and the delivery applies it (docs/design/account-deletion.md).
 func TestEnqueueStoresSecretFreeCopyAndDeliveryRedacts(t *testing.T) {
 	t.Parallel()
 
@@ -22,8 +23,8 @@ func TestEnqueueStoresSecretFreeCopyAndDeliveryRedacts(t *testing.T) {
 	svc := New(q, nil, []providers.Provider{providers.InappProvider{}}, slog.Default())
 	recipient := "ada@example.com"
 	in := model.EnqueueInput{
-		Channels: []string{model.ChannelEmail}, TemplateCode: "auth.account_deactivated",
-		Recipient: &recipient, SecurityEmail: true,
+		Channels: []string{model.ChannelInapp}, TemplateCode: "auth.account_deactivated",
+		Recipient: &recipient,
 		TemplateVars:    map[string]string{"name": "Ada", "restore_url": "https://x/restore#SECRET"},
 		SecretVars:      []string{"restore_url"},
 		ForgetRecipient: true,

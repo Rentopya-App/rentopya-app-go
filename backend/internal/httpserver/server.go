@@ -409,6 +409,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("httpserver: field encryption: %w", err)
 	}
+	// Security e-mails keep their content sealed until delivery.
+	notifSealer, err := fieldCipher.Sealer(notifusecase.SealPurpose)
+	if err != nil {
+		return nil, fmt.Errorf("httpserver: notification sealer: %w", err)
+	}
+	notifSvc.WithSealer(notifSealer)
 	stepUpSvc := stepup.NewService(deps.Queries, stepUpStore, stepUpWebAuthn, repo)
 	stepUpSvc.SetSecretBox(secretBox)
 
