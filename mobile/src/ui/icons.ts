@@ -16,6 +16,9 @@ import CloudOffIcon from 'lucide-react-native/icons/cloud-off';
 import CreditCardIcon from 'lucide-react-native/icons/credit-card';
 import EllipsisIcon from 'lucide-react-native/icons/ellipsis';
 import ExternalLinkIcon from 'lucide-react-native/icons/external-link';
+import FileTextIcon from 'lucide-react-native/icons/file-text';
+import FlashlightIcon from 'lucide-react-native/icons/flashlight';
+import GaugeIcon from 'lucide-react-native/icons/gauge';
 import GlobeIcon from 'lucide-react-native/icons/globe';
 import HouseIcon from 'lucide-react-native/icons/house';
 import InboxIcon from 'lucide-react-native/icons/inbox';
@@ -25,6 +28,7 @@ import LockIcon from 'lucide-react-native/icons/lock';
 import LogInIcon from 'lucide-react-native/icons/log-in';
 import LogOutIcon from 'lucide-react-native/icons/log-out';
 import MailIcon from 'lucide-react-native/icons/mail';
+import MapPinIcon from 'lucide-react-native/icons/map-pin';
 import MenuIcon from 'lucide-react-native/icons/menu';
 import MinusIcon from 'lucide-react-native/icons/minus';
 import MoonIcon from 'lucide-react-native/icons/moon';
@@ -32,6 +36,8 @@ import PencilIcon from 'lucide-react-native/icons/pencil';
 import PhoneIcon from 'lucide-react-native/icons/phone';
 import PlusIcon from 'lucide-react-native/icons/plus';
 import RefreshCwIcon from 'lucide-react-native/icons/refresh-cw';
+import RotateCcwIcon from 'lucide-react-native/icons/rotate-ccw';
+import ScanQrCodeIcon from 'lucide-react-native/icons/scan-qr-code';
 import SearchIcon from 'lucide-react-native/icons/search';
 import SettingsIcon from 'lucide-react-native/icons/settings';
 import ShieldCheckIcon from 'lucide-react-native/icons/shield-check';
@@ -39,6 +45,7 @@ import TrashIcon from 'lucide-react-native/icons/trash';
 import UserRoundIcon from 'lucide-react-native/icons/user-round';
 import UsersIcon from 'lucide-react-native/icons/users';
 import WalletIcon from 'lucide-react-native/icons/wallet';
+import WrenchIcon from 'lucide-react-native/icons/wrench';
 import XIcon from 'lucide-react-native/icons/x';
 import { I18nManager } from 'react-native';
 
@@ -88,7 +95,14 @@ export type IconName =
   | 'more'
   | 'card'
   | 'info'
-  | 'language';
+  | 'language'
+  | 'qr'
+  | 'wrench'
+  | 'document'
+  | 'gauge'
+  | 'location'
+  | 'history'
+  | 'flashlight';
 
 /** `sf` on iOS, `md` (Material Symbols, the font expo-symbols bundles) on Android, Lucide where neither draws. */
 type Entry = { sf: SFSymbol; md: AndroidSymbol; lucide: LucideIcon; minIOS?: number };
@@ -134,6 +148,13 @@ export const ICONS: Record<IconName, Entry> = {
   card: { sf: 'creditcard', md: 'credit_card', lucide: CreditCardIcon },
   info: { sf: 'info.circle', md: 'info', lucide: InfoIcon },
   language: { sf: 'globe', md: 'language', lucide: GlobeIcon },
+  qr: { sf: 'qrcode.viewfinder', md: 'qr_code_scanner', lucide: ScanQrCodeIcon },
+  wrench: { sf: 'wrench.and.screwdriver', md: 'build', lucide: WrenchIcon },
+  document: { sf: 'doc.text', md: 'description', lucide: FileTextIcon },
+  gauge: { sf: 'gauge.with.dots.needle.67percent', md: 'speed', lucide: GaugeIcon },
+  location: { sf: 'mappin.and.ellipse', md: 'location_on', lucide: MapPinIcon },
+  history: { sf: 'clock.arrow.circlepath', md: 'history', lucide: RotateCcwIcon },
+  flashlight: { sf: 'flashlight.on.fill', md: 'flashlight_on', lucide: FlashlightIcon },
 };
 /** Lucide glyph for a concept; `back`/`forward` mirror in RTL. */
 export function lucideFor(name: IconName): LucideIcon {

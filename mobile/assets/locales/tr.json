@@ -1,3 +1,4 @@
 {
-  "CFBundleDisplayName": "Rentopya"
+  "CFBundleDisplayName": "Rentopya",
+  "NSCameraUsageDescription": "Rentopya, araç QR etiketlerini ve plakaları okumak için kamerayı kullanır."
 }
