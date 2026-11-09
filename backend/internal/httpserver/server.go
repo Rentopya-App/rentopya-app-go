@@ -253,6 +253,10 @@ type Deps struct {
 	Realtime realtime.Publisher
 	Worker   *queue.Worker
 	Events   events.Bus
+	// ReportClock is the "now" of the read-only reports (vehicle
+	// profitability, reports, operations overview). Nil means time.Now;
+	// tests freeze it so report figures do not move with the wall clock.
+	ReportClock func() time.Time
 }
 
 // Server is the HTTP composition root for infrastructure routes.
@@ -837,10 +841,16 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Vehicle profitability report (TEC-727): read-only over the ledger,
 	// expenses and fleet tables.
 	profitabilitySvc := profitabilityusecase.New(deps.Queries)
+	if deps.ReportClock != nil {
+		profitabilitySvc.SetClock(deps.ReportClock)
+	}
 	// Reports (TEC-738): occupancy, income / expense, channels, aging and
 	// the branch comparison, read-only (occupancy and branches reuse the
 	// profitability engine).
 	reportsSvc := reportsusecase.New(deps.Queries, profitabilitySvc)
+	if deps.ReportClock != nil {
+		reportsSvc.SetClock(deps.ReportClock)
+	}
 	ioReg := ioengine.NewRegistry(
 		ioadapters.NewUsers(deps.Queries),
 		ioadapters.NewRoles(deps.Queries),
@@ -1053,7 +1063,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}, tokens, loader, tenantResolver)
 	// Operations overview (TEC-716): the tenant home page and the sidebar
 	// badge counts, read-only over the modules above.
-	overviewmodule.RegisterRoutes(mux, overviewhandler.New(overviewusecase.New(deps.Queries)), tokens, loader, tenantResolver)
+	overviewSvc := overviewusecase.New(deps.Queries)
+	if deps.ReportClock != nil {
+		overviewSvc.SetClock(deps.ReportClock)
+	}
+	overviewmodule.RegisterRoutes(mux, overviewhandler.New(overviewSvc), tokens, loader, tenantResolver)
 	profitabilitymodule.RegisterRoutes(mux, profitabilityhandler.New(profitabilitySvc),
 		exportH.TenantExport(profitabilitymodule.Resource, profitabilitymodule.ExportQueryKeys...), tokens, loader, tenantResolver)
 	reportsmodule.RegisterRoutes(mux, reportshandler.New(reportsSvc), exportH.TenantExport, tokens, loader, tenantResolver)
