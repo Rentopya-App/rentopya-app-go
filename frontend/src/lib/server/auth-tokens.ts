@@ -1,23 +1,18 @@
 import { decode, encode } from "next-auth/jwt";
 import { cookies } from "next/headers";
 
-const SESSION_COOKIE_BASES = [
-  "authjs.session-token",
-  "__Secure-authjs.session-token",
-] as const;
+import {
+  SESSION_COOKIE_BASES,
+  sessionCookieName,
+  usesSecureCookies,
+} from "@/lib/auth-cookie";
 
 const SESSION_COOKIE_CHUNKS = 12;
-
-export function sessionCookieName() {
-  return process.env.NODE_ENV === "production"
-    ? "__Secure-authjs.session-token"
-    : "authjs.session-token";
-}
 
 function sessionCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: usesSecureCookies(),
     sameSite: "lax" as const,
     path: "/",
   };

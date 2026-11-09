@@ -36,12 +36,12 @@ import { SessionManager } from "@/features/account/components/session-manager";
 import { TotpManager } from "@/features/account/components/totp-manager";
 import { ProfileEditForm } from "@/features/account/components/profile-edit-form";
 import { ProfilePermissionsList } from "@/features/account/components/profile-permissions-list";
-import { isApiError } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { authService } from "@/services/auth.service";
 import { fetchAppPublicConfig } from "@/services/app-config.service";
 import { cn } from "@/lib/utils";
+import { appToast } from "@/providers/toast-provider";
 
 type AccountShell = "platform" | "account";
 
@@ -223,11 +223,7 @@ function ProfileIdentity() {
       await authService.requestEmailVerify(user?.email);
       toast.success(t("auth.verify.request_success"));
     } catch (error) {
-      if (isApiError(error)) {
-        toast.error(error.message || t("common.error_generic"));
-      } else {
-        toast.error(t("common.error_generic"));
-      }
+      appToast.apiError(error, t("common.error_generic"));
     } finally {
       await hydrateProfile();
     }
