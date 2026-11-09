@@ -94,7 +94,9 @@ paths:
       tags: [Health]
       operationId: getHealthz
       summary: Liveness probe
-      description: Process is alive. Does not check dependencies.
+      description: |
+        Process is alive. Does not check dependencies. Also reports the release
+        baked into the image (version, git SHA, build time; never the notes).
       security: []
       responses:
         "200":
@@ -30931,11 +30933,24 @@ components:
 
     HealthzResponse:
       type: object
-      required: [status]
+      required: [status, version]
       properties:
         status:
           type: string
           examples: [ok]
+        version:
+          type: string
+          description: |
+            Release baked into the image: `v0.N` on a release image (main),
+            `sha-<short>` on a branch build, `dev` on a local build.
+          examples: [v0.1]
+        git_sha:
+          type: string
+          description: Full commit SHA the image was built from. Omitted on local builds.
+        built_at:
+          type: string
+          format: date-time
+          description: Image build time (RFC 3339). Omitted on local builds.
 
     BulkTarget:
       type: object

@@ -13,7 +13,8 @@ export interface paths {
         };
         /**
          * Liveness probe
-         * @description Process is alive. Does not check dependencies.
+         * @description Process is alive. Does not check dependencies. Also reports the release
+         *     baked into the image (version, git SHA, build time; never the notes).
          */
         get: operations["getHealthz"];
         put?: never;
@@ -21469,6 +21470,19 @@ export interface components {
         HealthzResponse: {
             /** @example ok */
             status: string;
+            /**
+             * @description Release baked into the image: `v0.N` on a release image (main),
+             *     `sha-<short>` on a branch build, `dev` on a local build.
+             * @example v0.1
+             */
+            version: string;
+            /** @description Full commit SHA the image was built from. Omitted on local builds. */
+            git_sha?: string;
+            /**
+             * Format: date-time
+             * @description Image build time (RFC 3339). Omitted on local builds.
+             */
+            built_at?: string;
         };
         BulkTarget: {
             /** @enum {string} */

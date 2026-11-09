@@ -208,6 +208,17 @@ Any `backend/docs/openapi.yaml` change (descriptions too) regenerates the mobile
 
 Shipping: push a feature branch and open a PR. The `auto-pr` job is disabled (`if: false`), so nothing merges by itself; the owner merges. Commit messages carry the Linear id and no AI attribution (`commit-policy`).
 
+### Images and releases (GHCR, `v0.N`)
+
+- **Which images**: every entry in [`deploy/images.json`](../deploy/images.json) (backend, frontend, site, backup). CI loops over it as a matrix; ship a new container by adding an entry there plus its service in `compose.prod.yml`. `migrate` and `worker` run the backend image; postgres, redis, seaweedfs, meilisearch, centrifugo and wuzapi are upstream images.
+- **Names** come from the repository, lower-cased: `ghcr.io/<owner>/<repo>-<service>` (for this repo `ghcr.io/rentopya-app/rentopya-app-go-backend`, `…-frontend`, `…-site`, `…-backup`). No app name is hard-coded.
+- **Every branch push**: `image-build` builds every image without pushing (gha cache per service). It is part of the `ci` gate, so it is also where the panel's production `next build` is checked.
+- **Test push (manual)**: Actions → CI → Run workflow with `push_test_images` ticked pushes `:test-<short-sha>` only. Never `latest` or `v0.*`.
+- **`main` push**: the whole suite runs; only when every test job passed (`commit-policy`, `prod-env`, `env`, `backend`, `frontend`, `site`, `acceptance`; a failed, cancelled or skipped one blocks it) does `publish-images` push `:sha-<short>` and `:v0.N`. Then `release-tag` creates the git tag `v0.N` and a GitHub release whose notes are `git log --no-merges <previous v0.* tag>..HEAD` (the whole history for the first release, capped at 200 lines). `release-meta` picks the number before the build: the highest existing `v0.*` tag plus one.
+- **The first merge into `main`** (no `v0.*` tag yet) produces `v0.1`: the git tag, a GitHub release, and images `:sha-<short>` and `:v0.1` for every service.
+- **Provenance**: every image carries OCI labels (`org.opencontainers.image.version`, `.created`, `.revision`, `.source`; release images also `.description` with the notes on one line). The backend bakes in version, git SHA and build time (ldflags) plus `release.json` with the notes (`internal/buildinfo`); `/healthz` reports `version` (`v0.N`, `sha-<short>` on a branch build, `dev` locally), `git_sha` and `built_at`. On each deploy the `migrate` service runs `release-record` after `migrate up` and adds one row to `app_releases` (an event log; fail-soft, never blocks a deploy).
+- Permissions: only `publish-images` / `image-test-push` get `packages: write` and only `release-tag` gets `contents: write` (the built-in `GITHUB_TOKEN`; no secret to add). The server still builds from `compose.prod.yml` until the pull-based deploy lands.
+
 ## Boilerplate sync
 
 Rentopya shares no git history with the boilerplate. Changes are read and re-applied by hand. Base SHA, inventory and work packages: [BOILERPLATE_SYNC.md](./BOILERPLATE_SYNC.md).
