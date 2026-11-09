@@ -1649,6 +1649,7 @@ type Notification struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 	OrganizationID    pgtype.Int8        `json:"organization_id"`
 	IdempotencyKey    pgtype.Text        `json:"idempotency_key"`
+	SealedContent     pgtype.Text        `json:"sealed_content"`
 }
 
 type NotificationDelivery struct {

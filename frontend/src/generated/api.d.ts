@@ -2110,7 +2110,7 @@ export interface paths {
         };
         /**
          * List own inbox
-         * @description Requires `notifications.read`. Supports `limit`,`offset`,`q`,`sort`,`status`,`channel`,`unread`. Platform / account shell inbox: only notifications without an organization (organization notifications appear in `GET /v1/tenant/notifications`).
+         * @description Requires `notifications.read`. E-mail rows are never listed. Supports `limit`,`offset`,`q`,`sort`,`status`,`channel`,`unread`. Platform / account shell inbox: only notifications without an organization (organization notifications appear in `GET /v1/tenant/notifications`).
          */
         get: operations["getNotifications"];
         put?: never;
@@ -2219,7 +2219,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get own notification */
+        /**
+         * Get own notification
+         * @description E-mail rows answer 404 (their bodies carry one-time codes and links that only the mailbox may read).
+         */
         get: operations["getNotificationByUUID"];
         put?: never;
         post?: never;
@@ -3787,7 +3790,7 @@ export interface paths {
         };
         /**
          * List own inbox in the organization panel
-         * @description Requires `notifications.read` and membership of the `X-Organization` organization. Lists the caller's notifications of that organization (tenant export / import / bulk jobs) plus the ones without an organization; other organizations' notifications never appear. Same query parameters as `GET /v1/notifications`.
+         * @description Requires `notifications.read` and membership of the `X-Organization` organization. Lists the caller's notifications of that organization (tenant export / import / bulk jobs) plus the ones without an organization; other organizations' notifications never appear. E-mail rows are never listed. Same query parameters as `GET /v1/notifications`.
          */
         get: operations["getTenantNotifications"];
         put?: never;
