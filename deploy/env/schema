@@ -30,7 +30,7 @@
 ## Yolcu360, Obilet, WhatsApp sessions) are per organization, sealed in the
 ## integration vault: never add env keys for them.
 
-@version 12
+@version 13
 
 # --- Identity / Docker ---
 NAME_PREFIX | const:rentopia
@@ -98,6 +98,11 @@ SMTP_HOST | empty
 SMTP_PORT | const:587
 SMTP_USERNAME | empty
 SMTP_PASSWORD | empty
+# TEC-1165: auto = implicit TLS on port 465, STARTTLS required on any other port;
+# starttls / implicit force one; none (plaintext) is refused in production.
+# SMTP_TIMEOUT bounds a whole send (dial, TLS, delivery).
+SMTP_TLS | const:auto
+SMTP_TIMEOUT | const:10s
 
 # --- Error tracking (optional) ---
 BACKEND_SENTRY_DSN | empty
