@@ -266,7 +266,29 @@ type SMTPConfig struct {
 	Password string
 	From     string
 	FromName string
+	// Timeout bounds the whole send (dial + TLS handshake + every SMTP
+	// command). A hung SMTP server must never block a worker or a request.
+	Timeout time.Duration
+	// TLSMode selects transport security (SMTP_TLS):
+	//   auto     implicit TLS on port 465, otherwise STARTTLS required (default
+	//            outside development/test);
+	//   starttls STARTTLS required on any port;
+	//   implicit TLS from the first byte (SMTPS) on any port;
+	//   none     plaintext, for the local mail catcher only (default in
+	//            development/test; refused in production).
+	TLSMode string
+	// TLSInsecureSkipVerify disables certificate verification for self-signed
+	// servers in development; validate() refuses it outside development/test.
+	TLSInsecureSkipVerify bool
 }
+
+// SMTP transport security modes (SMTP_TLS).
+const (
+	SMTPTLSAuto     = "auto"
+	SMTPTLSStartTLS = "starttls"
+	SMTPTLSImplicit = "implicit"
+	SMTPTLSNone     = "none"
+)
 
 type LogConfig struct {
 	Level  string
@@ -353,6 +375,8 @@ func Load() (Config, error) {
 			Password: getEnv("SMTP_PASSWORD", ""),
 			From:     firstNonEmpty(getEnv("MAIL_FROM", ""), getEnv("SMTP_FROM", "noreply@localhost")),
 			FromName: getEnv("MAIL_FROM_NAME", "Rentopya"),
+			Timeout:  getDuration("SMTP_TIMEOUT", 10*time.Second),
+			// TLSMode and TLSInsecureSkipVerify are set below, once APP_ENV is known.
 		},
 		Queue: QueueConfig{
 			Enabled:         getBool("QUEUE_ENABLED", true),
@@ -459,6 +483,15 @@ func Load() (Config, error) {
 		},
 	}
 
+	// The local mail catcher (compose.local.yml) speaks plaintext; every other
+	// environment requires TLS unless SMTP_TLS says otherwise.
+	defaultSMTPTLS := SMTPTLSAuto
+	if cfg.App.IsLocal() {
+		defaultSMTPTLS = SMTPTLSNone
+	}
+	cfg.SMTP.TLSMode = strings.ToLower(strings.TrimSpace(getEnv("SMTP_TLS", defaultSMTPTLS)))
+	cfg.SMTP.TLSInsecureSkipVerify = getBool("SMTP_TLS_INSECURE_SKIP_VERIFY", false)
+
 	if err := cfg.validate(); err != nil {
 		return Config{}, err
 	}
@@ -503,6 +536,9 @@ func (c Config) validate() error {
 	if c.JWT.AccessSecret == "" {
 		return fmt.Errorf("config: JWT_ACCESS_SECRET is required")
 	}
+	if err := c.validateSMTP(); err != nil {
+		return err
+	}
 	if c.Search.Enabled {
 		if c.Search.MeiliHost == "" {
 			return fmt.Errorf("config: MEILI_HOST is required when SEARCH_ENABLED=true")
@@ -510,6 +546,27 @@ func (c Config) validate() error {
 		if c.Search.IndexPrefix == "" {
 			return fmt.Errorf("config: MEILI_INDEX_PREFIX is required when SEARCH_ENABLED=true")
 		}
+	}
+	return nil
+}
+
+// validateSMTP checks the mail transport settings: a known SMTP_TLS mode, no
+// plaintext mail in production, and no skipped certificate checks outside
+// development/test.
+func (c Config) validateSMTP() error {
+	switch c.SMTP.TLSMode {
+	case "", SMTPTLSAuto, SMTPTLSStartTLS, SMTPTLSImplicit, SMTPTLSNone:
+	default:
+		return fmt.Errorf("config: SMTP_TLS must be one of auto|starttls|implicit|none")
+	}
+	if c.App.Env == envguard.Production && c.SMTP.TLSMode == SMTPTLSNone {
+		return fmt.Errorf("config: SMTP_TLS=none (plaintext mail) is not allowed in production; use auto, starttls or implicit")
+	}
+	if !c.App.IsLocal() && c.SMTP.TLSInsecureSkipVerify {
+		return fmt.Errorf("config: SMTP_TLS_INSECURE_SKIP_VERIFY must not be set outside development")
+	}
+	if c.SMTP.Timeout < 0 {
+		return fmt.Errorf("config: SMTP_TIMEOUT must not be negative")
 	}
 	return nil
 }
