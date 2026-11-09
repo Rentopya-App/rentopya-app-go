@@ -59,11 +59,13 @@ cd mobile
 npm ci
 npx tsc --noEmit
 npm run lint
+npm run i18n:check
 npm test
+npm run api:check     # openapi-typescript pinned + src/core/api/schema.d.ts up to date
 npx expo-doctor
 ```
 
-(the CI `mobile` job; it runs only when `mobile/**` changed, or on a full run)
+(the CI `mobile` job; it runs only when `mobile/**` changed, or on a full run). After any `backend/docs/openapi.yaml` change, run `npm run api:generate` here and commit `src/core/api/schema.d.ts`, even when `mobile/` is otherwise untouched. Release rules: `mobile-ci` skill.
 
 ## Database
 
@@ -86,6 +88,14 @@ make env-check
 (the CI `env` job: `.env.server.example` matches the schema, `.env.example` has every schema key and every `compose.prod.yml` variable, every backend env read reaches compose or has a decision in `deploy/env/compose-env.allow`; run it when the schema, `compose.prod.yml`, `.env.example` or a backend env read changed. Fix drift: `scripts/prod-env.sh example > .env.server.example`.)
 
 `NAME_PREFIX` must be set; internal hosts stay `<service>.<app network>`.
+
+## CI workflow changes
+
+```bash
+actionlint .github/workflows/*.yml   # go install github.com/rhysd/actionlint/cmd/actionlint@latest
+```
+
+Any change under `.github/workflows/` runs every job. `ci` is the single gate: a job passes when it succeeds or is skipped.
 
 ## Shipping
 
