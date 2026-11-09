@@ -9,12 +9,13 @@ description: >-
 
 # Verify changes
 
-CI (`.github/workflows/ci.yml`) runs on every branch push. Run the matching subset locally first.
+CI (`.github/workflows/ci.yml`) runs on every branch push. A `changes` job picks the area jobs from the changed paths (docs-only pushes skip them; `[ci-full]` in the head commit message runs everything), and the `ci` job is the single required check. Run the matching subset locally first.
 
 ## Backend (any `backend/**` change)
 
 ```bash
 cd backend
+sqlc generate && git diff --exit-code   # CI fails on stale sqlc output
 gofmt -l .            # must print nothing
 go build ./...
 go vet ./...
@@ -22,7 +23,7 @@ go test ./...
 make openapi-lint     # when backend/docs/openapi.yaml changed
 ```
 
-`make lint` runs golangci-lint (needs `make tools`).
+`make lint` runs golangci-lint (needs `make tools`; CI pins v2.15.0).
 
 ## Frontend (any `frontend/**` change)
 
@@ -51,9 +52,22 @@ pnpm test
 pnpm build
 ```
 
+## Mobile (any `mobile/**` change)
+
+```bash
+cd mobile
+npm ci
+npx tsc --noEmit
+npm run lint
+npm test
+npx expo-doctor
+```
+
+(the CI `mobile` job; it runs only when `mobile/**` changed, or on a full run)
+
 ## Database
 
-New migration → round-trip it (see the `db-migration` skill). Database tests (`TEST_DATABASE_URL`, including the RT-A01 isolation test in `internal/httpserver`) are skipped in CI; run them locally when you touch tenant tables, queries or `/v1/tenant` routes.
+New migration → round-trip it (see the `db-migration` skill). Database tests (`TEST_DATABASE_URL`, including the RT-A01 isolation test in `internal/httpserver`) run in CI against a Postgres service (backend and acceptance jobs); run them locally too when you touch tenant tables, queries or `/v1/tenant` routes.
 
 ## Prod compose / env schema
 
@@ -75,4 +89,4 @@ make env-check
 
 ## Shipping
 
-Push a feature branch: when backend + frontend pass, the `auto-pr` job opens a PR into `main` and merges the tested commit. Put `[no-automerge]` in the head commit message to keep the PR open for review.
+Push a feature branch and wait for the `ci` check to go green. The `auto-pr` job is currently disabled (`if: false`); when enabled it opens a PR into `main` after `ci` passes and merges the tested commit, and `[no-automerge]` in the head commit message keeps the PR open.
