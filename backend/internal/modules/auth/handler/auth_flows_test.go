@@ -24,7 +24,16 @@ import (
 // Repository call panics on the nil embedded interface.
 type stubRepo struct {
 	usecase.Repository
-	user model.User
+	user      model.User
+	soleOwned []model.SoleOwnedOrganization
+}
+
+func (s stubRepo) ListOrganizationsSolelyOwnedByUser(context.Context, int64) ([]model.SoleOwnedOrganization, error) {
+	return s.soleOwned, nil
+}
+
+func (s stubRepo) RestoreDeactivatedUser(context.Context, string, time.Time) (model.User, error) {
+	return model.User{}, repository.ErrNotFound
 }
 
 func (s stubRepo) FindUserByEmail(context.Context, string) (model.User, error) {
@@ -185,5 +194,24 @@ func TestDeactivateAccountHandler(t *testing.T) {
 	rec, env = do(t, h.DeactivateAccount, "/v1/auth/account/deactivate", `{"code":"123456"}`, ctx)
 	if rec.Code != http.StatusForbidden || env.Error.Code != "FORBIDDEN" {
 		t.Fatalf("impersonation must be refused: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDeleteAccountLastOwnerAndRestoreHandlers(t *testing.T) {
+	uid := uuid.New()
+	h := newTestHandler(t, stubRepo{
+		user:      model.User{ID: 7, UUID: uid, Email: "a@example.com", Status: "active"},
+		soleOwned: []model.SoleOwnedOrganization{{UUID: uuid.New(), Slug: "acme", Name: "Acme Rent"}},
+	})
+	ctx := authctx.WithPrincipal(context.Background(), authctx.Principal{UserID: uid, UserInternal: 7})
+	rec, env := do(t, h.RequestAccountDeactivationCode, "/v1/auth/account/deactivate/request", `{}`, ctx)
+	if rec.Code != http.StatusConflict || env.Error.Code != "LAST_ORGANIZATION_OWNER" ||
+		len(env.Error.Details) != 1 || env.Error.Details[0].Message != "Acme Rent" {
+		t.Fatalf("sole owner: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec, env = do(t, h.RestoreAccount, "/v1/auth/account/restore", `{"token":"forged"}`, nil)
+	if rec.Code != http.StatusBadRequest || env.Error.Code != "INVALID_RESTORE_LINK" {
+		t.Fatalf("forged restore token: %d %s", rec.Code, rec.Body.String())
 	}
 }

@@ -1049,11 +1049,29 @@ func (q *Queries) ReclaimProcessingNotification(ctx context.Context, arg Reclaim
 	return i, err
 }
 
+const redactNotification = `-- name: RedactNotification :exec
+UPDATE notifications
+SET title = COALESCE(payload->'redact'->>'title', title),
+    body = COALESCE(payload->'redact'->>'body', body),
+    recipient = CASE WHEN COALESCE((payload->'redact'->>'forget_recipient')::boolean, FALSE) THEN NULL ELSE recipient END,
+    payload = payload - 'redact'
+WHERE id = $1 AND payload ? 'redact'
+`
+
+// Security e-mails (EnqueueInput.SecretVars): once the row is final the
+// stored title / body are replaced with the copies rendered without the
+// secrets (payload.redact), and the recipient is dropped when asked, so no
+// restore link or erased address outlives the delivery.
+func (q *Queries) RedactNotification(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, redactNotification, id)
+	return err
+}
+
 const setUserEmailVerified = `-- name: SetUserEmailVerified :one
 UPDATE users
 SET email_verified_at = NOW()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, uuid, email, password_hash, name, surname, status, email_verified_at, last_login_at, locale, created_at, updated_at, deleted_at, deactivated_at, password_set
+RETURNING id, uuid, email, password_hash, name, surname, status, email_verified_at, last_login_at, locale, created_at, updated_at, deleted_at, deactivated_at, password_set, deletion_due_at, restore_token_hash
 `
 
 func (q *Queries) SetUserEmailVerified(ctx context.Context, id int64) (User, error) {
@@ -1075,6 +1093,8 @@ func (q *Queries) SetUserEmailVerified(ctx context.Context, id int64) (User, err
 		&i.DeletedAt,
 		&i.DeactivatedAt,
 		&i.PasswordSet,
+		&i.DeletionDueAt,
+		&i.RestoreTokenHash,
 	)
 	return i, err
 }
@@ -1084,7 +1104,7 @@ UPDATE users
 SET name = COALESCE($1, name),
     surname = COALESCE($2, surname)
 WHERE id = $3 AND deleted_at IS NULL
-RETURNING id, uuid, email, password_hash, name, surname, status, email_verified_at, last_login_at, locale, created_at, updated_at, deleted_at, deactivated_at, password_set
+RETURNING id, uuid, email, password_hash, name, surname, status, email_verified_at, last_login_at, locale, created_at, updated_at, deleted_at, deactivated_at, password_set, deletion_due_at, restore_token_hash
 `
 
 type UpdateUserProfileParams struct {
@@ -1112,6 +1132,8 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.DeletedAt,
 		&i.DeactivatedAt,
 		&i.PasswordSet,
+		&i.DeletionDueAt,
+		&i.RestoreTokenHash,
 	)
 	return i, err
 }

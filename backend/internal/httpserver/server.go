@@ -346,6 +346,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	uc := authusecase.New(repo, tokens)
 	uc.SetNotifier(notifSvc)
 	uc.SetLogger(log)
+	// Restore link of the account deletion e-mail; the token sits in the
+	// fragment so it reaches no server log (docs/design/account-deletion.md).
+	uc.SetAccountRestoreURL(strings.TrimRight(cfg.Auth.FrontendURL, "/") + "/platform/restore-account#")
 
 	searchReg := searchengine.NewRegistry(
 		searchadapters.NewUsers(deps.Queries),

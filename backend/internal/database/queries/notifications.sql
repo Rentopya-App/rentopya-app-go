@@ -251,3 +251,15 @@ WHERE user_id = $1 AND endpoint = $2;
 
 -- name: ListPushSubscriptionsByUser :many
 SELECT * FROM push_subscriptions WHERE user_id = $1;
+
+-- name: RedactNotification :exec
+-- Security e-mails (EnqueueInput.SecretVars): once the row is final the
+-- stored title / body are replaced with the copies rendered without the
+-- secrets (payload.redact), and the recipient is dropped when asked, so no
+-- restore link or erased address outlives the delivery.
+UPDATE notifications
+SET title = COALESCE(payload->'redact'->>'title', title),
+    body = COALESCE(payload->'redact'->>'body', body),
+    recipient = CASE WHEN COALESCE((payload->'redact'->>'forget_recipient')::boolean, FALSE) THEN NULL ELSE recipient END,
+    payload = payload - 'redact'
+WHERE id = sqlc.arg(id) AND payload ? 'redact';

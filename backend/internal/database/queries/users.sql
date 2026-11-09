@@ -41,12 +41,15 @@ SET name = $2,
 WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: UpdateUserPlatform :one
--- Re-activating a user (status -> active) clears a self-service deactivation.
+-- Re-activating a user (status -> active) clears a self-service deactivation
+-- and its scheduled purge (docs/design/account-deletion.md).
 UPDATE users
 SET name = COALESCE(sqlc.narg(name), name),
     surname = COALESCE(sqlc.narg(surname), surname),
     status = COALESCE(sqlc.narg(status), status),
-    deactivated_at = CASE WHEN sqlc.narg(status)::text = 'active' THEN NULL ELSE deactivated_at END
+    deactivated_at = CASE WHEN sqlc.narg(status)::text = 'active' THEN NULL ELSE deactivated_at END,
+    deletion_due_at = CASE WHEN sqlc.narg(status)::text = 'active' THEN NULL ELSE deletion_due_at END,
+    restore_token_hash = CASE WHEN sqlc.narg(status)::text = 'active' THEN NULL ELSE restore_token_hash END
 WHERE uuid = sqlc.arg(uuid) AND deleted_at IS NULL
 RETURNING *;
 
@@ -137,9 +140,12 @@ WHERE u.deleted_at IS NULL
 ORDER BY u.created_at DESC;
 
 -- name: DeactivateUser :one
--- Self-service account deletion: keep every row, mark the user disabled.
+-- Self-service account deletion: the user is disabled at once and erased by
+-- the worker at deletion_due_at unless restored with the e-mailed link.
 UPDATE users
 SET status = 'disabled',
-    deactivated_at = COALESCE(deactivated_at, NOW())
-WHERE id = $1 AND deleted_at IS NULL
+    deactivated_at = COALESCE(deactivated_at, NOW()),
+    deletion_due_at = sqlc.arg(deletion_due_at),
+    restore_token_hash = sqlc.arg(restore_token_hash)
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL
 RETURNING *;
