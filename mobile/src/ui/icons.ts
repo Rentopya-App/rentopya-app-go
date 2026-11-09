@@ -4,6 +4,7 @@ import BanIcon from 'lucide-react-native/icons/ban';
 import BellIcon from 'lucide-react-native/icons/bell';
 import BuildingIcon from 'lucide-react-native/icons/building';
 import CalendarDaysIcon from 'lucide-react-native/icons/calendar-days';
+import CameraIcon from 'lucide-react-native/icons/camera';
 import CarFrontIcon from 'lucide-react-native/icons/car-front';
 import CheckIcon from 'lucide-react-native/icons/check';
 import ChevronDownIcon from 'lucide-react-native/icons/chevron-down';
@@ -21,6 +22,7 @@ import FlashlightIcon from 'lucide-react-native/icons/flashlight';
 import GaugeIcon from 'lucide-react-native/icons/gauge';
 import GlobeIcon from 'lucide-react-native/icons/globe';
 import HouseIcon from 'lucide-react-native/icons/house';
+import ImagesIcon from 'lucide-react-native/icons/images';
 import InboxIcon from 'lucide-react-native/icons/inbox';
 import InfoIcon from 'lucide-react-native/icons/info';
 import LinkIcon from 'lucide-react-native/icons/link';
@@ -102,7 +104,9 @@ export type IconName =
   | 'gauge'
   | 'location'
   | 'history'
-  | 'flashlight';
+  | 'flashlight'
+  | 'camera'
+  | 'photos';
 
 /** `sf` on iOS, `md` (Material Symbols, the font expo-symbols bundles) on Android, Lucide where neither draws. */
 type Entry = { sf: SFSymbol; md: AndroidSymbol; lucide: LucideIcon; minIOS?: number };
@@ -155,6 +159,8 @@ export const ICONS: Record<IconName, Entry> = {
   location: { sf: 'mappin.and.ellipse', md: 'location_on', lucide: MapPinIcon },
   history: { sf: 'clock.arrow.circlepath', md: 'history', lucide: RotateCcwIcon },
   flashlight: { sf: 'flashlight.on.fill', md: 'flashlight_on', lucide: FlashlightIcon },
+  camera: { sf: 'camera', md: 'photo_camera', lucide: CameraIcon },
+  photos: { sf: 'photo.on.rectangle', md: 'photo_library', lucide: ImagesIcon },
 };
 /** Lucide glyph for a concept; `back`/`forward` mirror in RTL. */
 export function lucideFor(name: IconName): LucideIcon {
