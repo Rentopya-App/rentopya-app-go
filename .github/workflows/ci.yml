@@ -35,17 +35,24 @@ jobs:
   # .github/workflows/, or when the merge-base cannot be found.
   #
   # Mapping (first match wins; case globs, `*` spans '/'):
-  #   backend/docs/openapi.yaml          -> backend, frontend, env
+  #   backend/docs/openapi.yaml          -> backend, frontend, env, mobile
+  #                                         (mobile's api:check: committed types)
   #   backend/**  (non-.md)              -> backend, env (env reads)
   #   frontend/**, scripts/check-i18n.mjs-> frontend
   #   site/**                            -> site
   #   mobile/**                          -> mobile
+  #   scripts/ci/mobile-release*, .easignore -> mobile
   #   deploy/**, compose.*.yml, .env*.example, scripts/{prod-env,check-*env*}
   #                                      -> env
   #   Makefile                           -> backend (acceptance targets)
   #   docs/**, *.md, .agents/**, .claude/**, other .github/**, landing-video/**,
   #   llms.txt, .gitignore, .mcp.json    -> nothing
   #   anything else                      -> backend, frontend, site, env
+  #
+  # mobile_release (main pushes only, never another branch): the push itself
+  # (github.event.before..sha) changed a shipping file under mobile/ (not
+  # *.md / mobile/docs). Backend/OpenAPI changes never release the app; only a
+  # committed mobile/ diff (e.g. regenerated schema.d.ts) does (mobile-ci skill).
   # ---------------------------------------------------------------------------
   changes:
     runs-on: ubuntu-24.04
@@ -55,6 +62,7 @@ jobs:
       site: ${{ steps.f.outputs.site }}
       env: ${{ steps.f.outputs.env }}
       mobile: ${{ steps.f.outputs.mobile }}
+      mobile_release: ${{ steps.f.outputs.mobile_release }}
       workflows: ${{ steps.f.outputs.workflows }}
       full: ${{ steps.f.outputs.full }}
     steps:
@@ -67,6 +75,7 @@ jobs:
           REF: ${{ github.ref }}
           SHA: ${{ github.sha }}
           HEAD_MSG: ${{ github.event.head_commit.message }}
+          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
           backend=false; frontend=false; site=false; env=false
@@ -106,13 +115,14 @@ jobs:
             while IFS= read -r file; do
               [ -z "$file" ] && continue
               case "$file" in
-                backend/docs/openapi.yaml)           backend=true; frontend=true; env=true ;;
+                backend/docs/openapi.yaml)           backend=true; frontend=true; env=true; mobile=true ;;
                 docs/*|*.md|.agents/*|.claude/*|.github/*|landing-video/*|llms.txt|.gitignore|.mcp.json)
                                                      : ;;   # nothing (before app dirs: backend/*.md is docs)
                 backend/*)                           backend=true; env=true ;;
                 frontend/*|scripts/check-i18n.mjs)   frontend=true ;;
                 site/*)                              site=true ;;
-                mobile/*)                            mobile=true ;;
+                mobile/*|scripts/ci/mobile-release*|.easignore)
+                                                     mobile=true ;;
                 deploy/*|compose.*.yml|.env*.example|scripts/prod-env*|scripts/check-env-sync.sh|scripts/check-compose-env*)
                                                      env=true ;;
                 Makefile)                            backend=true ;;
@@ -125,16 +135,33 @@ jobs:
             backend=true; frontend=true; site=true; env=true; mobile=true
           fi
 
+          mobile_release=false
+          if [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
+            if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              pushed="$(git diff --name-only "$BEFORE" "$SHA")"
+            else
+              # New branch or unknown base: let the fingerprint decide.
+              pushed="mobile/package.json"
+            fi
+            while IFS= read -r file; do
+              case "$file" in
+                mobile/*.md|mobile/docs/*) : ;;
+                mobile/*) mobile_release=true ;;
+              esac
+            done <<< "$pushed"
+          fi
+
           {
             echo "backend=$backend"
             echo "frontend=$frontend"
             echo "site=$site"
             echo "env=$env"
             echo "mobile=$mobile"
+            echo "mobile_release=$mobile_release"
             echo "workflows=$workflows"
             echo "full=$full"
           } >> "$GITHUB_OUTPUT"
-          echo "backend=$backend frontend=$frontend site=$site env=$env mobile=$mobile workflows=$workflows full=$full" \
+          echo "backend=$backend frontend=$frontend site=$site env=$env mobile=$mobile mobile_release=$mobile_release workflows=$workflows full=$full" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Project rule (AGENTS.md): no AI attribution in commit messages.
@@ -313,8 +340,9 @@ jobs:
       - name: Build
         run: pnpm build
 
-  # Expo app (mobile/). Verification only: no secrets, never a release.
-  # Skips green until mobile/package.json exists.
+  # Expo app (mobile/). Verification only: no secrets, never a release
+  # (mobile-release below ships it). Also runs on every openapi.yaml change, so
+  # an API change that leaves mobile/src/core/api/schema.d.ts stale fails here.
   mobile:
     needs: changes
     if: needs.changes.outputs.mobile == 'true'
@@ -324,38 +352,30 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v7
-      - id: guard
-        working-directory: .
-        run: |
-          if [ -f mobile/package.json ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "Mobile CI skipped: \`mobile/package.json\` does not exist yet." >> "$GITHUB_STEP_SUMMARY"
-          fi
-      - if: steps.guard.outputs.present == 'true'
-        uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version-file: ${{ hashFiles('mobile/.nvmrc') != '' && 'mobile/.nvmrc' || 'frontend/.nvmrc' }}
+          node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - name: Install
-        if: steps.guard.outputs.present == 'true'
-        run: npm ci
+        run: npm ci --no-audit --no-fund
       - name: Typecheck
-        if: steps.guard.outputs.present == 'true'
         run: npx tsc --noEmit
       - name: Lint
-        if: steps.guard.outputs.present == 'true'
         run: npm run lint
       - name: Test
-        if: steps.guard.outputs.present == 'true'
         run: npm test
+      # openapi-typescript pinned to an exact version and the committed
+      # schema.d.ts equal to `npm run api:generate` (mobile-ci skill).
+      - name: API types up to date
+        run: npm run api:check
       - name: Expo doctor
-        if: steps.guard.outputs.present == 'true'
         run: npx expo-doctor
-      # TODO(TEC-1139): once the pinned OpenAPI client generator exists, add an
-      # "api:generate is up to date" diff check on the committed mobile types.
+      - name: Release script
+        working-directory: .
+        run: |
+          bash -n scripts/ci/mobile-release.sh
+          scripts/ci/mobile-release.test.sh
 
   # Acceptance suite RT-A01…A32 (TEC-740, docs/acceptance/beta.md). The Go
   # scenarios run against the same Postgres setup as the backend job whenever
@@ -452,6 +472,30 @@ jobs:
             frontend/e2e/evidence/
             ${{ runner.temp }}/rentopya-e2e/playwright/report/
 
+  # Mobile store release (mobile/docs/OTA.md): OTA when the native fingerprint
+  # is unchanged, otherwise an Android EAS build and an ios-build-* tag for
+  # Xcode Cloud. Only on a main push whose own diff touched mobile/, after the
+  # app's checks passed, and only once the repo variable MOBILE_RELEASE_ENABLED
+  # is "true" (an ios-build-* tag pushed before Xcode Cloud listens would be
+  # recorded as built). Otherwise skipped, which the `ci` gate accepts. Never
+  # runs on cc-collective-branch, feature branches or PRs.
+  mobile-release:
+    needs: [changes, backend, frontend, mobile]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      vars.MOBILE_RELEASE_ENABLED == 'true' &&
+      needs.changes.outputs.mobile_release == 'true' &&
+      needs.backend.result == 'success' &&
+      needs.frontend.result == 'success' &&
+      needs.mobile.result == 'success'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/mobile-release.yml
+    secrets:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
   # Feature branch pushed and the `ci` gate green → open (or reuse) a PR into
   # main and merge the tested commit. Opt out per push by putting
   # [no-automerge] in the head commit message. Not part of the `ci` gate.
@@ -524,7 +568,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, mobile, acceptance]
+    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, mobile, acceptance, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate
