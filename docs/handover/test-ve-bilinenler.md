@@ -44,15 +44,21 @@ CATALOG_TEST_DATABASE_URL=postgres://app:change_me@127.0.0.1:5432/postgres?sslmo
 
 ### CI (`.github/workflows/ci.yml`)
 
+`changes` job'ı değişen yollara göre hangi işlerin koşacağını seçer. Yalnızca doküman değişikliği ağır işleri atlar. `main` push'u, elle çalıştırma, `.github/workflows/` değişikliği ya da commit mesajında `[ci-full]` her şeyi koşturur.
+
 | İş | Adımlar |
 |----|---------|
+| `changes` | Yol filtresi (yukarıda) |
 | `commit-policy` | Commit mesajında araç atfı reddi |
 | `prod-env` | Şemadan env üret, prod compose doğrula |
+| `env` | `make env-check`: `.env.server.example` şemayla aynı, `.env.example` ve compose anahtarları tam |
 | `backend` | `sqlc generate`, golangci-lint, test DB migrate (`migrate/migrate:v4.19.1`), `go test ./...` (`TEST_DATABASE_URL` dolu: RT testleri koşar), OpenAPI lint |
 | `frontend` | `pnpm typecheck`, `pnpm lint`, `node scripts/check-i18n.mjs` |
 | `site` | typecheck, lint, format, unit test, build |
 | `acceptance` | Go kabul senaryoları, Playwright senaryoları, kanıt artefaktı `acceptance-evidence` (TEC-740 ile gelir; yukarıdaki not) |
-| `auto-pr` | Testler geçince PR açar / birleştirir (`[no-automerge]` hariç) |
+| `mobile` | `mobile/` değişince: `npm ci`, typecheck, lint, test, expo-doctor |
+| `ci` | Tek zorunlu kontrol: atlanan işi başarılı sayar, başarısız ya da iptal edilen işte düşer |
+| `auto-pr` | Kapalı (`if: false`). PR'ları sahip birleştirir |
 
 ## Geri yükleme provası
 

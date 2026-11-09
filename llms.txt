@@ -1,17 +1,20 @@
 # Rentopya
 
-Rentopya is a multi-company, multi-branch car rental SaaS. Monorepo: Go HTTP API + Asynq worker (`backend/`), Next.js BFF with the platform panel `/platform`, the company panel `/t/{slug}` and the customer portal `/r/{orgSlug}` (`frontend/`), and the branded site app serving every company's site by host (`site/`). Organizations are resolved per request from the `X-Organization` header; tenant permissions come from the member's roles in that organization. Stores: PostgreSQL, Redis, SeaweedFS (S3), Meilisearch, Centrifugo. Integrations: iyzico, Netgsm SMS, WhatsApp (wuzapi), e-invoice (go-ubltr), KABİS, HGS, Yolcu360, Obilet.
+Rentopya is a multi-company, multi-branch car rental SaaS. Monorepo: Go HTTP API + Asynq worker (`backend/`), Next.js BFF with the platform panel `/platform`, the company panel `/t/{slug}` and the customer portal `/r/{orgSlug}` (`frontend/`), the branded site app serving every company's site by host (`site/`), and an Expo app for the company panel (`mobile/`, Expo SDK 58) that calls the Go API directly with its own Bearer tokens. Organizations are resolved per request from the `X-Organization` header; tenant permissions come from the member's roles in that organization. Stores: PostgreSQL, Redis, SeaweedFS (S3), Meilisearch, Centrifugo. Integrations: iyzico, Netgsm SMS, WhatsApp (wuzapi), e-invoice (go-ubltr), KABİS, HGS, Yolcu360, Obilet.
 
 ## Start here
 
 - AGENTS.md — agent entry, hard rules, skill index (.agents/skills/)
 - docs/ARCHITECTURE.md — repo map, shells, modules, engines, RBAC
-- docs/DEVELOPMENT.md — env, make local-dev, provider fakes, Dokploy
+- docs/DEVELOPMENT.md — env, make local-dev, provider fakes, production env (make prod-env), Dokploy, CI
 - docs/EXTENDING.md — how to add a tenant / platform module or a provider
-- docs/design/ — one design doc per domain area
+- docs/design/ — one design doc per domain area (env-core.md: production env schema)
+- docs/BOILERPLATE_SYNC.md — boilerplate base SHA, ported commits, sync work packages
 - docs/brand.md — Rentopya brand kit, colors, kept `rentopia` identifiers
 - backend/API_CONVENTIONS.md — HTTP envelope, lists, route prefixes
 - backend/docs/auth.md — JWT, platform and tenant RBAC
 - frontend/README.md — BFF, panels, features
+- mobile/README.md, mobile/AGENTS.md — Expo app, API client, commands
+- CONTRIBUTING.md — working rules, checks, CI
 
-Canonical env: repo-root `.env`. Login: /platform/login. API: /v1/... (`/v1/platform`, `/v1/tenant`, `/v1/customer/{orgSlug}`, `/v1/public`).
+Canonical env: repo-root `.env`; production env is generated from `deploy/env/schema` (`make prod-env`). Login: /platform/login. API: /v1/... (`/v1/platform`, `/v1/tenant`, `/v1/customer/{orgSlug}`, `/v1/public`).
