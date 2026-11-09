@@ -12,7 +12,9 @@ func validProdConfig() Config {
 	c.App.Env = "production"
 	c.HTTP.Addr = ":8080"
 	c.DB.Host, c.DB.User, c.DB.Name = "db", "u", "n"
+	c.DB.Password = "real-db-password"
 	c.Redis.Addr = "redis:6379"
+	c.Redis.Password = "real-redis-password"
 	c.Queue.Concurrency = 1
 	c.JWT.AccessTTL, c.JWT.RefreshTTL = time.Minute, time.Hour
 	c.JWT.AccessSecret = strings.Repeat("a", 40)

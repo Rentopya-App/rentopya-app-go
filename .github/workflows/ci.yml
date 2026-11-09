@@ -44,6 +44,21 @@ jobs:
           docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q
           scripts/prod-env.sh check "$RUNNER_TEMP/prod.env"
 
+  # deploy/env/schema stays the source of truth (docs/design/env-core.md):
+  # .env.server.example is generated from it, .env.example has every key, and
+  # every env var the backend reads reaches compose.prod.yml (or has a decision
+  # in deploy/env/compose-env.allow). Local: make env-check
+  env:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Env schema sync
+        run: scripts/check-env-sync.sh
+      - name: Backend env reaches compose.prod.yml
+        run: |
+          scripts/check-compose-env.sh
+          scripts/check-compose-env.test.sh
+
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -259,7 +274,7 @@ jobs:
   #     github.ref_name != 'master' &&
   #     !contains(github.event.head_commit.message, '[no-automerge]')
   auto-pr:
-    needs: [commit-policy, prod-env, backend, frontend, site]
+    needs: [commit-policy, prod-env, env, backend, frontend, site]
     if: false
     runs-on: ubuntu-latest
     permissions:

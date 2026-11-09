@@ -64,6 +64,12 @@ scripts/prod-env.sh check /tmp/prod.env
 
 (the CI `prod-env` job; run it when `deploy/env/schema` or `compose.prod.yml` changed)
 
+```bash
+make env-check
+```
+
+(the CI `env` job: `.env.server.example` matches the schema, `.env.example` has every schema key and every `compose.prod.yml` variable, every backend env read reaches compose or has a decision in `deploy/env/compose-env.allow`; run it when the schema, `compose.prod.yml`, `.env.example` or a backend env read changed. Fix drift: `scripts/prod-env.sh example > .env.server.example`.)
+
 `NAME_PREFIX` must be set; internal hosts stay `<service>.<app network>`.
 
 ## Shipping
