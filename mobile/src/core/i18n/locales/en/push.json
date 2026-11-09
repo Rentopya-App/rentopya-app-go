@@ -1,0 +1,9 @@
+{
+  "channel_name": "Notifications",
+  "row_title": "Notifications",
+  "on": "Push notifications are sent to this phone.",
+  "denied": "Notifications are off. Turn them on in the system settings.",
+  "ask_hint": "Get notified about field tasks, handovers and reservations awaiting approval.",
+  "allow": "Turn on",
+  "open_settings": "Settings"
+}

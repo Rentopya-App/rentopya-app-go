@@ -259,6 +259,57 @@ func (e *Engine) remindOrg(ctx context.Context, orgID int64, r *rules) {
 				"overdue:"+strconv.FormatInt(c.DueAt.Time.Unix(), 10))
 		}
 	}
+	// Handover approaching: the assignee of an open handover task (staff).
+	if rule := r.get(ctx, catalog.FieldTaskHandoverUpcoming); rule.Enabled && len(rule.Offsets) > 0 {
+		rows, err := e.q.ListNotifyHandoverTasks(ctx, db.ListNotifyHandoverTasksParams{
+			OrganizationID: orgID, NowAt: ts(now), UntilAt: ts(now.Add(maxOffset(rule.Offsets))),
+		})
+		e.warn(err, orgID, catalog.FieldTaskHandoverUpcoming)
+		for _, c := range rows {
+			if o, ok := offsetDue(rule.Offsets, c.DueAt.Time, now); ok {
+				e.emitTask(ctx, orgID, catalog.FieldTaskHandoverUpcoming, c.Uuid, c.AssigneeID, c.TaskType, c.DueAt.Time, c.BranchName,
+					offsetKey(o, c.DueAt.Time)+":"+strconv.FormatInt(c.AssigneeID, 10))
+			}
+		}
+	}
+	// Reservations waiting for a staff decision: every member who may approve them.
+	if rule := r.get(ctx, catalog.ReservationApprovalWaiting); rule.Enabled {
+		rows, err := e.q.ListNotifyApprovalWaiting(ctx, db.ListNotifyApprovalWaitingParams{
+			OrganizationID: orgID, SinceAt: ts(now.Add(-sweepWindow)),
+		})
+		e.warn(err, orgID, catalog.ReservationApprovalWaiting)
+		slug := ""
+		if len(rows) > 0 {
+			if org, err := e.q.GetNotificationOrganization(ctx, orgID); err == nil {
+				slug = org.Slug
+			}
+		}
+		for _, c := range rows {
+			id := c.Uuid
+			e.emitSoft(ctx, orgID, EmitInput{
+				Event: catalog.ReservationApprovalWaiting, UserID: c.UserID, RefType: "reservation", RefUUID: &id,
+				Key: approvalKey(c.Status, c.UserID), Link: e.panelLink(slug, "/reservations/"+id.String()),
+				Vars: map[string]string{
+					"reference": c.Reference, "pickup_at": FormatTime(c.StartsAt.Time), "pickup_branch": c.BranchName,
+				},
+			})
+		}
+	}
+}
+
+// approvalKey: one "awaiting approval" notice per member and waiting
+// status (a request that moves on to awaiting_review is a new decision).
+func approvalKey(status string, userID int64) string {
+	return "approval:" + status + ":" + strconv.FormatInt(userID, 10)
+}
+
+// panelLink is the company panel path of a record (empty without a
+// frontend URL or slug); the push channel turns it into a relative path.
+func (e *Engine) panelLink(slug, path string) string {
+	if e.portalBase == "" || slug == "" {
+		return ""
+	}
+	return e.portalBase + "/t/" + slug + path
 }
 
 func (e *Engine) emitTask(ctx context.Context, orgID int64, code string, id uuid.UUID, userID int64, taskType string, due time.Time, branch, key string) {

@@ -5,6 +5,7 @@ import tr_auth from './locales/tr/auth.json';
 import tr_field_tasks from './locales/tr/field_tasks.json';
 import tr_inspections from './locales/tr/inspections.json';
 import tr_nav from './locales/tr/nav.json';
+import tr_push from './locales/tr/push.json';
 import tr_rentals_app from './locales/tr/rentals_app.json';
 import tr_returns from './locales/tr/returns.json';
 import tr_settings from './locales/tr/settings.json';
@@ -24,6 +25,7 @@ import en_auth from './locales/en/auth.json';
 import en_field_tasks from './locales/en/field_tasks.json';
 import en_inspections from './locales/en/inspections.json';
 import en_nav from './locales/en/nav.json';
+import en_push from './locales/en/push.json';
 import en_rentals_app from './locales/en/rentals_app.json';
 import en_returns from './locales/en/returns.json';
 import en_settings from './locales/en/settings.json';
@@ -39,9 +41,9 @@ import en_vehicle_records from '../../../../frontend/src/locales/en/vehicle_reco
 import en_rentals from '../../../../frontend/src/locales/en/rentals.json';
 import en_inspections_web from '../../../../frontend/src/locales/en/inspections.json';
 
-export const NAMESPACES = ['common', 'auth', 'field_tasks', 'inspections', 'nav', 'rentals_app', 'returns', 'settings', 'today', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'vehicles', 'vehicle_blocks', 'vehicle_records', 'rentals', 'inspections_web'] as const;
+export const NAMESPACES = ['common', 'auth', 'field_tasks', 'inspections', 'nav', 'push', 'rentals_app', 'returns', 'settings', 'today', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'vehicles', 'vehicle_blocks', 'vehicle_records', 'rentals', 'inspections_web'] as const;
 
 export const resources = {
-  tr: { common: tr_common, auth: tr_auth, field_tasks: tr_field_tasks, inspections: tr_inspections, nav: tr_nav, rentals_app: tr_rentals_app, returns: tr_returns, settings: tr_settings, today: tr_today, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records, rentals: tr_rentals, inspections_web: tr_inspections_web },
-  en: { common: en_common, auth: en_auth, field_tasks: en_field_tasks, inspections: en_inspections, nav: en_nav, rentals_app: en_rentals_app, returns: en_returns, settings: en_settings, today: en_today, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records, rentals: en_rentals, inspections_web: en_inspections_web },
+  tr: { common: tr_common, auth: tr_auth, field_tasks: tr_field_tasks, inspections: tr_inspections, nav: tr_nav, push: tr_push, rentals_app: tr_rentals_app, returns: tr_returns, settings: tr_settings, today: tr_today, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records, rentals: tr_rentals, inspections_web: tr_inspections_web },
+  en: { common: en_common, auth: en_auth, field_tasks: en_field_tasks, inspections: en_inspections, nav: en_nav, push: en_push, rentals_app: en_rentals_app, returns: en_returns, settings: en_settings, today: en_today, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records, rentals: en_rentals, inspections_web: en_inspections_web },
 };

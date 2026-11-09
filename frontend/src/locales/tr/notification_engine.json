@@ -35,6 +35,8 @@
   "events.account_payment_due": "Cari vade hatırlatması",
   "events.field_task_assigned": "Yeni saha işi",
   "events.field_task_overdue": "Geciken saha işi",
+  "events.field_task_handover_upcoming": "Teslim işi yaklaşıyor (görevli)",
+  "events.reservation_approval_waiting": "Onay bekleyen rezervasyon",
   "delivery_statuses.sending": "Gönderiliyor",
   "delivery_statuses.sent": "Gönderildi",
   "delivery_statuses.delivered": "Teslim edildi",
