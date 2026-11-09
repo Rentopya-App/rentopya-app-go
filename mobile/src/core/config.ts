@@ -13,6 +13,16 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:808
 export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
 /**
+ * Native sign-in switches. Sign in with Apple needs the capability on the App
+ * ID and the bundle id in the API's `AUTH_APPLE_NATIVE_CLIENT_IDS`; Google
+ * needs OAuth client ids (web always, iOS on iOS) that the API also lists in
+ * `AUTH_GOOGLE_NATIVE_CLIENT_IDS`. Unset = the button is not shown.
+ */
+export const APPLE_SIGN_IN = process.env.EXPO_PUBLIC_APPLE_SIGN_IN === '1';
+export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || undefined;
+export const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || undefined;
+
+/**
  * App release (`X-App-Version`). In Expo Go the native version is Expo Go's
  * own, so the app.json version is used there.
  */
