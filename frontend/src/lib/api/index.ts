@@ -12,6 +12,8 @@ export {
   parseApiError,
   setGlobalApiErrorHandler,
   emitApiError,
+  wasApiErrorShown,
+  markApiErrorShown,
   type ApiErrorBody,
   type ApiErrorDetail,
 } from "./errors";

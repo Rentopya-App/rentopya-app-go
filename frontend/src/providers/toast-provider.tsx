@@ -5,7 +5,13 @@ import { toast } from "sonner";
 
 import { Toaster } from "@/components/ui/sonner";
 
-import { ApiError, setGlobalApiErrorHandler } from "@/lib/api";
+import {
+  ApiError,
+  isApiError,
+  markApiErrorShown,
+  setGlobalApiErrorHandler,
+  wasApiErrorShown,
+} from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
@@ -68,7 +74,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 export const appToast = {
   success: (message: string) => toast.success(message),
-  error: (message: string) => toast.error(message),
+  // Keyed by text like the global API error toasts: the same message never
+  // stacks twice.
+  error: (message: string) => toast.error(message, { id: message }),
+  /**
+   * Toast a caught error unless the global API error handler already showed
+   * it (one toast per API error). Shows the ApiError's localized message, or
+   * `fallback` for anything else.
+   */
+  apiError: (error: unknown, fallback: string) => {
+    if (wasApiErrorShown(error)) return;
+    markApiErrorShown(error);
+    const message = (isApiError(error) && error.message) || fallback;
+    toast.error(message, { id: message });
+  },
   warning: (message: string) => toast.warning(message),
   info: (message: string) => toast.info(message),
 };
