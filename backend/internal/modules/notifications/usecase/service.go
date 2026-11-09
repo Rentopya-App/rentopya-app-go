@@ -45,6 +45,7 @@ type Querier interface {
 	ListStaleQueuedNotifications(ctx context.Context, staleMinutes int32) ([]db.ListStaleQueuedNotificationsRow, error)
 	GetNotificationByIdempotencyKey(ctx context.Context, idempotencyKey pgtype.Text) (db.Notification, error)
 	MarkNotificationSent(ctx context.Context, arg db.MarkNotificationSentParams) (db.Notification, error)
+	RedactNotification(ctx context.Context, id int64) error
 	MarkNotificationFailed(ctx context.Context, arg db.MarkNotificationFailedParams) (db.Notification, error)
 	MarkNotificationRead(ctx context.Context, arg db.MarkNotificationReadParams) (db.Notification, error)
 	MarkAllNotificationsReadForUser(ctx context.Context, arg db.MarkAllNotificationsReadForUserParams) (int64, error)
@@ -158,6 +159,7 @@ func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 			continue
 		}
 		title, body := in.Title, in.Body
+		tplSubject, tplBody := "", ""
 		if in.TemplateCode != "" {
 			tpl, err := s.q.GetTemplateByCodeChannelLang(ctx, db.GetTemplateByCodeChannelLangParams{
 				Code: in.TemplateCode, Channel: ch, Language: lang,
@@ -168,6 +170,7 @@ func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 				})
 			}
 			if err == nil {
+				tplSubject, tplBody = tpl.Subject, tpl.Body
 				title = templates.Render(tpl.Subject, in.TemplateVars)
 				body = templates.Render(tpl.Body, in.TemplateVars)
 			} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -176,7 +179,11 @@ func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 				title = in.TemplateCode
 			}
 		}
-		payload, err := json.Marshal(withPushVars(ch, payloadIn, in.TemplateVars))
+		rowPayload := withPushVars(ch, payloadIn, in.TemplateVars)
+		if len(in.SecretVars) > 0 || in.ForgetRecipient {
+			rowPayload = withRedaction(rowPayload, in, title, body, tplSubject, tplBody)
+		}
+		payload, err := json.Marshal(rowPayload)
 		if err != nil {
 			payload = []byte("{}")
 		}
@@ -303,6 +310,9 @@ func (s *Service) deliverRow(ctx context.Context, row db.Notification) error {
 		_, _ = s.q.MarkNotificationFailed(ctx, db.MarkNotificationFailedParams{
 			ID: id, LastError: pgtype.Text{String: err.Error(), Valid: true},
 		})
+		if row.AttemptCount >= row.MaxAttempts {
+			s.redact(ctx, id)
+		}
 		_, _ = s.q.InsertNotificationHistory(ctx, db.InsertNotificationHistoryParams{
 			NotificationID: id, Event: "failed",
 			Metadata: mustJSON(map[string]string{"error": err.Error()}),
@@ -324,6 +334,7 @@ func (s *Service) deliverRow(ctx context.Context, row db.Notification) error {
 	_, _ = s.q.InsertNotificationHistory(ctx, db.InsertNotificationHistoryParams{
 		NotificationID: id, Event: status, Metadata: []byte("{}"),
 	})
+	s.redact(ctx, id)
 
 	// Fan-out realtime mirror for inapp deliveries.
 	if row.Channel == model.ChannelInapp {

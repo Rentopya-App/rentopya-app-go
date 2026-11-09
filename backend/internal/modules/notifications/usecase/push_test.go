@@ -17,6 +17,15 @@ type pushTestQuerier struct {
 	subs  []db.PushSubscription
 	err   error
 	list  int
+	// redacted: rows RedactNotification was called for.
+	redacted []int64
+	// template answers GetTemplateByCodeChannelLang when its code is set.
+	template db.NotificationTemplate
+}
+
+func (m *pushTestQuerier) RedactNotification(_ context.Context, id int64) error {
+	m.redacted = append(m.redacted, id)
+	return nil
 }
 
 func (m *pushTestQuerier) GetNotificationPreferences(_ context.Context, userID int64) (db.NotificationPreference, error) {
@@ -91,7 +100,7 @@ func (m *pushTestQuerier) InsertNotificationHistory(context.Context, db.InsertNo
 	return db.NotificationHistory{}, nil
 }
 func (m *pushTestQuerier) GetTemplateByCodeChannelLang(context.Context, db.GetTemplateByCodeChannelLangParams) (db.NotificationTemplate, error) {
-	return db.NotificationTemplate{}, nil
+	return m.template, nil
 }
 func (m *pushTestQuerier) UpsertNotificationPreferences(context.Context, db.UpsertNotificationPreferencesParams) (db.NotificationPreference, error) {
 	return db.NotificationPreference{}, nil

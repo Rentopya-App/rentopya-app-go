@@ -37,6 +37,7 @@ const GUEST_AUTH_PREFIXES = [
   routes.guest.forgotPassword,
   routes.guest.resetPassword,
   routes.guest.verifyEmail,
+  routes.guest.restoreAccount,
 ];
 
 function isGuestAuthPath(pathname: string) {

@@ -36,6 +36,9 @@ type Querier interface {
 	AnonymizeCustomer(ctx context.Context, arg AnonymizeCustomerParams) (int64, error)
 	// Data subject request: wipes the drivers of a customer and soft-deletes them.
 	AnonymizeCustomerDrivers(ctx context.Context, arg AnonymizeCustomerDriversParams) error
+	// The row stays because rental, contract, finance and audit records point
+	// to it; nothing in it identifies the person any more.
+	AnonymizeUser(ctx context.Context, arg AnonymizeUserParams) (int64, error)
 	ApplyChannelReservation(ctx context.Context, arg ApplyChannelReservationParams) error
 	ApproveDocumentApprovalLink(ctx context.Context, arg ApproveDocumentApprovalLinkParams) (int64, error)
 	ApproveDocumentVersion(ctx context.Context, arg ApproveDocumentVersionParams) (int64, error)
@@ -363,8 +366,9 @@ type Querier interface {
 	CustomerHasSMSConsent(ctx context.Context, arg CustomerHasSMSConsentParams) (bool, error)
 	CustomerIdentityTaken(ctx context.Context, arg CustomerIdentityTakenParams) (bool, error)
 	DateRuleNameTaken(ctx context.Context, arg DateRuleNameTakenParams) (bool, error)
-	// Self-service account deletion: keep every row, mark the user disabled.
-	DeactivateUser(ctx context.Context, id int64) (User, error)
+	// Self-service account deletion: the user is disabled at once and erased by
+	// the worker at deletion_due_at unless restored with the e-mailed link.
+	DeactivateUser(ctx context.Context, arg DeactivateUserParams) (User, error)
 	DecideRentalCharge(ctx context.Context, arg DecideRentalChargeParams) (int64, error)
 	DecrementCampaignUsage(ctx context.Context, arg DecrementCampaignUsageParams) (int64, error)
 	DeleteAgreementContact(ctx context.Context, arg DeleteAgreementContactParams) (int64, error)
@@ -448,6 +452,8 @@ type Querier interface {
 	// Undo of a public booking that failed after its customer was created: the
 	// customer (and its drivers, cascade) is removed while nothing refers to it.
 	DeleteUnusedPublicCustomer(ctx context.Context, arg DeleteUnusedPublicCustomerParams) (int64, error)
+	// Deletion request: no push reaches the closed account's phones or browsers.
+	DeleteUserPushTargets(ctx context.Context, userID int64) error
 	DeleteUserTOTP(ctx context.Context, userID int64) error
 	DeleteVehicleTollTag(ctx context.Context, arg DeleteVehicleTollTagParams) (int64, error)
 	DeleteWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) error
@@ -1721,6 +1727,10 @@ type Querier interface {
 	// the newest member sign-in and the file bytes recorded on the tenant
 	// tables that keep a size (documents, photos, attachments, PDFs).
 	ListOrganizationUsage(ctx context.Context, arg ListOrganizationUsageParams) ([]ListOrganizationUsageRow, error)
+	// Live organizations where the user holds the template owner role and no
+	// other owner has an open (not deleted, not pending deletion) account. The
+	// deletion request is refused while any is listed.
+	ListOrganizationsSolelyOwnedByUser(ctx context.Context, userID int64) ([]ListOrganizationsSolelyOwnedByUserRow, error)
 	// Organizations that have passes waiting in the review queue (the
 	// periodic re-match walks them).
 	ListOrganizationsWithReviewTollPasses(ctx context.Context, since pgtype.Timestamptz) ([]int64, error)
@@ -2011,11 +2021,14 @@ type Querier interface {
 	// Catch-up sweep: confirmed payments without their collection entry.
 	ListUnpostedPayments(ctx context.Context, limitCount int32) ([]ListUnpostedPaymentsRow, error)
 	ListUnpostedRefunds(ctx context.Context, limitCount int32) ([]ListUnpostedRefundsRow, error)
+	// Organizations the account is a member of.
+	ListUserOrganizationIDs(ctx context.Context, userID int64) ([]int64, error)
 	ListUserRoleSlugs(ctx context.Context, userID int64) ([]string, error)
 	ListUserRolesByUserID(ctx context.Context, userID int64) ([]Role, error)
 	ListUserRolesByUserUUID(ctx context.Context, argUuid uuid.UUID) ([]Role, error)
 	ListUserUUIDsForBulk(ctx context.Context, arg ListUserUUIDsForBulkParams) ([]uuid.UUID, error)
 	ListUsersByIDsForFleet(ctx context.Context, ids []int64) ([]ListUsersByIDsForFleetRow, error)
+	ListUsersDueForPurge(ctx context.Context, arg ListUsersDueForPurgeParams) ([]ListUsersDueForPurgeRow, error)
 	ListUsersFiltered(ctx context.Context, arg ListUsersFilteredParams) ([]User, error)
 	ListUsersForExport(ctx context.Context, arg ListUsersForExportParams) ([]User, error)
 	ListVehicleAssignments(ctx context.Context, arg ListVehicleAssignmentsParams) ([]ListVehicleAssignmentsRow, error)
@@ -2357,6 +2370,16 @@ type Querier interface {
 	PurgeCustomerDocuments(ctx context.Context, arg PurgeCustomerDocumentsParams) error
 	// Worker sweep over every organization's expired records.
 	PurgeExpiredPublicIdempotency(ctx context.Context, now pgtype.Timestamptz) (int64, error)
+	// Membership goes (its roles and branch scopes cascade). Rentals,
+	// contracts, finance and activity rows keep their created_by / actor
+	// references to the anonymised users row.
+	PurgeUserFromOrganization(ctx context.Context, arg PurgeUserFromOrganizationParams) error
+	// Devices, preferences, inbox (every organization's notices to the person)
+	// and starred or shared files.
+	PurgeUserPersonalData(ctx context.Context, userID int64) error
+	// Sign-in methods (OAuth links, passkeys, TOTP), sessions, codes and
+	// platform roles; nothing else can reach the account.
+	PurgeUserSignInData(ctx context.Context, userID int64) error
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	ReassignCatalogModelRules(ctx context.Context, arg ReassignCatalogModelRulesParams) (int64, error)
 	ReassignCatalogTypesModel(ctx context.Context, arg ReassignCatalogTypesModelParams) (int64, error)
@@ -2380,6 +2403,11 @@ type Querier interface {
 	RecordDocumentApprovalLinkFailure(ctx context.Context, arg RecordDocumentApprovalLinkFailureParams) error
 	RecordOTPAttempt(ctx context.Context, arg RecordOTPAttemptParams) error
 	RecordWebhookEndpointResult(ctx context.Context, arg RecordWebhookEndpointResultParams) error
+	// Security e-mails (EnqueueInput.SecretVars): once the row is final the
+	// stored title / body are replaced with the copies rendered without the
+	// secrets (payload.redact), and the recipient is dropped when asked, so no
+	// restore link or erased address outlives the delivery.
+	RedactNotification(ctx context.Context, id int64) error
 	// Denormalizes the synced variants and brand color of linked display brands.
 	RefreshCatalogDisplayBrandsSyncedLogos(ctx context.Context) (int64, error)
 	// A notification that was not sent yet takes the current data.
@@ -2485,6 +2513,9 @@ type Querier interface {
 	// from the row). The caller serves the published snapshot of an enabled
 	// site, or the draft to a valid preview token.
 	ResolveSiteBySubdomain(ctx context.Context, subdomain string) (ResolveSiteBySubdomainRow, error)
+	// Self-service account deletion (docs/design/account-deletion.md).
+	// The e-mailed restore link reopens the account until the purge date.
+	RestoreDeactivatedUser(ctx context.Context, arg RestoreDeactivatedUserParams) (User, error)
 	// Copies a published snapshot back into the draft (publish again to make it
 	// live); bumps the version.
 	RestoreSiteDraft(ctx context.Context, arg RestoreSiteDraftParams) (int32, error)
@@ -2804,7 +2835,8 @@ type Querier interface {
 	UpdateUserLastLogin(ctx context.Context, id int64) error
 	UpdateUserLocale(ctx context.Context, arg UpdateUserLocaleParams) error
 	UpdateUserPasswordByID(ctx context.Context, arg UpdateUserPasswordByIDParams) error
-	// Re-activating a user (status -> active) clears a self-service deactivation.
+	// Re-activating a user (status -> active) clears a self-service deactivation
+	// and its scheduled purge (docs/design/account-deletion.md).
 	UpdateUserPlatform(ctx context.Context, arg UpdateUserPlatformParams) (User, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpdateUserProfileBasics(ctx context.Context, arg UpdateUserProfileBasicsParams) error

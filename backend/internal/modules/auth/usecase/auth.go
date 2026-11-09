@@ -85,7 +85,12 @@ type Repository interface {
 	UpdatePasskeyName(ctx context.Context, userUUID, passkeyUUID uuid.UUID, name *string) (model.PasskeyRecord, error)
 	DeletePasskeyByCredentialID(ctx context.Context, credentialID string) error
 	DeletePasskeyByUUID(ctx context.Context, userUUID, passkeyUUID uuid.UUID) error
-	DeactivateUser(ctx context.Context, userID int64) (model.User, error)
+	DeactivateUser(ctx context.Context, userID int64, dueAt time.Time, restoreHash string) (model.User, error)
+	RestoreDeactivatedUser(ctx context.Context, restoreHash string, now time.Time) (model.User, error)
+	ListOrganizationsSolelyOwnedByUser(ctx context.Context, userID int64) ([]model.SoleOwnedOrganization, error)
+	DeleteUserPushTargets(ctx context.Context, userID int64) error
+	ListUsersDueForPurge(ctx context.Context, now time.Time, limit int32) ([]model.PurgeCandidate, error)
+	PurgeUser(ctx context.Context, userID int64, anonymousName string, now time.Time) (bool, error)
 	UpdateOAuthAccountRefreshToken(ctx context.Context, accountID int64, refreshTokenEnc, clientID *string) error
 	GetOAuthAccountByProviderAccount(ctx context.Context, provider, providerAccountID string) (model.OAuthAccountRecord, error)
 	GetOAuthAccountByUserProvider(ctx context.Context, userID int64, provider string) (model.OAuthAccountRecord, error)
@@ -129,6 +134,9 @@ type AuthUseCase struct {
 	// reviewAccounts maps email -> fixed sign-in code (app store review).
 	reviewAccounts map[string]string
 	native         NativeOAuthConfig
+	// restoreURL prefixes the account restore token in the deletion e-mail
+	// (docs/design/account-deletion.md).
+	restoreURL string
 }
 
 // SecretBox encrypts at-rest secrets (TOTP).

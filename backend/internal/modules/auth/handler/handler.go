@@ -567,7 +567,19 @@ func writeUsecaseError(w http.ResponseWriter, r *http.Request, err error) {
 			})
 		return
 	}
+	var soleOwner *usecase.LastOrganizationOwnerError
+	if errors.As(err, &soleOwner) {
+		details := make([]response.Detail, 0, len(soleOwner.Organizations))
+		for _, o := range soleOwner.Organizations {
+			details = append(details, response.Detail{Field: "organization", Message: o.Name, Code: o.Slug})
+		}
+		response.ErrorWithDetails(w, r, http.StatusConflict, response.CodeLastOrganizationOwner,
+			"You are the only owner of an organization. Hand over ownership before deleting your account.", details)
+		return
+	}
 	switch {
+	case errors.Is(err, usecase.ErrInvalidRestoreLink):
+		response.BadRequest(w, r, response.CodeInvalidRestoreLink, "The restore link is invalid or expired")
 	case errors.Is(err, usecase.ErrAccountDeactivated):
 		response.Error(w, r, http.StatusForbidden, response.CodeAccountDeactivated, "This account has been deleted")
 	case errors.Is(err, usecase.ErrInvalidEmailCode):

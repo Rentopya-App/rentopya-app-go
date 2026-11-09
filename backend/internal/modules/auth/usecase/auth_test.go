@@ -23,6 +23,11 @@ type memRepo struct {
 	nextID    int64
 	perms     map[string][]string
 	roles     map[string]int64
+	// account deletion bookkeeping
+	restoreHash map[int64]string
+	purged      map[int64]bool
+	soleOwned   map[int64][]model.SoleOwnedOrganization
+	pushDeleted map[int64]int
 }
 
 func newMemRepo() *memRepo {
@@ -341,7 +346,7 @@ func (r *memRepo) UpdatePasskeyName(context.Context, uuid.UUID, uuid.UUID, *stri
 	return model.PasskeyRecord{}, repository.ErrNotFound
 }
 
-func (r *memRepo) DeactivateUser(_ context.Context, userID int64) (model.User, error) {
+func (r *memRepo) DeactivateUser(_ context.Context, userID int64, dueAt time.Time, restoreHash string) (model.User, error) {
 	u, ok := r.users[userID]
 	if !ok {
 		return model.User{}, repository.ErrNotFound
@@ -349,10 +354,72 @@ func (r *memRepo) DeactivateUser(_ context.Context, userID int64) (model.User, e
 	now := time.Now().UTC()
 	u.Status = "disabled"
 	u.DeactivatedAt = &now
+	u.DeletionDueAt = &dueAt
+	r.putUser(u)
+	if r.restoreHash == nil {
+		r.restoreHash = map[int64]string{}
+	}
+	r.restoreHash[u.ID] = restoreHash
+	return u, nil
+}
+
+func (r *memRepo) putUser(u model.User) {
 	r.users[u.ID] = u
 	r.byEmail[u.Email] = u
 	r.byUUID[u.UUID] = u
-	return u, nil
+}
+
+func (r *memRepo) RestoreDeactivatedUser(_ context.Context, restoreHash string, now time.Time) (model.User, error) {
+	for id, h := range r.restoreHash {
+		u := r.users[id]
+		if h != restoreHash || r.purged[id] || u.DeletionDueAt == nil || !u.DeletionDueAt.After(now) {
+			continue
+		}
+		u.Status, u.DeactivatedAt, u.DeletionDueAt = "active", nil, nil
+		r.putUser(u)
+		delete(r.restoreHash, id)
+		return u, nil
+	}
+	return model.User{}, repository.ErrNotFound
+}
+
+func (r *memRepo) ListOrganizationsSolelyOwnedByUser(_ context.Context, userID int64) ([]model.SoleOwnedOrganization, error) {
+	return r.soleOwned[userID], nil
+}
+
+func (r *memRepo) DeleteUserPushTargets(_ context.Context, userID int64) error {
+	if r.pushDeleted == nil {
+		r.pushDeleted = map[int64]int{}
+	}
+	r.pushDeleted[userID]++
+	return nil
+}
+
+func (r *memRepo) ListUsersDueForPurge(_ context.Context, now time.Time, limit int32) ([]model.PurgeCandidate, error) {
+	var out []model.PurgeCandidate
+	for id, u := range r.users {
+		if !r.purged[id] && u.DeletionDueAt != nil && !u.DeletionDueAt.After(now) && int32(len(out)) < limit {
+			out = append(out, model.PurgeCandidate{ID: id, UUID: u.UUID})
+		}
+	}
+	return out, nil
+}
+
+func (r *memRepo) PurgeUser(_ context.Context, userID int64, anonymousName string, _ time.Time) (bool, error) {
+	u, ok := r.users[userID]
+	if !ok || r.purged[userID] {
+		return false, nil
+	}
+	if r.purged == nil {
+		r.purged = map[int64]bool{}
+	}
+	r.purged[userID] = true
+	delete(r.byEmail, u.Email)
+	u.Email, u.Name, u.Surname = "deleted-"+u.UUID.String()+"@deleted.invalid", anonymousName, ""
+	r.users[u.ID] = u
+	r.byUUID[u.UUID] = u
+	delete(r.restoreHash, userID)
+	return true, nil
 }
 
 func (r *memRepo) UpdateOAuthAccountRefreshToken(context.Context, int64, *string, *string) error {

@@ -16,6 +16,7 @@ const (
 	codeVerifyEmailLimit   = 10
 	nativeOAuthIPLimit     = 30
 	deactivateRequestLimit = 5
+	restoreIPLimit         = 10
 	authRateWindow         = 15 * time.Minute
 )
 
@@ -155,4 +156,29 @@ func (h *Handler) DeactivateAccount(w http.ResponseWriter, r *http.Request) {
 		}, r)
 	}
 	response.JSON(w, r, http.StatusOK, map[string]string{"status": "deactivated"})
+}
+
+// RestoreAccount is POST /v1/auth/account/restore: the link from the deletion
+// e-mail reopens the account while its restore window is open. Public; the
+// token is the credential (10 attempts per IP per window).
+func (h *Handler) RestoreAccount(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token string `json:"token"`
+	}
+	if err := decodeJSON(w, r, &in); err != nil {
+		return
+	}
+	if !h.allowRates(w, r, rateCheck{"account_restore_ip", sessionMeta(r).IP, restoreIPLimit}) {
+		return
+	}
+	user, err := h.uc.RestoreAccount(r.Context(), in.Token)
+	if err != nil {
+		writeUsecaseError(w, r, err)
+		return
+	}
+	if h.activity != nil {
+		id := user.ID
+		h.activity.Record(r.Context(), &id, "auth.account_restored", "auth.account", nil, nil, r)
+	}
+	response.JSON(w, r, http.StatusOK, map[string]string{"status": "restored"})
 }
