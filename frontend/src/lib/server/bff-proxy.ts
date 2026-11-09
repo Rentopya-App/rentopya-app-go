@@ -14,6 +14,12 @@ import {
   proxyPublicBooking,
 } from "@/lib/server/public-booking";
 import {
+  BodyTooLargeError,
+  bodyTooLargeResponse,
+  maxProxyBodyBytes,
+  readBodyCapped,
+} from "@/lib/server/request-body";
+import {
   sharedRefresh,
   type RefreshResult,
 } from "@/lib/server/refresh-single-flight";
@@ -498,10 +504,16 @@ export async function proxyToUpstream(
   const url = new URL(request.url);
   const pathWithQuery = `${path}${url.search}`;
 
-  const incomingBody =
-    request.method === "GET" || request.method === "HEAD"
-      ? new ArrayBuffer(0)
-      : await request.arrayBuffer();
+  let incomingBody: ArrayBuffer;
+  try {
+    incomingBody =
+      request.method === "GET" || request.method === "HEAD"
+        ? new ArrayBuffer(0)
+        : await readBodyCapped(request, maxProxyBodyBytes());
+  } catch (err) {
+    if (err instanceof BodyTooLargeError) return bodyTooLargeResponse();
+    throw err;
+  }
 
   const { accessToken, refreshToken } = await getApiTokens();
 

@@ -109,6 +109,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	tokens, err := h.uc.Login(r.Context(), in.Email, in.Password, in.TOTPCode, sessionMeta(r))
 	if err != nil {
+		if h.limiter != nil && (errors.Is(err, usecase.ErrInvalidCredentials) || errors.Is(err, usecase.ErrInvalidMFACode)) {
+			h.limiter.RecordLoginFailure(r.Context(), in.Email)
+		}
 		writeUsecaseError(w, r, err)
 		return
 	}

@@ -24,6 +24,9 @@ func New(svc *bulkusecase.Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+// maxBulkBody bounds a bulk request body.
+const maxBulkBody = 1 << 20
+
 type bulkRequest struct {
 	Action string                `json:"action"`
 	Target bulkengine.BulkTarget `json:"target"`
@@ -47,7 +50,9 @@ func (h *Handler) Execute(resource string) http.HandlerFunc {
 func (h *Handler) execute(w http.ResponseWriter, r *http.Request, resource string) {
 	p := authctx.MustPrincipal(r.Context())
 	var body bulkRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	// Same 1 MiB cap as the tenant bulk route: an unbounded body would be
+	// read into memory whole (TEC-1170).
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBulkBody)).Decode(&body); err != nil {
 		response.BadRequest(w, r, response.CodeValidationError, "invalid JSON body")
 		return
 	}
