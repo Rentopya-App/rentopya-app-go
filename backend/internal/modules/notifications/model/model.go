@@ -103,6 +103,13 @@ type EnqueueInput struct {
 	Language       string
 	// SecurityEmail bypasses email preference (password reset / verification).
 	SecurityEmail bool
+	// SecretVars names template vars (restore links, the name of an erased
+	// account) that must not outlive the delivery: the stored title / body
+	// are re-rendered without them once the row is final.
+	SecretVars []string
+	// ForgetRecipient drops the stored recipient address once the row is
+	// final (the last e-mail to an erased account).
+	ForgetRecipient bool
 	// IdempotencyKey (optional) names the cause of the notification and its
 	// recipient (EventKey for outbox events, "notify:<delivery>" for the
 	// notification engine). Each channel's row stores RowKey(key, channel)

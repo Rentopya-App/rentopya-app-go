@@ -208,6 +208,7 @@ func (u *AuthUseCase) sendEmailCode(
 		TemplateCode: templateCode, SourceEvent: templateCode,
 		SecurityEmail: true, Recipient: &to, Language: user.Locale,
 		TemplateVars: vars,
+		SecretVars:   []string{"code"}, // the stored copy drops the code once delivered
 	})
 	return err
 }

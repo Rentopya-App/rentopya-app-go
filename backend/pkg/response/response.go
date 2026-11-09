@@ -36,6 +36,7 @@ const (
 	CodeRateLimited               = "RATE_LIMITED"
 	CodeInvalidMFACode            = "INVALID_MFA_CODE"
 	CodeAccountDeactivated        = "ACCOUNT_DEACTIVATED"
+	CodeInvalidRestoreLink        = "INVALID_RESTORE_LINK"
 	CodeInvalidEmailCode          = "INVALID_EMAIL_CODE"
 	CodeInvalidIDToken            = "INVALID_ID_TOKEN"
 	CodeOAuthAccountNotLinked     = "OAUTH_ACCOUNT_NOT_LINKED"

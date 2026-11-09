@@ -26,15 +26,25 @@ func (u *AuthUseCase) RequestAccountDeactivationCode(ctx context.Context, userUU
 		}
 		return err
 	}
+	// Tell a sole owner before any code is sent.
+	if err := u.guardSoleOwner(ctx, user.ID); err != nil {
+		return err
+	}
 	if u.isReviewAccount(normalizeEmail(user.Email)) {
 		return nil
 	}
 	return u.sendEmailCode(ctx, user, normalizeEmail(user.Email), otpTypeAccountDeactivation, "auth.account_deactivation_code", nil)
 }
 
-// DeactivateAccount is self-service account deletion. No data is deleted: the
-// user is marked disabled + deactivated_at, every refresh session is revoked
-// and stored Apple tokens are revoked (best effort).
+// DeactivateAccount is self-service account deletion (App Store 5.1.1(v)).
+// The user is disabled at once: every refresh session, push device / browser
+// subscription and stored Apple token is revoked. The worker erases the
+// account after AccountRestoreWindow (PurgeDueAccounts); the confirmation
+// e-mail carries a link that restores it until then
+// (docs/design/account-deletion.md).
+//
+// Refused with ErrLastOrganizationOwner while the user is the only open
+// owner of a live organization (ownership is handed over first).
 //
 // Confirmation: stepUpVerified (recent /v1/auth/step-up/* grant) or a valid
 // account-deactivation email code.
@@ -62,6 +72,9 @@ func (u *AuthUseCase) DeactivateAccount(ctx context.Context, userUUID uuid.UUID,
 			return ErrLastSuperAdmin
 		}
 	}
+	if err := u.guardSoleOwner(ctx, user.ID); err != nil {
+		return err
+	}
 
 	var otpID int64
 	code = strings.TrimSpace(code)
@@ -75,13 +88,21 @@ func (u *AuthUseCase) DeactivateAccount(ctx context.Context, userUUID uuid.UUID,
 		return ErrConfirmationRequired
 	}
 
-	if _, err := u.repo.DeactivateUser(ctx, user.ID); err != nil {
+	restoreToken, restoreHash, err := newRestoreToken()
+	if err != nil {
+		return err
+	}
+	dueAt := u.now().UTC().Add(AccountRestoreWindow)
+	if _, err := u.repo.DeactivateUser(ctx, user.ID, dueAt, restoreHash); err != nil {
 		return err
 	}
 	if otpID != 0 {
 		_ = u.repo.ConsumeOTP(ctx, otpID)
 	}
 	if err := u.repo.RevokeAllRefresh(ctx, user.ID); err != nil {
+		return err
+	}
+	if err := u.repo.DeleteUserPushTargets(ctx, user.ID); err != nil {
 		return err
 	}
 	u.revokeAppleTokens(ctx, user.ID)
@@ -94,7 +115,14 @@ func (u *AuthUseCase) DeactivateAccount(ctx context.Context, userUUID uuid.UUID,
 			UserID: &uid, Channels: []string{notifmodel.ChannelEmail},
 			TemplateCode: "auth.account_deactivated", SourceEvent: "auth.account_deactivated",
 			SecurityEmail: true, Recipient: &email, Language: user.Locale,
-			TemplateVars: map[string]string{"name": user.Name},
+			TemplateVars: map[string]string{
+				"name":        user.Name,
+				"purge_date":  formatPurgeDate(dueAt, user.Locale),
+				"restore_url": u.restoreURL + restoreToken,
+			},
+			// The restore link is a bearer secret: the stored copy of
+			// the e-mail drops it once delivered.
+			SecretVars: []string{"restore_url"},
 		})
 	}
 	return nil

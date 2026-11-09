@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	authrepo "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/auth/repository"
+	authusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/auth/usecase"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -577,6 +579,12 @@ func main() {
 	})
 	integrationRunner.AddListener(platformHealthSvc)
 
+	// Deleted accounts are erased when their 30-day restore window ends
+	// (docs/design/account-deletion.md).
+	accountPurger := authusecase.New(authrepo.NewPostgres(pool, queries), nil)
+	accountPurger.SetLogger(log)
+	accountPurger.SetSearchIndexer(searchIndexer)
+	accountPurger.SetNotifier(notifSvc)
 	worker := queue.NewWorker(cfg, log, notifSvc.Deliver).
 		WithExport(exportSvc.ProcessExport).
 		WithImport(importSvc.ProcessImport).
@@ -666,6 +674,7 @@ func main() {
 		}).
 		WithWhatsApp(whatsappSvc.Watch).
 		WithDocumentPDF(contractsSvc.RenderPDF).
+		WithAccountPurge(accountPurger.PurgeDueAccounts).
 		WithSearch(
 			searchIndexer.ProcessUpsert,
 			searchIndexer.ProcessDelete,
@@ -727,6 +736,10 @@ func main() {
 	}
 	if err := queue.RegisterWhatsAppSchedule(scheduler); err != nil {
 		log.Error("whatsapp_scheduler_failed", "error", err)
+		exit(1)
+	}
+	if err := queue.RegisterAccountPurgeSchedule(scheduler); err != nil {
+		log.Error("account_purge_scheduler_failed", "error", err)
 		exit(1)
 	}
 	go func() {

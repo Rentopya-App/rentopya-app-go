@@ -71,6 +71,8 @@ func RegisterRoutes(
 	mux.Handle("POST /v1/auth/email/verify-request", middleware.Chain(http.HandlerFunc(h.VerifyEmailRequest), authn))
 	mux.Handle("POST /v1/auth/account/deactivate/request", middleware.Chain(http.HandlerFunc(h.RequestAccountDeactivationCode), authn))
 	mux.Handle("POST /v1/auth/account/deactivate", middleware.Chain(http.HandlerFunc(h.DeactivateAccount), authn))
+	// Public: the link from the deletion e-mail (docs/design/account-deletion.md).
+	mux.HandleFunc("POST /v1/auth/account/restore", h.RestoreAccount)
 
 	mux.Handle("GET /v1/auth/sessions", middleware.Chain(http.HandlerFunc(h.ListSessions), authn))
 	mux.Handle("POST /v1/auth/sessions/revoke-others", middleware.Chain(http.HandlerFunc(h.RevokeOtherSessions), authn))

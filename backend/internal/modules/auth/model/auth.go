@@ -20,9 +20,25 @@ type User struct {
 	CreatedAt     time.Time
 	// DeactivatedAt is set when the user deleted (deactivated) their own account.
 	DeactivatedAt *time.Time
+	// DeletionDueAt is when a deactivated account is erased (restorable until then).
+	DeletionDueAt *time.Time
 	// PasswordSet is false when the user never chose a password (OAuth sign-up
 	// stores a random hash).
 	PasswordSet bool
+}
+
+// PurgeCandidate is a deactivated account whose restore window has ended.
+type PurgeCandidate struct {
+	ID   int64
+	UUID uuid.UUID
+}
+
+// SoleOwnedOrganization is an organization whose only open owner account is
+// the user asking to delete theirs.
+type SoleOwnedOrganization struct {
+	UUID uuid.UUID
+	Slug string
+	Name string
 }
 
 // UserAuthMethod is a login option linked to a platform user.
