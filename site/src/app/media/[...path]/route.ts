@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { apiOrigin } from "@/lib/api";
 import { PREVIEW_COOKIE, previewToken } from "@/lib/preview";
-import { clientIpFrom } from "@/lib/request";
+import { forwardedForFrom } from "@/lib/request";
 import { resolveSite } from "@/lib/resolve";
 
 /**
@@ -24,7 +24,7 @@ export async function GET(
       : "";
   const site = await resolveSite(
     request.headers.get("host"),
-    clientIpFrom(request.headers),
+    forwardedForFrom(request.headers),
     preview,
   ).catch(() => null);
   if (!site) return new Response(null, { status: 404 });

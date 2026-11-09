@@ -23,7 +23,7 @@ import {
   type OAuthConfigPayload,
 } from "@/lib/auth/go-adapter-client";
 import { logAuthError } from "@/lib/observability/auth-logger";
-import { clientIpFromHeaders } from "@/lib/server/upstream";
+import { forwardedForFromHeaders } from "@/lib/server/upstream";
 import { fetchAppPublicConfig } from "@/services/app-config.service";
 
 const pendingGitHubLogins = new Map<string, string>();
@@ -162,7 +162,7 @@ async function _doBuildProviders(): Promise<Provider[]> {
               password,
               totpCode || undefined,
               request instanceof Request
-                ? clientIpFromHeaders(request.headers)
+                ? forwardedForFromHeaders(request.headers)
                 : null,
             );
             const user = await adapterGetUserByEmail(email);
@@ -212,7 +212,7 @@ async function _doBuildProviders(): Promise<Provider[]> {
             code,
             totpCode || undefined,
             request instanceof Request
-              ? clientIpFromHeaders(request.headers)
+              ? forwardedForFromHeaders(request.headers)
               : null,
           );
           const user = await adapterGetUserByEmail(email);
@@ -257,7 +257,7 @@ async function _doBuildProviders(): Promise<Provider[]> {
             browserSecret,
             exchangeToken,
             request instanceof Request
-              ? clientIpFromHeaders(request.headers)
+              ? forwardedForFromHeaders(request.headers)
               : null,
           );
           return {

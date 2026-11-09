@@ -7,10 +7,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/clientip"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/pkg/apiquery"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/pkg/response"
 	"github.com/google/uuid"
@@ -84,18 +84,9 @@ func Values(r *http.Request, key string) []string {
 	return out
 }
 
-// ClientIP is the first X-Forwarded-For address (set by the BFF), else the
-// remote address.
+// ClientIP is the client address resolved by clientip.Middleware
+// (X-Forwarded-For honoured only behind a trusted proxy, TRUSTED_PROXIES).
+// Handlers never parse forwarding headers themselves.
 func ClientIP(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		first, _, _ := strings.Cut(fwd, ",")
-		if ip := net.ParseIP(strings.TrimSpace(first)); ip != nil {
-			return ip.String()
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
+	return clientip.From(r)
 }
