@@ -89,3 +89,25 @@ func TestSessionMetaUsesResolvedIP(t *testing.T) {
 		t.Fatalf("session IP = %q, want the untrusted peer", got)
 	}
 }
+
+// TEC-1170: failed logins of one account are bounded across IPs, so a
+// botnet cannot guess one account's password or 2FA code without limit.
+func TestLoginFailuresLimitedPerAccountAcrossIPs(t *testing.T) {
+	mr := miniredis.RunT(t)
+	h := newTestHandler(t, stubRepo{})
+	h.SetRateLimiter(ratelimit.New(redis.NewClient(&redis.Options{Addr: mr.Addr()}), "test"))
+
+	for i := 0; i < 30; i++ {
+		rec := loginVia(t, h, "198.51.100."+strconv.Itoa(i+1)+":4000", "")
+		if rec.Code == http.StatusTooManyRequests {
+			t.Fatalf("attempt %d limited too early", i)
+		}
+	}
+	rec := loginVia(t, h, "203.0.113.77:4000", "")
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("31st failure from a fresh IP = %d, want 429", rec.Code)
+	}
+	if rec.Header().Get("Retry-After") == "" {
+		t.Fatal("expected Retry-After")
+	}
+}

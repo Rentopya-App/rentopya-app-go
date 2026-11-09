@@ -20,7 +20,7 @@ func (h *Handler) TenantExecute(resource string) http.HandlerFunc {
 		p := authctx.MustPrincipal(r.Context())
 		scope := orgctx.Must(r.Context())
 		var body bulkRequest
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBulkBody)).Decode(&body); err != nil {
 			response.BadRequest(w, r, response.CodeValidationError, "invalid JSON body")
 			return
 		}
