@@ -9,7 +9,6 @@ import { permissions } from "@/config/permissions";
 import { AccessSettingsForm } from "@/features/access/components/access-settings-form";
 import type { AccessFormValues } from "@/features/access/schemas/access-form";
 import { accessService } from "@/features/access/services/access.service";
-import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 import { appToast } from "@/providers/toast-provider";
@@ -34,11 +33,7 @@ export function AccessSettingsPage() {
       appToast.success(t("access.toast.saved"));
     },
     onError: (error) => {
-      if (isApiError(error)) {
-        appToast.error(error.message);
-        return;
-      }
-      appToast.error(t("access.toast.failed"));
+      appToast.apiError(error, t("access.toast.failed"));
     },
   });
 

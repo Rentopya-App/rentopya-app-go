@@ -10,7 +10,6 @@ import { permissions } from "@/config/permissions";
 import { GitHubSettingsForm } from "@/features/integrations/github/components/github-settings-form";
 import type { GitHubSettingsFormValues } from "@/features/integrations/github/schemas/github-settings-form";
 import { githubIntegrationService } from "@/features/integrations/github/services/github-integration.service";
-import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 import { appToast } from "@/providers/toast-provider";
@@ -53,11 +52,7 @@ export function GitHubIntegrationSettingsPage() {
       appToast.success(t("integrations.github.toast.saved"));
     },
     onError: (error) => {
-      if (isApiError(error)) {
-        appToast.error(error.message);
-        return;
-      }
-      appToast.error(t("integrations.github.toast.failed"));
+      appToast.apiError(error, t("integrations.github.toast.failed"));
     },
   });
 

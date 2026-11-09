@@ -14,10 +14,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isApiError } from "@/lib/api";
 import { datetime } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { authService } from "@/services/auth.service";
+import { appToast } from "@/providers/toast-provider";
 
 type ProviderId = "github" | "google" | "facebook" | "apple";
 
@@ -67,11 +67,7 @@ export function OAuthIdentityManager({ providers }: OAuthIdentityManagerProps) {
         const result = await authService.listIdentities();
         return result.items ?? [];
       } catch (error) {
-        toast.error(
-          isApiError(error)
-            ? error.message || t("common.error_generic")
-            : t("common.error_generic"),
-        );
+        appToast.apiError(error, t("common.error_generic"));
         throw error;
       }
     },
@@ -99,11 +95,7 @@ export function OAuthIdentityManager({ providers }: OAuthIdentityManagerProps) {
       toast.success(t("auth.oauth.unlink_success"));
       await identitiesQuery.refetch();
     } catch (error) {
-      if (isApiError(error)) {
-        toast.error(error.message || t("auth.oauth.unlink_error"));
-      } else {
-        toast.error(t("auth.oauth.unlink_error"));
-      }
+      appToast.apiError(error, t("auth.oauth.unlink_error"));
     } finally {
       setPendingProvider(null);
     }

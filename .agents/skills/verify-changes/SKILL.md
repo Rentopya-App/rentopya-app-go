@@ -31,6 +31,7 @@ cd frontend
 pnpm api:generate     # after OpenAPI changes; commit src/generated/api.d.ts
 pnpm typecheck
 pnpm lint
+pnpm test             # node --test on src/**/*.test.ts (pure modules)
 pnpm format:check
 pnpm build            # slow; run before a PR
 ```

@@ -24,10 +24,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isApiError } from "@/lib/api";
 import { datetime } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { authService, type DeviceSession } from "@/services/auth.service";
+import { appToast } from "@/providers/toast-provider";
 
 function sessionLabel(item: DeviceSession, fallback: string) {
   const ua = item.user_agent?.trim();
@@ -48,11 +48,7 @@ export function SessionManager() {
         const list = await authService.listSessions();
         return list.items ?? [];
       } catch (error) {
-        toast.error(
-          isApiError(error)
-            ? error.message || t("common.error_generic")
-            : t("common.error_generic"),
-        );
+        appToast.apiError(error, t("common.error_generic"));
         throw error;
       }
     },
@@ -68,11 +64,7 @@ export function SessionManager() {
       setPending(null);
       await sessionsQuery.refetch();
     } catch (error) {
-      if (isApiError(error)) {
-        toast.error(error.message || t("common.error_generic"));
-      } else {
-        toast.error(t("common.error_generic"));
-      }
+      appToast.apiError(error, t("common.error_generic"));
     } finally {
       setRevokingId(null);
     }
@@ -86,11 +78,7 @@ export function SessionManager() {
       setRevokeOthersOpen(false);
       await sessionsQuery.refetch();
     } catch (error) {
-      if (isApiError(error)) {
-        toast.error(error.message || t("common.error_generic"));
-      } else {
-        toast.error(t("common.error_generic"));
-      }
+      appToast.apiError(error, t("common.error_generic"));
     } finally {
       setRevokingOthers(false);
     }
