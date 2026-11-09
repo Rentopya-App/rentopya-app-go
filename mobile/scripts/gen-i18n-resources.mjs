@@ -25,6 +25,9 @@ const WEB = {
   vehicle_records: 'vehicle_records',
   rentals: 'rentals',
   inspections: 'inspections_web',
+  reservations: 'reservations',
+  payments: 'payments',
+  customer_portal: 'customer_portal',
 };
 const WEB_NS = Object.values(WEB);
 

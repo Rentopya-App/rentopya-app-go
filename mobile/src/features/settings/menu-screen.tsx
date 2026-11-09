@@ -8,6 +8,7 @@ import { type Language, LANGUAGES, setLanguage } from '@/core/i18n';
 import { type ThemePreference, usePreferences } from '@/core/preferences';
 import { useSelectedBranch } from '@/core/tenant';
 import { signOutGoogle } from '@/features/auth/social';
+import { ReservationsMenuEntry } from '@/features/reservations/menu-entry';
 import { UploadQueueRow } from '@/features/uploads/queue-row';
 import { PushSettingsRow } from '@/features/push/push-settings-row';
 import { Chips } from '@/ui/chips';
@@ -92,6 +93,7 @@ export function MenuScreen() {
             </List>
           </View>
         ) : null}
+        <ReservationsMenuEntry />
         <View>
           <SectionHeader title={t('section_account')} />
           <List>
