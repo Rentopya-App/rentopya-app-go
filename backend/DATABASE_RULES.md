@@ -46,7 +46,7 @@ Historical migrations may be squashed into a clean `000001`–`000019` baseline 
 # drops all tables + schema_migrations; then re-applies migrations
 psql "$DB_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 make migrate-up
-make create-super-admin
+make create-super-admin SA_EMAIL=you@example.com
 ```
 
 ## SQLC

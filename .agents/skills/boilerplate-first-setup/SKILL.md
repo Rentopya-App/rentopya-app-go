@@ -48,9 +48,11 @@ Change secrets in `.env` even for local if the machine is shared: `JWT_*`, `AUTH
 
 ```sh
 make local-dev
-make create-super-admin
-# optional: make create-super-admin SA_EMAIL=you@example.com SA_PASSWORD='Secret1' SA_NAME=Ada SA_SURNAME=Admin
+make create-super-admin SA_EMAIL=you@example.com   # prints a generated password once
+# or: SA_PASSWORD='…' make create-super-admin SA_EMAIL=you@example.com SA_NAME=Ada SA_SURNAME=Admin
 ```
+
+The super admin CLI has **no default credentials**: `SA_EMAIL` is required, `SA_PASSWORD` must pass the sign-up policy (min 8, upper + lower + digit) or is generated, and an existing user's password is only overwritten with `SA_RESET_PASSWORD=true`. Production: `make prod-super-admin SA_EMAIL=…` (runs `/app/create-super-admin` in the backend container).
 
 `make local-dev` starts Docker infra, migrates, then **air** + **pnpm dev** on the host. It does **not** build app images.
 
@@ -121,7 +123,7 @@ Compose creates the app's own private network (`${NAME_PREFIX}-app`). Only **fro
 
 - [ ] Unique `NAME_PREFIX` + volume names on a shared Docker host
 - [ ] `API_URL` ends with `/v1`
-- [ ] `make local-dev` then `make create-super-admin`
+- [ ] `make local-dev` then `make create-super-admin SA_EMAIL=you@example.com`
 - [ ] Login at `/platform/login`
 - [ ] MailHog receives verify/reset mail
 - [ ] VAPID keys if push is in scope

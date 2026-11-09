@@ -239,4 +239,4 @@ Probe: `GET /v1/tenant/context` returns `{organization, role, roles, permissions
 
 ## CLI
 
-`make create-super-admin` upserts the user and assigns the `super_admin` role.
+`make create-super-admin SA_EMAIL=…` creates the user and assigns the `super_admin` role. No default credentials: the password comes from `SA_PASSWORD` (checked against the sign-up policy) or is generated and printed once; an existing user's password is only overwritten with `SA_RESET_PASSWORD=true`.

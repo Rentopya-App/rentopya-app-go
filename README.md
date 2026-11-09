@@ -70,8 +70,8 @@ make local-dev
 In another terminal (after Postgres is up):
 
 ```sh
-make create-super-admin
-# or: make create-super-admin SA_EMAIL=you@example.com SA_PASSWORD='Secret1'
+make create-super-admin SA_EMAIL=you@example.com   # prints a generated password once
+# or: SA_PASSWORD='…' make create-super-admin SA_EMAIL=you@example.com
 ```
 
 Then open http://localhost:3000/platform/login and sign in as `super_admin`. Create an organization under Platform → Organizations; its panel is at `/t/{slug}`.
