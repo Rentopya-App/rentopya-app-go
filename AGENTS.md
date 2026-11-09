@@ -34,6 +34,7 @@ Canonical env is the **repo-root** `.env`. Compose files are `compose.local.yml`
 | [docs/design/](./docs/design) | Domain design per area (tenant-core, reservations, payments, integration-jobs, …) |
 | [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md) | Local / prod commands |
 | [docs/EXTENDING.md](./docs/EXTENDING.md) | How to add a feature (narrative) |
+| [docs/BOILERPLATE_SYNC.md](./docs/BOILERPLATE_SYNC.md) | Boilerplate base SHA, commit inventory, last ported SHA, sync work packages |
 | [backend/API_CONVENTIONS.md](./backend/API_CONVENTIONS.md) | Envelope, lists, meta |
 | [backend/DATABASE_RULES.md](./backend/DATABASE_RULES.md) | Migrations + sqlc |
 | [backend/docs/auth.md](./backend/docs/auth.md) | JWT, roles, permissions |
