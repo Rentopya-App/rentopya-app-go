@@ -30,7 +30,7 @@ browser ── acme.rentopia.app ──▶ site (Next.js, one image)
 
 - The site talks to the API **server side only** (`API_URL`, the internal address, the same as the panel BFF). The browser only reaches the site's own origin. Images go through `/media/...`, which passes through only this host's site images and this organization's product images.
 - No staff credential and no secret key exists in the site. The site uses the publishable key that the resolve answer returns, and mints one booking session (30 min) per visitor for the **origin the API resolved**. The session cookie records that origin; a cookie from another origin is never used, and the API also refuses a session from another origin.
-- `X-Forwarded-For` carries the visitor IP, so the public API's per-IP and per-session limits apply per visitor, not per site container.
+- `X-Forwarded-For` carries the visitor IP (the site forwards the chain it received from the edge proxy; the API believes it only from trusted proxies, `TRUSTED_PROXIES`), so the public API's per-IP and per-session limits apply per visitor, not per site container.
 - Every page renders dynamically (`force-dynamic`). The only cache is the per-process resolve cache, keyed by host (30 s; unknown hosts 10 s). Nothing about an organization exists at build time.
 
 ## 2. Hosts

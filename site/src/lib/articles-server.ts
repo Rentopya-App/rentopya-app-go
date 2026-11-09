@@ -5,7 +5,7 @@ import { cache } from "react";
 import { ApiError, apiFetch } from "./api";
 import { isArticleSlug } from "./articles";
 import { isLocale } from "./i18n";
-import { getClientIp, getSite } from "./server";
+import { getForwardedFor, getSite } from "./server";
 import type { ArticlePage, Locale, PublicArticle } from "./types";
 
 /**
@@ -27,7 +27,7 @@ export async function loadArticlePage(
   try {
     return await apiFetch<ArticlePage>(
       `/v1/public/site/articles?host=${encodeURIComponent(site.host)}&locale=${locale}&limit=${GUIDE_PAGE_SIZE}&offset=${offset}`,
-      { clientIp: await getClientIp() },
+      { forwardedFor: await getForwardedFor() },
     );
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return null;
@@ -43,7 +43,7 @@ export const loadArticle = cache(
     try {
       const article = await apiFetch<PublicArticle>(
         `/v1/public/site/articles/by-slug/${locale}/${encodeURIComponent(slug)}?host=${encodeURIComponent(site.host)}`,
-        { clientIp: await getClientIp() },
+        { forwardedFor: await getForwardedFor() },
       );
       return article && article.slug === slug ? article : null;
     } catch (err) {

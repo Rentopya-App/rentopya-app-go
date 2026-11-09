@@ -2,7 +2,6 @@ package handler
 
 import (
 	"io"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/finance/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/finance/usecase"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/bulkengine"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/clientip"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/resourcemeta"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/pkg/apiquery"
@@ -46,16 +46,10 @@ func DepositsMeta() resourcemeta.ResourceMeta {
 	}
 }
 
-// clientIP is the caller's address for the provider's fraud checks.
+// clientIP is the caller's address for the provider's fraud checks, as
+// resolved by clientip.Middleware (trusted proxies only).
 func clientIP(r *http.Request) string {
-	if fwd := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]); fwd != "" {
-		return fwd
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
+	return clientip.From(r)
 }
 
 func depositPayload(d model.Deposit) map[string]any {

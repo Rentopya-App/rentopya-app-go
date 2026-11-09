@@ -1,4 +1,4 @@
-import { clientIpFromHeaders, fetchUpstream } from "@/lib/server/upstream";
+import { fetchUpstream, forwardedForFromHeaders } from "@/lib/server/upstream";
 
 /**
  * Public booking API (TEC-728, `/api/v1/public/{sessions,locations,…}`):
@@ -69,8 +69,9 @@ export async function proxyPublicBooking(
   // The upstream helper strips Origin; the API reads it from here.
   const origin = request.headers.get("origin");
   if (origin) headers.set("X-Forwarded-Origin", origin);
-  const clientIp = clientIpFromHeaders(request.headers);
-  if (clientIp) headers.set("X-Forwarded-For", clientIp);
+  // The API resolves the visitor from the chain (trusted proxies only).
+  const forwardedFor = forwardedForFromHeaders(request.headers);
+  if (forwardedFor) headers.set("X-Forwarded-For", forwardedFor);
 
   const body =
     method === "GET" || method === "HEAD" || method === "OPTIONS"

@@ -49,7 +49,7 @@ export function usableSession(
 
 export async function mintSession(
   site: Pick<Site, "origin" | "publishable_key">,
-  clientIp?: string,
+  forwardedFor?: string,
 ): Promise<StoredSession> {
   const out = await apiFetch<{ token: string; expires_at: string }>(
     "/v1/public/sessions",
@@ -57,7 +57,7 @@ export async function mintSession(
       method: "POST",
       body: { publishable_key: site.publishable_key },
       origin: site.origin,
-      clientIp,
+      forwardedFor,
     },
   );
   return {
