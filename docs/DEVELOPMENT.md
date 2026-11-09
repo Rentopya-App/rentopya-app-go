@@ -33,7 +33,7 @@ Root `.env` is canonical. `backend/.env` is a fallback only. Do not keep a long-
 
 ```sh
 make local-dev
-make create-super-admin
+make create-super-admin SA_EMAIL=you@example.com
 ```
 
 Sign in at http://localhost:3000/platform/login, create an organization under Platform → Organizations and open its panel at `/t/{slug}`. Organization routes need `TENANCY_ENABLED=true` (the `.env.example` value).
@@ -111,7 +111,7 @@ Optional frontend public vars (root `.env`): `NEXT_PUBLIC_BFF_BASE_URL`, `NEXT_P
 */5 * * * * /opt/rentopia/scripts/server-sync.sh >> /var/log/rentopia-sync.log 2>&1
 ```
 
-Rollback: `touch .sync-paused`, `git checkout <previous sha>`, `scripts/server-sync.sh --force` (rebuilds the checked-out commit without pulling; migrations are not reverted). Remove `.sync-paused` to resume. First admin: `make prod-super-admin SA_EMAIL=… SA_PASSWORD=…` (runs inside the backend container). TSB list import from the host: `docker compose --env-file .env.server -f compose.prod.yml exec backend /app/catalog-import -file /path/in/container.xlsx -apply` (or use Platform → Araç kataloğu → Aktarımlar).
+Rollback: `touch .sync-paused`, `git checkout <previous sha>`, `scripts/server-sync.sh --force` (rebuilds the checked-out commit without pulling; migrations are not reverted). Remove `.sync-paused` to resume. First admin: `make prod-super-admin SA_EMAIL=…` (runs `/app/create-super-admin` inside the backend container; without `SA_PASSWORD` it prints a generated password once, see [Super admin](#super-admin)). TSB list import from the host: `docker compose --env-file .env.server -f compose.prod.yml exec backend /app/catalog-import -file /path/in/container.xlsx -apply` (or use Platform → Araç kataloğu → Aktarımlar).
 
 ### Upgrading the env for a new release
 
@@ -152,11 +152,20 @@ Local dev reads `SENTRY_DSN` from the root `.env` directly. `APP_ENV` (developme
 From the repo root (loads `.env`):
 
 ```sh
-make create-super-admin
-make create-super-admin SA_EMAIL=you@example.com SA_PASSWORD='Secret1' SA_NAME=Ada SA_SURNAME=Admin
+make create-super-admin SA_EMAIL=you@example.com                 # generates a password, printed once
+SA_PASSWORD='…' make create-super-admin SA_EMAIL=you@example.com SA_NAME=Ada SA_SURNAME=Admin
+make create-super-admin SA_EMAIL=you@example.com SA_RESET_PASSWORD=true   # reset an existing user
 ```
 
 The same target exists under `backend/` (`make -C backend create-super-admin …`).
+
+There are no default credentials (the old `admin@example.com` / `Password1` is gone):
+
+- `SA_EMAIL` (`-email`) is required.
+- `SA_PASSWORD` (`-password`) must pass the sign-up password policy (min 8, upper + lower + digit). Prefer the env var: a flag shows up in the process list. Without it, `-generate-password` (what `make` passes) creates a 20-character random password and prints it once to stdout; it is not logged anywhere else.
+- An existing user is refused unless `SA_RESET_PASSWORD=true` (`-reset-password`), which overwrites its password and grants `super_admin`.
+
+Production (pull-only host, no source tree): `make prod-super-admin SA_EMAIL=you@example.com`, or directly `docker compose --env-file .env.server -f compose.prod.yml exec backend /app/create-super-admin -email you@example.com -generate-password`.
 
 ## After a backend contract change
 

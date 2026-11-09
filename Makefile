@@ -144,9 +144,14 @@ compose-env-check:
 prod-sync:
 	scripts/server-sync.sh
 
+# First production admin. SA_EMAIL is required; the password travels as an env
+# var (not argv). Without SA_PASSWORD a strong one is generated and printed once.
 prod-super-admin:
-	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml exec backend /app/create-super-admin \
-		-email "$(SA_EMAIL)" -password "$(SA_PASSWORD)" -name "$(or $(SA_NAME),Platform)" -surname "$(or $(SA_SURNAME),Admin)"
+	@test -n "$(SA_EMAIL)" || (echo "Usage: make prod-super-admin SA_EMAIL=you@example.com [SA_PASSWORD=...] [SA_RESET_PASSWORD=true]"; exit 1)
+	@SA_PASSWORD="$(SA_PASSWORD)" docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml exec \
+		-e SA_PASSWORD -e SA_RESET_PASSWORD="$(SA_RESET_PASSWORD)" backend /app/create-super-admin \
+		-email "$(SA_EMAIL)" -name "$(or $(SA_NAME),Platform)" -surname "$(or $(SA_SURNAME),Admin)" \
+		$(if $(SA_PASSWORD),,-generate-password)
 
 prod-config:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml config
@@ -171,9 +176,9 @@ tools:
 	@echo "env:     $(ENV_FILE)"
 	@$(MAKE) -C backend tools
 
-# Bootstrap platform super_admin (loads root .env). Override: SA_EMAIL SA_PASSWORD SA_NAME SA_SURNAME
-SA_EMAIL    ?= admin@example.com
-SA_PASSWORD ?= Password1
+# Bootstrap platform super_admin (loads root .env). No default credentials:
+# SA_EMAIL is required; without SA_PASSWORD a strong password is generated and
+# printed once. SA_RESET_PASSWORD=true overwrites an existing user's password.
 SA_NAME     ?= Platform
 SA_SURNAME  ?= Admin
 
@@ -181,6 +186,7 @@ create-super-admin:
 	@$(load_env) $(MAKE) -C backend create-super-admin \
 		SA_EMAIL="$(SA_EMAIL)" \
 		SA_PASSWORD="$(SA_PASSWORD)" \
+		SA_RESET_PASSWORD="$(SA_RESET_PASSWORD)" \
 		SA_NAME="$(SA_NAME)" \
 		SA_SURNAME="$(SA_SURNAME)"
 

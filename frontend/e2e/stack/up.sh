@@ -69,8 +69,8 @@ if [ "${E2E_SKIP_BUILD:-0}" != "1" ] || [ ! -x "$E2E_STATE/server" ]; then
   log "building API binaries"
   (cd "$ROOT/backend" && go build -o "$E2E_STATE/server" ./cmd/server && go build -o "$E2E_STATE/create-super-admin" ./cmd/create-super-admin)
 fi
-(cd "$E2E_STATE" && env $(e2e_api_env) ./create-super-admin -email "$E2E_ADMIN_EMAIL" -password "$E2E_PASSWORD" \
-  -name Kabul -surname Yonetici >/dev/null 2>&1 || true)
+(cd "$E2E_STATE" && env $(e2e_api_env) SA_PASSWORD="$E2E_PASSWORD" ./create-super-admin -email "$E2E_ADMIN_EMAIL" \
+  -reset-password -name Kabul -surname Yonetici >/dev/null 2>&1 || true)
 # Run from the state dir: config.Load reads ../.env and .env relative to the
 # working directory, so a developer's .env never leaks into the test stack.
 start_bg api "$E2E_STATE/api.log" bash -c "cd '$E2E_STATE' && exec env $(e2e_api_env) ./server"
