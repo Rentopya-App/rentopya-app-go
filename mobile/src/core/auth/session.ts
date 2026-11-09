@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { setActiveOrganization, setSessionExpiredHandler, setTenantAccessLostHandler } from '@/core/api/client';
 import { queryClient } from '@/core/query';
 import { readJSON, storage, writeJSON } from '@/core/storage';
+import { unregisterPush } from '@/features/push/push';
 
 import { type ApiTokens, fetchMe, logout, type Me } from './api';
 import { type MeOrganization, organizationPreference, pickOrganization } from './organization';
@@ -94,7 +95,8 @@ export const useSession = create<Session>((set, get) => ({
   },
 
   signOut: async ({ remote = true } = {}) => {
-    // Push device unregistration joins here with push (TEC-1140).
+    // While the access token still works: this phone stops getting the member's pushes.
+    if (remote) await unregisterPush();
     if (remote) await logout().catch(() => undefined);
     await clearTokens();
     storage.remove(ME_KEY);

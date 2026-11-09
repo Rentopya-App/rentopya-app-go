@@ -92,8 +92,15 @@ Rules (the same as the Takwim app):
   `src/core/auth/permission-slugs.ts`); the API enforces each one.
 - Branch: a filter only (`useSelectedBranch().branchUuid` as the list query
   filter), kept per organization; never a header, the API applies the branch scope.
-- Not yet: native passkey sign-in (web only, like the Takwim app); push
-  registration on sign-in (TEC-1140).
+- Not yet: native passkey sign-in (web only, like the Takwim app).
+- Push (`src/features/push`): the permission is asked once a company is
+  picked (not at launch); the Expo token goes to `POST /v1/push-devices`
+  (again when it rotates), sign-out deletes it first. A tapped push opens
+  its `data.url` panel path through `links.ts` (`/t/{slug}/...` → app route,
+  switching company first; unknown paths open Bugün). The app badge is
+  `/v1/tenant/notifications/unread-count`. Needs a physical device and
+  `extra.eas.projectId` (Owner TODO 1); without it registration is skipped
+  with a log line. Off on web.
 - Colors only through theme classes (`bg-card`, `text-muted-foreground`, ...).
 - Type is Plus Jakarta Sans, one family per weight: use `font-sans-medium`,
   `font-sans-semibold`, `font-sans-bold` (or a `Text` variant), never
@@ -128,7 +135,7 @@ Full flow, required secrets and the owner checklist: [`docs/OTA.md`](docs/OTA.md
 
 Summary; the details are in `docs/OTA.md` → Owner checklist.
 
-1. `npx eas-cli@latest init` in `mobile/`. It writes `extra.eas.projectId` into `app.json`; commit it. `app.config.js` derives the update URL from it.
+1. `npx eas-cli@latest init` in `mobile/`. It writes `extra.eas.projectId` into `app.json`; commit it. `app.config.js` derives the update URL from it. Push registration stays off until then; push credentials: `eas credentials` (APNs key for iOS, FCM V1 service account for Android).
 2. Repo secret `EXPO_TOKEN` (Expo robot token).
 3. EAS `production` environment, as plain text or sensitive values: `EXPO_PUBLIC_APP_ENV=production`, `EXPO_PUBLIC_API_MODE=live`, `EXPO_PUBLIC_API_URL=https://<api host>`, `EXPO_PUBLIC_WEB_URL=https://<panel host>`, plus the sign-in values, which must equal `release.env`.
 4. iOS: the identifier `com.rentopya.app` (team `N5T7KH96U3`) and the App Store Connect record. Put its `ascAppId` under `submit.production.ios` in `eas.json`.

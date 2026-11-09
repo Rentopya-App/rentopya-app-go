@@ -1322,6 +1322,85 @@ func (q *Queries) ListNotifyAccountDue(ctx context.Context, arg ListNotifyAccoun
 	return items, nil
 }
 
+const listNotifyApprovalWaiting = `-- name: ListNotifyApprovalWaiting :many
+SELECT r.id, r.uuid, r.reference, r.status, r.starts_at, pb.name AS branch_name, om.user_id
+FROM reservations r
+JOIN branches pb ON pb.organization_id = r.organization_id AND pb.id = r.pickup_branch_id
+JOIN organization_members om ON om.organization_id = r.organization_id
+JOIN users u ON u.id = om.user_id
+WHERE r.organization_id = $1
+  AND pb.organization_id = $1
+  AND om.organization_id = $1
+  AND r.status IN ('request', 'awaiting_review')
+  AND r.created_at > $2::timestamptz
+  AND u.deleted_at IS NULL
+  AND EXISTS (
+        SELECT 1
+        FROM organization_member_roles mr
+        JOIN role_permissions rp ON rp.role_id = mr.role_id
+        JOIN permissions p ON p.id = rp.permission_id
+        WHERE mr.organization_id = om.organization_id AND mr.member_id = om.id
+          AND p.slug = 'tenant.reservations.approve'
+  )
+  AND (
+        om.branch_scope = 'all'
+        OR EXISTS (
+            SELECT 1 FROM organization_member_branches mb
+            WHERE mb.organization_id = om.organization_id AND mb.member_id = om.id
+              AND mb.branch_id = r.pickup_branch_id
+        )
+  )
+ORDER BY r.created_at, om.user_id
+LIMIT 2000
+`
+
+type ListNotifyApprovalWaitingParams struct {
+	OrganizationID int64              `json:"organization_id"`
+	SinceAt        pgtype.Timestamptz `json:"since_at"`
+}
+
+type ListNotifyApprovalWaitingRow struct {
+	ID         int64              `json:"id"`
+	Uuid       uuid.UUID          `json:"uuid"`
+	Reference  string             `json:"reference"`
+	Status     string             `json:"status"`
+	StartsAt   pgtype.Timestamptz `json:"starts_at"`
+	BranchName string             `json:"branch_name"`
+	UserID     int64              `json:"user_id"`
+}
+
+// Reservations waiting for a staff decision (request / awaiting_review)
+// created recently, once per member who may approve them: a role with
+// tenant.reservations.approve and a branch scope that covers the pickup
+// branch.
+func (q *Queries) ListNotifyApprovalWaiting(ctx context.Context, arg ListNotifyApprovalWaitingParams) ([]ListNotifyApprovalWaitingRow, error) {
+	rows, err := q.db.Query(ctx, listNotifyApprovalWaiting, arg.OrganizationID, arg.SinceAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNotifyApprovalWaitingRow{}
+	for rows.Next() {
+		var i ListNotifyApprovalWaitingRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.Reference,
+			&i.Status,
+			&i.StartsAt,
+			&i.BranchName,
+			&i.UserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNotifyAssignedTasks = `-- name: ListNotifyAssignedTasks :many
 SELECT t.id, t.uuid, t.task_type, t.assignee_id::bigint AS assignee_id, t.due_at, t.assigned_at::timestamptz AS assigned_at,
     b.name AS branch_name
@@ -1369,6 +1448,65 @@ func (q *Queries) ListNotifyAssignedTasks(ctx context.Context, arg ListNotifyAss
 			&i.AssigneeID,
 			&i.DueAt,
 			&i.AssignedAt,
+			&i.BranchName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNotifyHandoverTasks = `-- name: ListNotifyHandoverTasks :many
+SELECT t.id, t.uuid, t.task_type, t.assignee_id::bigint AS assignee_id, t.due_at, b.name AS branch_name
+FROM operation_tasks t
+JOIN branches b ON b.organization_id = t.organization_id AND b.id = t.branch_id
+WHERE t.organization_id = $1
+  AND b.organization_id = $1
+  AND t.task_type = 'handover'
+  AND t.assignee_id IS NOT NULL
+  AND t.status IN ('planned', 'assigned', 'en_route')
+  AND t.due_at > $2::timestamptz
+  AND t.due_at <= $3::timestamptz
+ORDER BY t.due_at
+LIMIT 2000
+`
+
+type ListNotifyHandoverTasksParams struct {
+	OrganizationID int64              `json:"organization_id"`
+	NowAt          pgtype.Timestamptz `json:"now_at"`
+	UntilAt        pgtype.Timestamptz `json:"until_at"`
+}
+
+type ListNotifyHandoverTasksRow struct {
+	ID         int64              `json:"id"`
+	Uuid       uuid.UUID          `json:"uuid"`
+	TaskType   string             `json:"task_type"`
+	AssigneeID int64              `json:"assignee_id"`
+	DueAt      pgtype.Timestamptz `json:"due_at"`
+	BranchName string             `json:"branch_name"`
+}
+
+// Open handover field tasks with an assignee whose due time is within the
+// horizon (the staff member's "handover approaching" reminder).
+func (q *Queries) ListNotifyHandoverTasks(ctx context.Context, arg ListNotifyHandoverTasksParams) ([]ListNotifyHandoverTasksRow, error) {
+	rows, err := q.db.Query(ctx, listNotifyHandoverTasks, arg.OrganizationID, arg.NowAt, arg.UntilAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListNotifyHandoverTasksRow{}
+	for rows.Next() {
+		var i ListNotifyHandoverTasksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.TaskType,
+			&i.AssigneeID,
+			&i.DueAt,
 			&i.BranchName,
 		); err != nil {
 			return nil, err

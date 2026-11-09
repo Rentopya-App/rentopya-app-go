@@ -15,18 +15,20 @@ import (
 
 // Event codes.
 const (
-	SiteLeadCreated           = "site_lead.created"
-	ReservationConfirmed      = "reservation.confirmed"
-	ReservationRejected       = "reservation.rejected"
-	ReservationCancelled      = "reservation.cancelled"
-	ReservationPaymentPending = "reservation.payment_pending"
-	RentalPickupUpcoming      = "rental.pickup_upcoming"
-	RentalReturnUpcoming      = "rental.return_upcoming"
-	RentalOverdue             = "rental.overdue"
-	InvoiceIssued             = "invoice.issued"
-	AccountPaymentDue         = "account.payment_due"
-	FieldTaskAssigned         = "field_task.assigned"
-	FieldTaskOverdue          = "field_task.overdue"
+	SiteLeadCreated            = "site_lead.created"
+	ReservationConfirmed       = "reservation.confirmed"
+	ReservationRejected        = "reservation.rejected"
+	ReservationCancelled       = "reservation.cancelled"
+	ReservationPaymentPending  = "reservation.payment_pending"
+	RentalPickupUpcoming       = "rental.pickup_upcoming"
+	RentalReturnUpcoming       = "rental.return_upcoming"
+	RentalOverdue              = "rental.overdue"
+	InvoiceIssued              = "invoice.issued"
+	AccountPaymentDue          = "account.payment_due"
+	FieldTaskAssigned          = "field_task.assigned"
+	FieldTaskOverdue           = "field_task.overdue"
+	FieldTaskHandoverUpcoming  = "field_task.handover_upcoming"
+	ReservationApprovalWaiting = "reservation.approval_waiting"
 )
 
 // Groups (UI sections).
@@ -194,6 +196,28 @@ var events = []Event{
 				Body: "{{staff_name}}, {{due_at}} zamanlı {{task_type}} işi gecikti ({{branch}}). {{link}}"},
 			"en": {Subject: "Overdue field task: {{task_type}}",
 				Body: "{{staff_name}}, the {{task_type}} task due {{due_at}} is overdue ({{branch}}). {{link}}"},
+		},
+	},
+	{
+		Code: FieldTaskHandoverUpcoming, Group: GroupOperations, Audience: channel.AudienceStaff, Reminder: true,
+		Channels: []string{channel.Push}, Offsets: []int32{60},
+		Vars: []string{"staff_name", "organization_name", "task_type", "due_at", "branch", "link"},
+		Templates: map[string]Template{
+			"tr": {Subject: "Teslim yaklaşıyor",
+				Body: "{{staff_name}}, {{due_at}} zamanlı teslim işiniz yaklaşıyor ({{branch}}). {{link}}"},
+			"en": {Subject: "Handover coming up",
+				Body: "{{staff_name}}, your handover due {{due_at}} is coming up ({{branch}}). {{link}}"},
+		},
+	},
+	{
+		Code: ReservationApprovalWaiting, Group: GroupReservations, Audience: channel.AudienceStaff, Instant: true,
+		Channels: []string{channel.Push},
+		Vars:     []string{"staff_name", "organization_name", "reference", "pickup_at", "pickup_branch", "link"},
+		Templates: map[string]Template{
+			"tr": {Subject: "Onay bekleyen rezervasyon ({{reference}})",
+				Body: "{{reference}} numaralı rezervasyon onayınızı bekliyor. Teslim: {{pickup_at}}, {{pickup_branch}}. {{link}}"},
+			"en": {Subject: "Reservation awaiting approval ({{reference}})",
+				Body: "Reservation {{reference}} is waiting for your approval. Pickup: {{pickup_at}}, {{pickup_branch}}. {{link}}"},
 		},
 	},
 }
