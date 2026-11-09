@@ -232,30 +232,3 @@ export function ReservationSummaryScreen() {
     </>
   );
 }
-
-/**
- * Placeholder of the mobile handover / return flows (TEC-1145 / TEC-1146),
- * behind the same permission as the panel's field pages (`tenant.rentals.write`).
- */
-export function FieldStubScreen({ kind }: { kind: 'handover' | 'return' }) {
-  const { t } = useTranslation('today');
-  const { rentalUuid } = useLocalSearchParams<{ rentalUuid: string }>();
-  const rental = useRentalSummary(rentalUuid);
-  return (
-    <>
-      <Stack.Screen options={{ title: t(kind === 'handover' ? 'field.handover_title' : 'field.return_title') }} />
-      <Can perm={Permission.TenantRentalsWrite} fallback={<EmptyState icon="security" title={t('common:forbidden')} />}>
-        <Screen>
-          {rental.data ? (
-            <Text variant="callout" tone="muted" className="px-1">
-              {[rental.data.reference, rental.data.vehicle?.plate, rental.data.customer.display_name]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
-          ) : null}
-          <EmptyState icon="clock" title={t('field.soon_title')} body={t('field.soon_body')} />
-        </Screen>
-      </Can>
-    </>
-  );
-}

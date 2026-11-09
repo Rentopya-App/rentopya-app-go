@@ -88,9 +88,5 @@
   "detail.no_vehicle": "No vehicle assigned",
   "detail.summary_note": "Summary view. Full details and other actions are in the panel.",
   "action.handover": "Hand over",
-  "action.return": "Take back",
-  "field.handover_title": "Vehicle handover",
-  "field.return_title": "Vehicle return",
-  "field.soon_title": "Coming soon",
-  "field.soon_body": "Mobile handover and return steps (check, photos, signature) arrive in the next release. Use the panel for now."
+  "action.return": "Take back"
 }

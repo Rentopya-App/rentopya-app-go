@@ -1,5 +1,3 @@
-import { FieldStubScreen } from '@/features/today/summary-screens';
+import { ReturnWizardScreen } from '@/features/inspections/return-screen';
 
-export default function ReturnScreen() {
-  return <FieldStubScreen kind="return" />;
-}
+export default ReturnWizardScreen;
