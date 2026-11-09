@@ -37,6 +37,9 @@ x-backend-environment: &backend-environment
   # staging: official KABİS / e-invoice / Netgsm endpoints are then refused.
   APP_ENV: ${APP_ENV:-production}
   APP_HTTP_ADDR: :8080
+  # Empty = loopback + private ranges (Traefik, the panel BFF and the site
+  # reach the API over the docker networks).
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
   DB_HOST: postgres.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}
   DB_PORT: "5432"
   DB_USER: ${DB_USER:?DB_USER is required}

@@ -22,6 +22,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/rentals/model"
 	smsusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/sms/usecase"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/activity"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/clientip"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/crypto"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/integrations"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ratelimit"
@@ -615,12 +616,19 @@ func TestRemoteApprovalRateLimits(t *testing.T) {
 	h.SetRateLimiter(contracts.Limiter{L: ratelimit.New(redis.NewClient(&redis.Options{Addr: mr.Addr()}), "test")})
 	mux := http.NewServeMux()
 	contracts.RegisterRoutes(mux, h, nil, nil, nil)
+	ipRes, err := clientip.NewResolver(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := clientip.Middleware(ipRes)(mux)
 	post := func(path, ip string) int {
 		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader("{}"))
+		// As in production: the request arrives from the BFF (a trusted proxy).
+		req.RemoteAddr = "10.0.0.2:41000"
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Forwarded-For", ip)
 		rec := httptest.NewRecorder()
-		mux.ServeHTTP(rec, req)
+		root.ServeHTTP(rec, req)
 		return rec.Code
 	}
 	other := strings.Repeat("B", 43)

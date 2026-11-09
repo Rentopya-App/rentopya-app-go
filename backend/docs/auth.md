@@ -162,7 +162,7 @@ Redis INCR, 15-minute window, fail-open if Redis is down. `429 RATE_LIMITED` + `
 | OAuth link create | IP (register bucket) | 5 |
 | Account deletion code request / deactivate | user | 5 / 10 |
 
-The BFF forwards the browser IP as `X-Forwarded-For`; the Go API must not be reachable directly from clients or the header could be spoofed.
+Per-IP limits, session rows and activity events use the client IP resolved by `internal/platform/clientip` (one middleware at the root of the HTTP stack; handlers call `clientip.From(r)` / `httpkit.ClientIP(r)` and never parse headers themselves). `X-Forwarded-For` is honoured only when the direct peer is a trusted proxy (`TRUSTED_PROXIES`, default loopback + private ranges; `none` disables it): the chain is walked right-to-left and the first untrusted hop wins, so client-prepended entries are ignored. The panel BFF and the site forward the chain they received from the edge proxy unchanged (`forwardedForFromHeaders`), using `X-Real-IP` only when no chain is present. Both must sit behind an edge proxy (Traefik) that appends the real client address; keep the Go API off public networks.
 
 ## `/v1/auth/me`
 

@@ -9,7 +9,7 @@ import type { EmbedContext } from "./embed";
 import { ApiError, apiFetch, type ApiRequest } from "./api";
 import { LOCALE_COOKIE, pickLocale, translator, type Translate } from "./i18n";
 import { PREVIEW_HEADER, previewToken } from "./preview";
-import { clientIpFrom } from "./request";
+import { forwardedForFrom } from "./request";
 import { resolveSite } from "./resolve";
 import {
   SESSION_COOKIE,
@@ -27,12 +27,14 @@ export const getSite = cache(async (): Promise<Site> => {
   const h = await headers();
   // Set by the proxy only (client copies are dropped there).
   const preview = previewToken(h.get(PREVIEW_HEADER));
-  const site = await resolveSite(h.get("host"), clientIpFrom(h), preview);
+  const site = await resolveSite(h.get("host"), forwardedForFrom(h), preview);
   if (!site) notFound();
   return site;
 });
 
-export const getClientIp = cache(async () => clientIpFrom(await headers()));
+export const getForwardedFor = cache(async () =>
+  forwardedForFrom(await headers()),
+);
 
 export type Ctx = {
   site: Site;
@@ -81,7 +83,7 @@ async function currentToken(site: Site): Promise<string | null> {
 async function refreshToken(site: Site): Promise<string> {
   if (await embedContext())
     throw new ApiError(401, "EMBED_EXPIRED", "Session expired");
-  const fresh = await mintSession(site, await getClientIp());
+  const fresh = await mintSession(site, await getForwardedFor());
   try {
     // Allowed in server actions; a page render keeps the proxy's cookie.
     (await cookies()).set(
@@ -101,7 +103,7 @@ async function refreshToken(site: Site): Promise<string> {
  */
 export async function bookingApi<T>(
   path: string,
-  req: Omit<ApiRequest, "token" | "origin" | "clientIp"> = {},
+  req: Omit<ApiRequest, "token" | "origin" | "forwardedFor"> = {},
 ): Promise<T> {
   const site = await getSite();
   if (!site.booking_enabled || !site.publishable_key) {
@@ -115,7 +117,11 @@ export async function bookingApi<T>(
   ) {
     throw new ApiError(403, "PREVIEW_READ_ONLY", "Previews cannot book");
   }
-  const base = { ...req, origin: site.origin, clientIp: await getClientIp() };
+  const base = {
+    ...req,
+    origin: site.origin,
+    forwardedFor: await getForwardedFor(),
+  };
   let token = await currentToken(site);
   if (!token) token = await refreshToken(site);
   try {
