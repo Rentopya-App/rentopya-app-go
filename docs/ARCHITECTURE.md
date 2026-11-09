@@ -1,6 +1,6 @@
 # Architecture
 
-Three apps (Go API, Next.js panel, Next.js branded site) plus Compose files. Dependencies point inward: HTTP handlers and Next.js pages call use cases / services; they do not own SQL, SMTP or provider calls.
+Four apps (Go API, Next.js panel, Next.js branded site, Expo mobile app) plus Compose files. Dependencies point inward: HTTP handlers and Next.js pages call use cases / services; they do not own SQL, SMTP or provider calls.
 
 The Go module path stays `github.com/furkanmeclis/nextjs-go-boilerplate/backend` on purpose: renaming it touches every import for no gain, so do not rename it.
 
@@ -10,7 +10,8 @@ The Go module path stays `github.com/furkanmeclis/nextjs-go-boilerplate/backend`
 .
 ├── backend/                         Go API + worker
 │   ├── cmd/                         server, worker, create-super-admin, search-reindex,
-│   │                                catalog-import (TSB list), enqueue-ping,
+│   │                                catalog-import (TSB list), enqueue-ping, messaging-reconcile,
+│   │                                integration-jobs-reconcile,
 │   │                                iyzico-fake, netgsm-fake (local provider fakes)
 │   ├── internal/modules/            one package per HTTP area (grouped below)
 │   ├── internal/platform/           engines, provider layers, shared helpers (table below)
@@ -29,7 +30,10 @@ The Go module path stays `github.com/furkanmeclis/nextjs-go-boilerplate/backend`
 │   ├── src/app/api/v1               BFF proxy → Go
 │   └── src/features/                one folder per feature (grouped below)
 ├── site/                            branded site (Next.js, own image, one image for every company)
-├── deploy/                          env schema (prod-env.sh), Centrifugo config
+├── mobile/                          Expo app (SDK 58) for the company panel, calls the Go API directly
+├── deploy/                          env schema (deploy/env/schema), compose-env allow list, Centrifugo config
+├── scripts/                         prod-env.sh, env/compose checks, i18n check, backup, server-sync
+├── .github/workflows/ci.yml         path-gated CI, single `ci` gate
 ├── compose.local.yml                infra only
 └── compose.prod.yml                 full stack
 ```
@@ -88,13 +92,19 @@ Browser
 
 Branded site (site/)
   → $API_URL/public/...            Go API (publishable key → organization; booking session)
+
+Mobile app (mobile/)
+  → $EXPO_PUBLIC_API_URL/v1/...    Go API directly (own Bearer token pair in secure store;
+                                   X-Organization on /v1/tenant/*)
 ```
 
 - Access and refresh tokens never enter JavaScript. The BFF stores them in HttpOnly cookies and strips them from JSON responses.
 - NextAuth is the frontend session layer; the Go adapter talks to `/v1/internal/auth/*`.
 - Tenant pages call `tenantRequest(slug, …)`; the BFF forwards `X-Organization` on `/api/v1/tenant/*` only. Two tabs on two organizations stay independent.
 - The customer portal uses its own session cookie (`frontend/src/lib/server/customer-session.ts`) against `/v1/customer/{orgSlug}/*`.
-- OpenAPI types are generated into `frontend/src/generated/api.d.ts` via `pnpm api:generate`.
+- OpenAPI types are generated into `frontend/src/generated/api.d.ts` via `pnpm api:generate` and into `mobile/src/core/api/schema.d.ts` via `npm run api:generate`; both are committed.
+- The mobile app has no BFF. It keeps its tokens in `expo-secure-store` and sends the picked organization in `X-Organization`; the organization is never in the token. Details: `mobile/README.md`.
+- Client IP: `platform/clientip` resolves it once per request. `X-Forwarded-For` counts only when the direct peer is a trusted proxy (`TRUSTED_PROXIES`, default loopback + private ranges); handlers call `clientip.From(r)` / `httpkit.ClientIP(r)`. Details: [backend/docs/auth.md](../backend/docs/auth.md).
 
 ## Backend layers
 
@@ -139,7 +149,8 @@ Composition roots: `internal/httpserver/server.go` (API) and `cmd/worker/main.go
 | `channels` | Channel manager providers: `yolcu360`, `obilet`, `channelfake` |
 | `pdfrender` | HTML → PDF with headless Chromium (go-ubltr render/chromium) |
 | `tsbcatalog` | Reads the monthly TSB kasko value list for the platform catalog |
-| `mail`, `jwt`, `password`, `totp`, `oidc`, `appleauth`, `ratelimit`, `i18n`, `slug`, `httpkit`, `authctx` | Auth and HTTP helpers, backend i18n catalog |
+| `mail`, `jwt`, `password`, `totp`, `oidc`, `appleauth`, `ratelimit`, `i18n`, `slug`, `httpkit`, `authctx`, `clientip` | Auth and HTTP helpers, trusted-proxy client IP, backend i18n catalog |
+| `envguard` | `APP_ENV` values, fake providers outside production only, official provider endpoints refused outside production (development secrets are refused by `internal/config/guard.go`) |
 
 The notification engine (`modules/notifyengine`) sits on top: rules and templates per organization, channels SMS, e-mail, push and WhatsApp, sends from the worker sweep.
 

@@ -2,8 +2,9 @@
 name: boilerplate-first-setup
 description: >-
   First-time setup for this repo (Rentopya, built on the Next.js + Go
-  boilerplate): root .env, NAME_PREFIX, compose local/prod, Dokploy network,
-  VAPID, media URL rules, super admin, make local-dev and make site-dev. Use when initializing the repo, configuring Docker naming,
+  boilerplate): root .env, NAME_PREFIX, compose local/prod, the schema-driven
+  production env (scripts/prod-env.sh), Dokploy network, VAPID, media URL rules,
+  super admin, make local-dev and make site-dev. Use when initializing the repo, configuring Docker naming,
   or onboarding a new clone.
 ---
 
@@ -16,17 +17,19 @@ Human docs: `docs/DEVELOPMENT.md`. Canonical env is the **repo-root** `.env`.
 - `backend/` — Go API + worker (`:8080`, `/v1/...`)
 - `frontend/` — Next.js BFF (`/platform`, company panel `/t/{slug}`, customer portal `/r/{orgSlug}`)
 - `site/` — branded site (`make site-dev`, http://{subdomain}.localhost:3100)
+- `mobile/` — Expo app for the company panel; calls the Go API directly (`mobile/README.md`)
 - `compose.local.yml` — infra only (Postgres, Redis, SeaweedFS, MailHog, Adminer, Centrifugo, Meilisearch)
-- `compose.prod.yml` — full stack on its own app network; frontend + centrifugo also join `dokploy-network`
+- `compose.prod.yml` — full stack on its own app network; frontend, site and centrifugo also join `dokploy-network`
 
 Do **not** keep a long-lived `frontend/.env.local` for API URLs. Do **not** treat `backend/.env` as canonical.
 
 ## 1. Copy env
 
 ```sh
-cp .env.example .env
-# production later: make prod-env (generates .env.server from deploy/env/schema)
+cp .env.example .env          # local dev: safe defaults, nothing to generate
 ```
+
+Production never starts from `.env.example`: `make prod-env` generates `.env.server` from `deploy/env/schema` (§7).
 
 `API_URL` **must** include `/v1` (default `http://127.0.0.1:8080/v1`).
 
@@ -99,7 +102,7 @@ Required for closed-browser notifications; optional otherwise.
 npx web-push generate-vapid-keys
 ```
 
-Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` in `.env`.
+Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` in `.env`. In production `make prod-env` generates the pair.
 
 Frontend: `/app-push-sw.js` → BFF → `/v1/notifications/vapid-public-key` + push-subscriptions.
 
@@ -111,13 +114,23 @@ Browser must **never** assemble S3 URLs from object keys. Use API-returned `publ
 
 ## 7. Production / Dokploy
 
-1. `make prod-env` (asks the app URL, generates every secret into `.env.server`), `.env.server.example` (generated from the schema, never hand-edited) lists every key; `make prod-env-check` verifies the file; every `${VAR:?…}` in `compose.prod.yml` is required
-2. `make prod-config` then `make prod-up`
-3. Plain Docker host only: `docker network create dokploy-network` (once; Dokploy creates it itself)
+The production env comes from `deploy/env/schema` (design: `docs/design/env-core.md`). Never invent secret values by hand.
+
+1. `make prod-env`: asks the app URL, derives every URL, generates every secret and the VAPID pair into `.env.server` (mode 600, git-ignored). `.env.server.example` lists every key; it is generated from the schema, never hand-edited.
+2. Fill `SMTP_*` (TEC-1165 `SMTP_TLS`: `auto` = implicit TLS on 465, STARTTLS on any other port; `none` is refused in production) and the Sentry DSNs if used. `TRUSTED_PROXIES` stays empty behind Traefik on the docker networks (loopback + private ranges).
+3. `make prod-env-check` (exit 1 on a version gap, missing keys or development secrets), then `make prod-config` and `make prod-up`. Every `${VAR:?…}` in `compose.prod.yml` is required.
+4. Plain Docker host only: `docker network create dokploy-network` (once; Dokploy creates it itself)
+5. First admin: `make prod-super-admin SA_EMAIL=…` (`/app/create-super-admin` in the backend container).
+
+Later: `make prod-env-upgrade` after a schema change (keeps every value, migrates renames and removals, adds new keys, keeps a backup), `make prod-env-check` before a deploy. The backend refuses to boot in staging/production with an empty or development secret, and only accepts `APP_ENV` = `development` | `test` | `staging` | `production`.
+
+Images are still built on the server today (`*_IMAGE` = `{NAME_PREFIX}-*:latest`, `scripts/server-sync.sh`). The GHCR image / `v0.N` tag deploy model is documented with its port (`docs/BOILERPLATE_SYNC.md`, İP-9).
 
 Compose creates the app's own private network (`${NAME_PREFIX}-app`). Only **frontend**, **site** and **centrifugo** join `dokploy-network` (set their domains in Dokploy: service + container port; the site gets `*.<app host>`). Backend, SeaweedFS, Postgres, Redis, Meilisearch, wuzapi and the worker stay private.
 
-`SEARCH_*` / `MEILI_*` enable Cmd+K. `APP_ENCRYPTION_KEY` (32-byte raw or base64) derives every at-rest key: OAuth / GitHub secrets, organization integration credentials, encrypted personal data and blind indexes. Generate once (`openssl rand -base64 32`) and never change it on a running install.
+`SEARCH_*` / `MEILI_*` enable Cmd+K. `APP_ENCRYPTION_KEY` (32-byte raw or base64) derives every at-rest key: OAuth / GitHub secrets, organization integration credentials, encrypted personal data and blind indexes. `make prod-env` generates it; never change it on a running install (stored credentials and personal data become unreadable).
+
+New env var? Follow `docs/EXTENDING.md` → "Environment variables" (config.go → `.env.example` → schema + `@version` → compose → guard), then `make env-check`.
 
 ## 8. After clone checklist
 
@@ -128,4 +141,6 @@ Compose creates the app's own private network (`${NAME_PREFIX}-app`). Only **fro
 - [ ] MailHog receives verify/reset mail
 - [ ] VAPID keys if push is in scope
 - [ ] `APP_ENCRYPTION_KEY` replaced before any real data (it cannot be rotated by editing the env)
+- [ ] Production: `make prod-env` (not a copy of `.env.example`), then `make prod-env-check` passes
+- [ ] Production: first admin with `make prod-super-admin SA_EMAIL=…` (no default credentials)
 - [ ] Organization created under `/platform/organizations`; its panel opens at `/t/{slug}`

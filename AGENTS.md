@@ -4,13 +4,13 @@ Read this first, then the matching skill. Human docs live under `docs/`; one des
 
 Rentopya is a multi-company car rental SaaS. Shells: `/platform` (platform admin, `platform.*`), `/t/{slug}` (company panel, `/v1/tenant/*` with the `X-Organization` header, `tenant.*` permissions from the member's roles in that organization), the customer portal `/r/{orgSlug}` (`/v1/customer/{orgSlug}/*`), and the branded site app `site/` (`/v1/public/*`). Do not invent workspaces, a `/business` shell, or an organization claim in the JWT. Map: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
-Canonical env is the **repo-root** `.env`. Compose files are `compose.local.yml` (infra) and `compose.prod.yml` (full stack).
+Canonical env is the **repo-root** `.env`. Compose files are `compose.local.yml` (infra) and `compose.prod.yml` (full stack). The Expo app for the company panel lives in `mobile/` (read `mobile/README.md` and `mobile/AGENTS.md` before touching it).
 
 ## Skills (`.agents/skills/`)
 
 | Skill | When |
 |-------|------|
-| [boilerplate-first-setup](./.agents/skills/boilerplate-first-setup/SKILL.md) | Clone, `.env`, Docker names, Dokploy, `make local-dev` |
+| [boilerplate-first-setup](./.agents/skills/boilerplate-first-setup/SKILL.md) | Clone, `.env`, Docker names, production env (`make prod-env`), Dokploy, `make local-dev` |
 | [monorepo-playbooks](./.agents/skills/monorepo-playbooks/SKILL.md) | Cross-app work; repo map |
 | [add-platform-resource](./.agents/skills/add-platform-resource/SKILL.md) | New platform list resource under `/platform` (module → RBAC → OpenAPI → UI → nav) |
 | [add-tenant-resource](./.agents/skills/add-tenant-resource/SKILL.md) | New organization-scoped list resource under `/t/{slug}` (org isolation, engines, full DataTable standard; example: branches) |
@@ -24,6 +24,7 @@ Canonical env is the **repo-root** `.env`. Compose files are `compose.local.yml`
 | [step-up-engine](./.agents/skills/step-up-engine/SKILL.md) | Re-auth gates (password/passkey) on sensitive actions |
 | [admin-date-picker](./.agents/skills/admin-date-picker/SKILL.md) | Any date field in `frontend/` |
 | [db-migration](./.agents/skills/db-migration/SKILL.md) | New table/column/seed/query: migration → sqlc → OpenAPI |
+| [mobile-ci](./.agents/skills/mobile-ci/SKILL.md) | `mobile/` CI, committed OpenAPI client types, mobile release (OTA / EAS Build / Xcode Cloud) |
 | [verify-changes](./.agents/skills/verify-changes/SKILL.md) | Checks to run before commit / PR (mirrors CI) |
 
 ## Human docs

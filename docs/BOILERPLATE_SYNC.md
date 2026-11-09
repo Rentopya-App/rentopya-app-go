@@ -46,7 +46,7 @@ Bu, envanterde kapsanan en yeni SHA. Taşıma durumu iş paketleri tablosunda.
 ## 4. Envanter
 
 `03bf65d..a3b4961` aralığında 45 commit var. Hiçbiri merge commit'i değil.
-Karar sayıları: **PORT 32** (18'i CI/CD), **ZATEN VAR 11**, **ATLA 2**.
+Karar sayıları: **PORT 33** (18'i CI/CD, 1'i mobil), **ZATEN VAR 11**, **ATLA 1**.
 
 Tarih = commit tarihi. Yazar tarihi farklıysa parantezde. Sıra boilerplate'teki uygulama sırası.
 
@@ -71,7 +71,7 @@ Tarih = commit tarihi. Yazar tarihi farklıysa parantezde. Sıra boilerplate'tek
 | `b82338c` | 2026-11-03 | guard testlerinde Close hatası kontrolü (errcheck) | PORT | `8cd2080` ile birlikte (İP-7). |
 | `0796eb4` | 2026-11-03 | Prod'da imajları sunucuda build etme, hazır imaj çek | PORT (CI/CD) | Rentopya bugün sunucuda build ediyor (`BACKEND_IMAGE derive:{NAME_PREFIX}-backend:latest`, `scripts/server-sync.sh` cron). `deploy/images.json` yok. `site` imajı da eklenmeli. |
 | `26fac85` | 2026-11-03 | Path filtreli pipeline, GHCR yayını, v0.N etiketi | PORT (CI/CD) | Rentopya `ci.yml` job'ları: commit-policy, prod-env, backend, frontend, site, acceptance, auto-pr. `changes` / `image-build` / `publish-images` / `release-tag` / `ci` kapısı yok. commit-policy ve acceptance korunmalı. |
-| `59bab48` | 2026-11-03 | Mobil CI + EAS sürümü | ATLA | Rentopya'da `mobile/` uygulaması yok. `mobile-ci` skill'i de gelmez. |
+| `59bab48` | 2026-11-03 | Mobil CI + EAS sürümü | PORT (uyarlanarak) | Rentopya'da artık `mobile/` var (TEC-1136). `mobile-ci` skill'i TEC-1172 ile geldi. CI ve release otopoly modeliyle TEC-1139'da: OTA / EAS Build / Xcode Cloud, `scripts/ci/mobile-release.sh`. |
 | `bd2e26c` | 2026-11-03 | Doküman: GHCR pull + v0.* tag deploy modeli | PORT (CI/CD) | |
 | `84840de` | 2026-11-03 | `app_releases` tablosu | PORT (CI/CD) | Rentopya'da yok. Boilerplate'te `000031`. Rentopya'da yeni numara alır (`000139`'dan başlayan sıradaki boş numara). |
 | `2b9982b` | 2026-11-03 | Sürüm + notları backend'e göm, deploy kaydı | PORT (CI/CD) | `internal/buildinfo`, `cmd/release-record`, entrypoint, Sentry release. Rentopya'da yok. |
@@ -104,18 +104,19 @@ Ayrıntılı dosya listeleri ve riskler ilgili Linear issue'larında.
 
 | İP | Konu | SHA'lar | Linear | Durum |
 |---|---|---|---|---|
-| İP-1 | Güvenlik: güvenilir proxy arkasında istemci IP'si | `529ed47` | TEC-1163 | açık |
-| İP-2 | Güvenlik: depolama yükleme gövdesi sınırı | `2c0ed87`, `43a0cb4` | TEC-1164 | açık |
-| İP-3 | Güvenlik: SMTP zaman aşımı ve TLS modları | `ac23b89` | TEC-1165 | açık |
+| İP-1 | Güvenlik: güvenilir proxy arkasında istemci IP'si | `529ed47` | TEC-1163 | birleşti (#7) |
+| İP-2 | Güvenlik: depolama yükleme gövdesi sınırı | `2c0ed87`, `43a0cb4` | TEC-1164 | birleşti (#9) |
+| İP-3 | Güvenlik: SMTP zaman aşımı ve TLS modları | `ac23b89` | TEC-1165 | PR açık (#10) |
 | İP-4 | Güvenlik: bildirim gelen kutusu ve güvenlik e-postası sırları | `4141d63` (gelen kutusu), `8686dc6` | TEC-1166 | açık |
 | İP-5 | Güvenlik: davet ve üyelik sertleştirmesi | `4141d63` (davet, üye) | TEC-1167 | açık |
-| İP-6 | Frontend düzeltmeleri ve araç zinciri | `a3b4961`, `917a4f2`, `7a76aec`, `57244d8` | TEC-1168 | açık |
-| İP-7 | Güvenlik: prod gizli anahtar koruması ve süper admin aracı | `8cd2080`, `b82338c`, `f077b5f` | TEC-1169 (süper admin varsayılanları), TEC-1130 (secret guard) | açık |
-| İP-8 | CI/CD: şema tabanlı prod env çekirdeği | `5478a7d`, `c33cb26`, `46ab039`, `85ddaec`, `8c5c2c2`, `48c1a22`, `b046965`, `ece3989` | TEC-1130 | açık |
-| İP-9 | CI/CD: GHCR imaj yayını, v0.N etiketleri, sürüm kaydı | `0796eb4`, `26fac85`, `bd2e26c`, `84840de`, `2b9982b`, `2e0a092`, `647be7a` (mobil hariç), `b012eb3` (expo hariç), `24d1b20`, `1c94dfd` | TEC-1131, TEC-1132, TEC-1133 | açık |
+| İP-6 | Frontend düzeltmeleri ve araç zinciri | `a3b4961`, `917a4f2`, `7a76aec`, `57244d8` | TEC-1168 | birleşti (#5) |
+| İP-7 | Güvenlik: prod gizli anahtar koruması ve süper admin aracı | `8cd2080`, `b82338c`, `f077b5f` | TEC-1169 (süper admin varsayılanları), TEC-1130 (secret guard) | birleşti (#8, #3) |
+| İP-8 | CI/CD: şema tabanlı prod env çekirdeği | `5478a7d`, `c33cb26`, `46ab039`, `85ddaec`, `8c5c2c2`, `48c1a22`, `b046965`, `ece3989` | TEC-1130 | birleşti (#3) |
+| İP-9 | CI/CD: GHCR imaj yayını, v0.N etiketleri, sürüm kaydı | `0796eb4`, `26fac85`, `bd2e26c`, `84840de`, `2b9982b`, `2e0a092`, `647be7a` (mobil hariç), `b012eb3` (expo hariç), `24d1b20`, `1c94dfd` | TEC-1131, TEC-1132, TEC-1133 | CI iskeleti birleşti (TEC-1131, #15); GHCR, etiket ve sürüm kaydı açık. Deploy dokümanı TEC-1134 |
 | İP-10 | Modül self-registration altyapısı (adım 1) | `6dd4c13` | TEC-1171 | açık |
+| İP-11 | Skill ve doküman senkronu (`.agents/skills`, `llms.txt`, `CONTRIBUTING.md`, `docs/`) | `59bab48` (skill), `b046965`, `9339e09`, `f077b5f` (doküman kısımları) | TEC-1172 | PR |
 
-Gelmeyecekler (ATLA): `59bab48`, `8fdc26f`. `647be7a` ve `b012eb3`'ün mobil kısımları da gelmez.
+Gelmeyecekler (ATLA): `8fdc26f`. `647be7a` ve `b012eb3`'ün mobil kısımları boilerplate'ten gelmez; Rentopya'nın mobil CI'ı TEC-1139'da otopoly modeliyle yazılır.
 
 ## 6. Güvenlik kontrol listesi
 
@@ -143,7 +144,7 @@ Kısa yollar Rentopya'da `backend/internal/` veya `frontend/src/` altındadır. 
 | Auth / MFA / passkey / OAuth / parola sıfırlama / oturum / step-up | — | Tabandan sonra auth'a dokunan commit'ler yalnızca: `529ed47` (oturum meta IP'si → İP-1), `554ad8f` (davetli kayıt, ZATEN VAR), `a3b4961` (oturum çerezi → İP-6), `4141d63`/`8686dc6` (doğrulama, sıfırlama, login, OAuth bağlama ve hesap kapatma kodları → İP-4). MFA/TOTP, passkey, step-up, JWT ve refresh rotasyonunda tabandan sonra değişiklik yok (`git log 03bf65d..origin/main` ilgili yollarda boş). |
 
 ### CI/CD commit'leri (hepsi İP-8 / İP-9)
-`5478a7d`, `c33cb26`, `46ab039`, `85ddaec`, `8c5c2c2`, `48c1a22`, `b046965`, `ece3989`, `0796eb4`, `26fac85`, `bd2e26c`, `84840de`, `2b9982b`, `2e0a092`, `647be7a`, `b012eb3`, `24d1b20`, `1c94dfd` (18 PORT) + `59bab48` (mobil, ATLA). CI/CD'ye değen ama güvenlik paketlerine konanlar: `8cd2080`/`b82338c`/`f077b5f` (İP-7), `43a0cb4` (compose, İP-2).
+`5478a7d`, `c33cb26`, `46ab039`, `85ddaec`, `8c5c2c2`, `48c1a22`, `b046965`, `ece3989`, `0796eb4`, `26fac85`, `bd2e26c`, `84840de`, `2b9982b`, `2e0a092`, `647be7a`, `b012eb3`, `24d1b20`, `1c94dfd` (18 PORT) + `59bab48` (mobil; skill İP-11, CI ve release TEC-1139). CI/CD'ye değen ama güvenlik paketlerine konanlar: `8cd2080`/`b82338c`/`f077b5f` (İP-7), `43a0cb4` (compose, İP-2).
 
 ## 7. Kararlar
 
@@ -157,4 +158,4 @@ Kısa yollar Rentopya'da `backend/internal/` veya `frontend/src/` altındadır. 
 8. Offline kapsam: fotoğraf ve imza kuyruğu.
 9. iOS build Xcode Cloud, Android EAS Build.
 10. Mobil testler `node --test`. `mobile-release.sh` testleri sıfırdan yazılır (otopoly'de yok).
-11. ATLA: `59bab48` (boilerplate mobil CI; Rentopya'nın mobil CI'ı TEC-1139'da otopoly modeliyle yazılır), `8fdc26f` (Rentopya'da tenancy her zaman açık).
+11. ATLA: `8fdc26f` (Rentopya'da tenancy her zaman açık). `59bab48`'den yalnızca `mobile-ci` skill fikri alındı (TEC-1172); mobil CI ve release TEC-1139'da otopoly modeliyle yazılır.
