@@ -10,6 +10,7 @@ import { I18nextProvider } from 'react-i18next';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
+import { useSession } from '@/core/auth/session';
 import { FONTS } from '@/core/fonts';
 import { i18n } from '@/core/i18n';
 import { applyThemePreference } from '@/core/preferences';
@@ -31,12 +32,14 @@ export const ErrorBoundary = ErrorFallback;
 export const unstable_settings = { screenErrorBoundary: ErrorFallback };
 
 /**
- * Root shell. The session guard (`Stack.Protected` around `(app)` and
- * `(public)`) arrives with the auth layer; until then both groups are open
- * and the home tab is the first screen.
+ * Root shell. The token pair is read from the secure store before the splash
+ * hides; `Stack.Protected` then shows the signed-in shell (`(app)`) or the
+ * sign-in screens (`(public)`), and switches on sign-in / sign-out / a dead
+ * refresh chain.
  */
 export default function RootLayout() {
   const theme = useNavigationTheme();
+  const status = useSession((s) => s.status);
   // Bundled with the app, so loading is local; on failure the system font stands in.
   const [fontsLoaded, fontError] = useFonts(FONTS);
   const fontsReady = fontsLoaded || !!fontError;
@@ -45,10 +48,14 @@ export default function RootLayout() {
   useEffect(() => startUpdateChecks(), []);
 
   useEffect(() => {
-    if (fontsReady) void SplashScreen.hideAsync();
-  }, [fontsReady]);
+    void useSession.getState().hydrate();
+  }, []);
 
-  if (!fontsReady) return null;
+  useEffect(() => {
+    if (fontsReady && status !== 'loading') void SplashScreen.hideAsync();
+  }, [fontsReady, status]);
+
+  if (!fontsReady || status === 'loading') return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -58,8 +65,12 @@ export default function RootLayout() {
             <ThemeProvider value={theme}>
               <StatusBar style="auto" />
               <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(app)" />
-                <Stack.Screen name="(public)" options={{ presentation: 'modal' }} />
+                <Stack.Protected guard={status === 'signedIn'}>
+                  <Stack.Screen name="(app)" />
+                </Stack.Protected>
+                <Stack.Protected guard={status === 'signedOut'}>
+                  <Stack.Screen name="(public)" />
+                </Stack.Protected>
               </Stack>
               <UpdateBanner />
               <Toaster />

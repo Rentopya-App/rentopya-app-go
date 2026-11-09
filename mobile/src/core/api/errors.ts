@@ -1,12 +1,7 @@
-/**
- * The `/v1` error envelope's `error` object (backend/API_CONVENTIONS.md). Kept
- * local until the generated OpenAPI schema lands with the API client.
- */
-type ErrorBody = {
-  code: string;
-  message: string;
-  details?: { field?: string; code?: string; message?: string }[];
-};
+import type { components } from './schema';
+
+/** The `/v1` error envelope's `error` object (backend/API_CONVENTIONS.md). */
+type ErrorBody = components['schemas']['ErrorBody'];
 
 /** A failed API call, carrying the backend's machine-readable error code. */
 export class ApiError extends Error {
