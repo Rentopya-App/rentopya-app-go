@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/buildinfo"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/cache"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/config"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database"
@@ -1316,8 +1317,23 @@ func (s *Server) handleAppConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleHealthz is the liveness probe. It also reports the baked-in release
+// (internal/buildinfo) so a deploy can be checked from outside: version is
+// v0.N on a release image, sha-<short> on a branch build and "dev" locally.
+// Release notes stay out of this unauthenticated response.
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, healthzBody(buildinfo.Current()))
+}
+
+func healthzBody(rel buildinfo.Release) map[string]string {
+	body := map[string]string{"status": "ok", "version": rel.Version}
+	if rel.GitSHA != "" {
+		body["git_sha"] = rel.GitSHA
+	}
+	if rel.BuiltAt != "" {
+		body["built_at"] = rel.BuiltAt
+	}
+	return body
 }
 
 func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
