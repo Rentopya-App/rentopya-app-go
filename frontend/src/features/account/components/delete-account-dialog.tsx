@@ -24,8 +24,10 @@ import { useLocale } from "@/providers/locale-provider";
 import { authService } from "@/services/auth.service";
 
 /**
- * "Delete my account": deactivates the account after an emailed confirmation
- * code. Data is kept server-side; every sign-in is blocked afterwards.
+ * "Delete my account": closes the account after an emailed confirmation
+ * code. It can be restored for 30 days with the e-mailed link, then the
+ * account details are erased (docs/design/account-deletion.md). The only
+ * owner of a company is asked to hand over ownership first.
  */
 export function DeleteAccountDialog() {
   const { t } = useLocale();
@@ -48,6 +50,13 @@ export function DeleteAccountDialog() {
       if (err.code === "INVALID_EMAIL_CODE")
         return t("auth.email_code.invalid");
       if (err.code === "RATE_LIMITED") return t("auth.login.rate_limited");
+      if (err.code === "LAST_ORGANIZATION_OWNER") {
+        const names = (err.details ?? [])
+          .map((d) => d.message)
+          .filter(Boolean)
+          .join(", ");
+        return t("auth.delete_account.last_owner", { organizations: names });
+      }
       return err.message || t("auth.delete_account.error");
     }
     return t("auth.delete_account.error");

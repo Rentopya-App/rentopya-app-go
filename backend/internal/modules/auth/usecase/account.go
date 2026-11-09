@@ -151,6 +151,7 @@ func (u *AuthUseCase) ForgotPassword(ctx context.Context, email string) error {
 			TemplateVars: map[string]string{
 				"name": user.Name, "code": code, "expires_minutes": strconv.Itoa(int(otpTTL.Minutes())),
 			},
+			SecretVars: []string{"code"}, // the stored copy drops the code once delivered
 		})
 		if err != nil {
 			return ErrPasswordResetFail
@@ -271,6 +272,7 @@ func (u *AuthUseCase) issueEmailVerification(ctx context.Context, user model.Use
 		TemplateVars: map[string]string{
 			"name": user.Name, "code": code, "expires_minutes": strconv.Itoa(int(otpTTL.Minutes())),
 		},
+		SecretVars: []string{"code"}, // the stored copy drops the code once delivered
 	})
 	return err
 }

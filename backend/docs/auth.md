@@ -87,17 +87,21 @@ NextAuth keeps handling web OAuth; mobile apps send the SDK id_token to the API.
 - Apple tokens: when `authorization_code` is sent and `AUTH_APPLE_TEAM_ID` / `AUTH_APPLE_KEY_ID` / `AUTH_APPLE_PRIVATE_KEY` (the Sign in with Apple `.p8`, `\n` escapes allowed) are set, the refresh token is stored encrypted (`oauth_accounts.refresh_token_enc`, `client_id`) and revoked on account deletion.
 - Apple signing key resolution (`internal/platform/appleauth.Resolver`): the `.p8` uploaded in Platform → Integrations → Apple (`oauth_provider_settings.apple_team_id` / `apple_key_id` / `apple_private_key_enc`, encrypted with `APP_ENCRYPTION_KEY`) wins; the `AUTH_APPLE_*` env vars are the fallback. The parsed key is cached for 1 minute and dropped immediately when an admin saves the Apple settings. With a key, the web (NextAuth) Apple `client_secret` returned by `GET /v1/internal/auth/oauth/apple` is generated per request (ES256, `iss` = Team ID, `sub` = Services ID, `kid` = Key ID, valid 24h, `client_secret_expires_at` set); a pasted client secret JWT is only used when no key is configured.
 
-## Account deletion (deactivation)
+## Account deletion
+
+Real deletion with a 30-day restore window; full design in [docs/design/account-deletion.md](../../docs/design/account-deletion.md).
 
 | Method | Path | Auth |
 |--------|------|------|
 | POST | `/v1/auth/account/deactivate/request` | Bearer — emails `auth.account_deactivation_code` |
 | POST | `/v1/auth/account/deactivate` `{code?}` | Bearer + recent step-up **or** `code` |
+| POST | `/v1/auth/account/restore` `{token}` | Public — token from the deletion e-mail |
 
-- No data is deleted. `users.status = disabled`, `users.deactivated_at = now()`; all refresh tokens revoked; step-up grant revoked; stored Apple refresh tokens revoked via `https://appleid.apple.com/auth/revoke` (skipped when none stored or no key/secret configured); `auth.account_deactivated` email.
+- Request: `users.status = disabled`, `deactivated_at = now()`, `deletion_due_at = now() + 30 days`, `restore_token_hash` (SHA-256 only); all refresh tokens, push devices and browser push subscriptions removed; step-up grant revoked; stored Apple refresh tokens revoked via `https://appleid.apple.com/auth/revoke` (skipped when none stored or no key/secret configured); `auth.account_deactivated` e-mail with the purge date and restore link.
 - Every login path (password, refresh, email code, native OAuth, NextAuth OAuth / passkey session issue, org context) returns `403 ACCOUNT_DEACTIVATED`; existing access tokens stop working on the next request (identity loader rejects disabled users).
-- The last super admin cannot deactivate (`409`). Not allowed while impersonating.
-- Reactivation: a platform admin sets the user's status to `active` (clears `deactivated_at`).
+- Refused: the last super admin (`409 CONFLICT`); the only open owner of a live organization (`409 LAST_ORGANIZATION_OWNER`, details list the organizations; also on the code request); while impersonating.
+- Restore within the window: `POST /v1/auth/account/restore` (or a platform admin sets status `active`, which also clears the schedule).
+- Purge: the worker's hourly `app:auth:account-purge` erases sign-in methods, sessions, devices, inbox and memberships and anonymises the users row; business and audit rows keep their reference.
 
 ## QR sign-in (web QR approved in the mobile app)
 
@@ -161,6 +165,7 @@ Redis INCR, 15-minute window, fail-open if Redis is down. `429 RATE_LIMITED` + `
 | Native OAuth | IP | 30 |
 | OAuth link create | IP (register bucket) | 5 |
 | Account deletion code request / deactivate | user | 5 / 10 |
+| Account restore | IP | 10 |
 
 Per-IP limits, session rows and activity events use the client IP resolved by `internal/platform/clientip` (one middleware at the root of the HTTP stack; handlers call `clientip.From(r)` / `httpkit.ClientIP(r)` and never parse headers themselves). `X-Forwarded-For` is honoured only when the direct peer is a trusted proxy (`TRUSTED_PROXIES`, default loopback + private ranges; `none` disables it): the chain is walked right-to-left and the first untrusted hop wins, so client-prepended entries are ignored. The panel BFF and the site forward the chain they received from the edge proxy unchanged (`forwardedForFromHeaders`), using `X-Real-IP` only when no chain is present. Both must sit behind an edge proxy (Traefik) that appends the real client address; keep the Go API off public networks.
 
