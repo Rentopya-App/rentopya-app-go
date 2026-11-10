@@ -32,6 +32,8 @@ const WEB = {
   customer_portal: 'customer_portal',
   finance: 'finance',
   deposits: 'deposits',
+  transfers: 'transfers',
+  fleet_calendar: 'fleet_calendar',
 };
 const WEB_NS = Object.values(WEB);
 
