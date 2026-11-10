@@ -321,6 +321,7 @@ type Querier interface {
 	CreateRentalProductVersion(ctx context.Context, arg CreateRentalProductVersionParams) (RentalProductVersion, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateServicePoint(ctx context.Context, arg CreateServicePointParams) (ServicePoint, error)
+	// A pending claim never blocks other organizations; a host verified by another organization does (no row).
 	CreateSiteDomain(ctx context.Context, arg CreateSiteDomainParams) (SiteDomain, error)
 	// Support access grants (TEC-678). Organization-scoped: every query names
 	// organization_id. "Active" = revoked_at IS NULL AND expires_at > now, with
@@ -505,6 +506,9 @@ type Querier interface {
 	ExtraFacets(ctx context.Context, organizationID int64) ([]ExtraFacetsRow, error)
 	FailChannelReservation(ctx context.Context, arg FailChannelReservationParams) error
 	FailPayment(ctx context.Context, arg FailPaymentParams) (int64, error)
+	// The first organization to verify a host wins; the other organizations' pending claims fail.
+	// A leased claim is mid-check; its own verification attempt hits uq_site_domains_verified_host instead.
+	FailRivalSiteDomainClaims(ctx context.Context, arg FailRivalSiteDomainClaimsParams) (int64, error)
 	FinalizeInspection(ctx context.Context, arg FinalizeInspectionParams) (int64, error)
 	// draft → queued: the number, the stored XML and the send job.
 	FinalizeInvoice(ctx context.Context, arg FinalizeInvoiceParams) (int64, error)
@@ -2683,6 +2687,8 @@ type Querier interface {
 	SetWhatsAppSessionState(ctx context.Context, arg SetWhatsAppSessionStateParams) (WhatsappSession, error)
 	SettleCollection(ctx context.Context, arg SettleCollectionParams) (int64, error)
 	SiteDomainHealthCounts(ctx context.Context) (SiteDomainHealthCountsRow, error)
+	// The route of a host verified by another organization must survive this organization's cleanup.
+	SiteDomainVerifiedElsewhere(ctx context.Context, arg SiteDomainVerifiedElsewhereParams) (bool, error)
 	SiteLeadRecipients(ctx context.Context, organizationID int64) ([]int64, error)
 	SiteMediaHasPublicArticle(ctx context.Context, arg SiteMediaHasPublicArticleParams) (bool, error)
 	SiteMediaHasPublicCampaign(ctx context.Context, arg SiteMediaHasPublicCampaignParams) (bool, error)
