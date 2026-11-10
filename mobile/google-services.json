@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "285051362905",
+    "project_id": "rentopya-2d9bf",
+    "storage_bucket": "rentopya-2d9bf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:285051362905:android:216fc58c9eff8f9c521b48",
+        "android_client_info": {
+          "package_name": "com.rentopya.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtEh5E4gkNh7joPLFtV0aKrWe0H4REMpQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
