@@ -146,8 +146,8 @@ Rules (the same as the Takwim app):
   (`RentopyaGlance` inline module). The serializer is pure and tested
   (`summary.ts`). Timeline: an entry now, every 15 minutes and at each job's
   due time until the organization's day ends, then a "open the app" entry.
-  Sign-out or another organization clears it. Not written on push receipt
-  yet (the app has no push handler on this base).
+  Sign-out or another organization clears it. A received push invalidates
+  the overview, so the board refetches and writes again.
 - **Siri / Shortcuts** (`app-intents/`, tr + en phrases): "Rentopya bugünkü
   teslimler" (counts + next job, spoken and as a card, app stays shut),
   "Rentopya sıradaki iş", "Rentopya'da bugünü aç", "Rentopya'da araç bul"
