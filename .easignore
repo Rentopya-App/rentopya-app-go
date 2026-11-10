@@ -11,9 +11,9 @@ deploy/
 docs/
 # The app bundles the panel's translations (frontend/src/locales, metro watchFolders).
 frontend/*
-!frontend/src/
+!frontend/src
 frontend/src/*
-!frontend/src/locales/
+!frontend/src/locales
 landing-video/
 scripts/
 site/
