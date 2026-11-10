@@ -10,6 +10,7 @@ import { useSelectedBranch } from '@/core/tenant';
 import { signOutGoogle } from '@/features/auth/social';
 import { ReservationsMenuEntry } from '@/features/reservations/menu-entry';
 import { NotificationCenterRow } from '@/features/notifications/bell';
+import { FinanceMenuEntry } from '@/features/finance/menu-entry';
 import { UploadQueueRow } from '@/features/uploads/queue-row';
 import { PushSettingsRow } from '@/features/push/push-settings-row';
 import { Chips } from '@/ui/chips';
@@ -95,6 +96,7 @@ export function MenuScreen() {
           </View>
         ) : null}
         <ReservationsMenuEntry />
+        <FinanceMenuEntry />
         <View>
           <SectionHeader title={t('section_account')} />
           <List>
