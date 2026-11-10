@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"encoding/json"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"net/http"
 	"strings"
 
@@ -100,7 +101,7 @@ func (h *Handler) SubscriptionToken(w http.ResponseWriter, r *http.Request) {
 
 // RegisterRoutes mounts realtime token endpoints.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,

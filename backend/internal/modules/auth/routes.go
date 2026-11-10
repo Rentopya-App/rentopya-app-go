@@ -5,6 +5,7 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/auth/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/stepup"
@@ -12,7 +13,7 @@ import (
 
 // RegisterRoutes mounts auth and platform routes on mux.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *handler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,

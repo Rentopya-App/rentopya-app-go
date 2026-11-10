@@ -8,6 +8,7 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/orgsettings/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -16,7 +17,7 @@ import (
 // RegisterRoutes mounts /v1/tenant/settings. A nil resolver (tenancy off)
 // mounts nothing. Saving does not need step-up.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *handler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,

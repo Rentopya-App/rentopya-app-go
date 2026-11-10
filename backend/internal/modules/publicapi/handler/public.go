@@ -486,7 +486,7 @@ func (h *Public) PaymentLink(w http.ResponseWriter, r *http.Request) {
 }
 
 // Mount registers the public routes on mux.
-func (h *Public) Mount(mux *http.ServeMux) {
+func (h *Public) Mount(mux httpkit.Mux) {
 	read := func(scope string) route { return route{scope: scope} }
 	write := func(scope string, limit int, window time.Duration, action string) route {
 		return route{scope: scope, write: true, limit: limit, window: window, action: action}

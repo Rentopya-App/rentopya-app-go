@@ -52,7 +52,7 @@ Canonical env is the **repo-root** `.env`. Compose files are `compose.local.yml`
 - Browser talks to same-origin `/api/v1/*`, never the Go host.
 - Media URLs are API-owned. Never assemble S3 keys in the browser.
 - Never expose Meilisearch to the browser; search goes through `/v1/search` (`/v1/tenant/search` in the company panel).
-- New `/v1` routes update `backend/docs/openapi.yaml` in the same change.
+- New `/v1` routes update `backend/docs/openapi.yaml` in the same change (enforced by `TestRoutesDocumented` in `internal/httpserver/routes_test.go`, design: [docs/design/module-registry.md](./docs/design/module-registry.md)).
 - Organization-owned data: `organization_id` on every table and in every query, the organization comes from `orgctx` (never from the client), another organization's record answers 404. Guard rails: the query guard in `go test ./...` and RT-A01 (`internal/httpserver/isolation_test.go`, needs `TEST_DATABASE_URL`).
 - Provider credentials are per organization, sealed with the integration vault; never in env, logs or API responses (masked hints only).
 - Permission slugs are added only via migration + `internal/platform/rbac` + `frontend/src/config/permissions.ts`.
