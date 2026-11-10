@@ -25,6 +25,7 @@ Canonical env is the **repo-root** `.env`. Compose files are `compose.local.yml`
 | [admin-date-picker](./.agents/skills/admin-date-picker/SKILL.md) | Any date field in `frontend/` |
 | [db-migration](./.agents/skills/db-migration/SKILL.md) | New table/column/seed/query: migration → sqlc → OpenAPI |
 | [mobile-ci](./.agents/skills/mobile-ci/SKILL.md) | `mobile/` CI, committed OpenAPI client types, mobile release (OTA / EAS Build / Xcode Cloud) |
+| [mobile-app](./.agents/skills/mobile-app/SKILL.md) | New or changed `mobile/` module: feature folder, routes, menu entry, i18n namespace, gating, lists, step-up, checks, OTA vs store build, merge conflicts |
 | [verify-changes](./.agents/skills/verify-changes/SKILL.md) | Checks to run before commit / PR (mirrors CI) |
 
 ## Human docs
