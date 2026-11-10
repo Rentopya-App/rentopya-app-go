@@ -209,11 +209,13 @@ function NextStep({ task }: { task: FieldTask }) {
 
   const closed = task.status === 'completed' || task.status === 'cancelled';
   const canCancel = canDo(task, 'cancel') && can(Permission.TenantFieldTasksAssign);
+  const canAssign = canDo(task, 'assign') && can(Permission.TenantFieldTasksAssign);
   const any =
     canDo(task, 'start') ||
     (canDo(task, 'inspection') && inspection) ||
     canDo(task, 'complete') ||
     canDo(task, 'report_issue') ||
+    canAssign ||
     canCancel;
 
   return (
@@ -264,6 +266,15 @@ function NextStep({ task }: { task: FieldTask }) {
           title={t('actions.report_issue')}
           disabled={step.isPending}
           onPress={() => router.push(`${base}/issue` as Href)}
+        />
+      ) : null}
+      {canAssign ? (
+        <Button
+          variant="outline"
+          icon="user"
+          title={task.assignee ? t('transfers_app:board.reassign') : t('transfers_app:board.assign')}
+          disabled={step.isPending}
+          onPress={() => router.push(`/field/board/assign?uuids=${task.uuid}` as Href)}
         />
       ) : null}
       {canCancel ? (
