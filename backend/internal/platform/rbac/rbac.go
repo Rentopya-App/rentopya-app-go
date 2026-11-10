@@ -261,6 +261,13 @@ const (
 // time-boxed grants that let platform support staff enter the organization.
 const PermTenantSupportAccessManage = "tenant.support_access.manage"
 
+// Public legal pages (migration 000143): privacy policy, terms of use and
+// account deletion text, edited in /platform/legal/*.
+const (
+	PermPlatformLegalRead  = "platform.legal.read"
+	PermPlatformLegalWrite = "platform.legal.write"
+)
+
 // Tenant template role keys seeded by migrations 000030 and 000041.
 const (
 	TenantRoleOwner            = "owner"

@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { AppLogo } from "@/components/brand";
+import { legalPath, supportPath } from "@/features/legal/lib/legal";
 import { useLocale } from "@/providers/locale-provider";
 
 import {
@@ -11,9 +12,20 @@ import {
   demoMailto,
 } from "../config";
 
+const linkClass = "hover:text-primary underline-offset-4 hover:underline";
+
 export function LandingFooter() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const year = new Date().getFullYear();
+  const legalLinks = [
+    { href: legalPath("privacy", locale), label: t("landing.footer.privacy") },
+    { href: legalPath("terms", locale), label: t("landing.footer.terms") },
+    { href: supportPath(locale), label: t("landing.footer.support") },
+    {
+      href: legalPath("account-deletion", locale),
+      label: t("landing.footer.account_delete"),
+    },
+  ];
 
   return (
     <footer className="border-t">
@@ -50,6 +62,18 @@ export function LandingFooter() {
                 {LANDING_CONTACT_EMAIL}
               </a>
             </li>
+          </ul>
+          <ul
+            aria-label={t("landing.footer.legal")}
+            className="text-muted-foreground mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs md:justify-end"
+          >
+            {legalLinks.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href} className={linkClass}>
+                  {link.label}
+                </Link>
+              </li>
+            ))}
           </ul>
           <p className="text-muted-foreground mt-4 text-xs md:text-right">
             {t("landing.footer.rights", { year })}

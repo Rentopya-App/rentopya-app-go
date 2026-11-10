@@ -51,6 +51,8 @@ export const Permission = {
   PlatformHealthRead: "platform.health.read",
   PlatformSiteDomainsRead: "platform.site_domains.read",
   PlatformSiteDomainsManage: "platform.site_domains.manage",
+  PlatformLegalRead: "platform.legal.read",
+  PlatformLegalWrite: "platform.legal.write",
 
   AuthSession: "auth.session",
 
@@ -295,6 +297,10 @@ export const permissions = {
   authSettings: {
     read: Permission.PlatformAuthSettingsRead,
     write: Permission.PlatformAuthSettingsWrite,
+  },
+  legal: {
+    read: Permission.PlatformLegalRead,
+    write: Permission.PlatformLegalWrite,
   },
   auth: {
     session: Permission.AuthSession,

@@ -5,6 +5,8 @@ import (
 	accesshandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/access/handler"
 	activitymodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/activity"
 	activityhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/activity/handler"
+	legalmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/legal"
+	legalhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/legal/handler"
 	logsmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs"
 	logshandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs/handler"
 	searchmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/search"
@@ -18,6 +20,7 @@ type moduleHandlers struct {
 	search   *searchhandler.Handler
 	activity *activityhandler.Handler
 	logs     *logshandler.Handler
+	legal    *legalhandler.Handler
 }
 
 // selfRegisteredModules is the single list of modules mounted through
@@ -29,5 +32,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		searchmodule.Module{H: h.search},
 		activitymodule.Module{H: h.activity},
 		logsmodule.Module{H: h.logs},
+		legalmodule.Module{H: h.legal},
 	}
 }

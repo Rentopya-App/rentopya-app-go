@@ -74,6 +74,7 @@ import enInspections from "@/locales/en/inspections.json";
 import enFieldTasks from "@/locales/en/field_tasks.json";
 import enCustomerPortal from "@/locales/en/customer_portal.json";
 import enLanding from "@/locales/en/landing.json";
+import enLegal from "@/locales/en/legal.json";
 import trAccess from "@/locales/tr/access.json";
 import trActivity from "@/locales/tr/activity.json";
 import trAuth from "@/locales/tr/auth.json";
@@ -148,6 +149,7 @@ import trInspections from "@/locales/tr/inspections.json";
 import trFieldTasks from "@/locales/tr/field_tasks.json";
 import trCustomerPortal from "@/locales/tr/customer_portal.json";
 import trLanding from "@/locales/tr/landing.json";
+import trLegal from "@/locales/tr/legal.json";
 
 export type MessageDictionary = Record<string, string>;
 
@@ -189,6 +191,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     field_tasks: trFieldTasks,
     customer_portal: trCustomerPortal,
     landing: trLanding,
+    legal: trLegal,
     vehicle_records: trVehicleRecords,
     vehicle_blocks: trVehicleBlocks,
     transfers: trTransfers,
@@ -265,6 +268,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     field_tasks: enFieldTasks,
     customer_portal: enCustomerPortal,
     landing: enLanding,
+    legal: enLegal,
     vehicle_records: enVehicleRecords,
     vehicle_blocks: enVehicleBlocks,
     transfers: enTransfers,

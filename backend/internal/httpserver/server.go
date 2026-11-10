@@ -114,6 +114,8 @@ import (
 	kabismodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis"
 	kabishandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis/handler"
 	kabisusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis/usecase"
+	legalhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/legal/handler"
+	legalusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/legal/usecase"
 	logshandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs/handler"
 	logsusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs/usecase"
 	notifmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifications"
@@ -1206,6 +1208,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		search:   searchhandler.New(searchSvc),
 		activity: activityhandler.New(activityusecase.New(deps.Queries)),
 		logs:     logshandler.New(logsSvc),
+		legal:    legalhandler.New(legalusecase.New(deps.Queries), activityRec),
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}
