@@ -19,6 +19,7 @@ import { startUpdateChecks } from '@/core/updates';
 import { ErrorFallback } from '@/features/shell/error-fallback';
 import { LaunchVeil } from '@/features/shell/launch-veil';
 import { useNavigationTheme } from '@/features/shell/navigation-theme';
+import { PushNotifications } from '@/features/push/push-notifications';
 import { UpdateBanner } from '@/features/shell/update-banner';
 import { Toaster } from '@/ui/toast';
 
@@ -72,6 +73,7 @@ export default function RootLayout() {
                   <Stack.Screen name="(public)" />
                 </Stack.Protected>
               </Stack>
+              <PushNotifications />
               <UpdateBanner />
               <Toaster />
               <LaunchVeil />

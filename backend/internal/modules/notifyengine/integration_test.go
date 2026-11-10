@@ -522,4 +522,120 @@ func TestCustomerPush(t *testing.T) {
 	}
 }
 
+// seedMember adds a user as a member of the organization with one system
+// role: approver=true picks a role that grants tenant.reservations.approve,
+// false one that does not. branch>0 limits the member to that branch.
+func (e *env) seedMember(t *testing.T, approver bool, branch int64) int64 {
+	t.Helper()
+	ctx := e.ctx
+	var role int64
+	if err := e.pool.QueryRow(ctx, `SELECT r.id FROM roles r
+		WHERE r.scope = 'tenant' AND r.organization_id IS NULL
+		  AND EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
+		              WHERE rp.role_id = r.id AND p.slug = 'tenant.reservations.approve') = $1
+		ORDER BY r.id LIMIT 1`, approver).Scan(&role); err != nil {
+		t.Fatal(err)
+	}
+	var user, member int64
+	if err := e.pool.QueryRow(ctx, `INSERT INTO users (email, password_hash, name, surname, status)
+		VALUES ($1, 'x', 'Personel', 'Bir', 'active') RETURNING id`, uuid.NewString()+"@example.test").Scan(&user); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = e.pool.Exec(context.Background(), "DELETE FROM users WHERE id = $1", user) })
+	scope := "all"
+	if branch > 0 {
+		scope = "selected"
+	}
+	if err := e.pool.QueryRow(ctx, `INSERT INTO organization_members (organization_id, user_id, role_id, branch_scope)
+		VALUES ($1, $2, $3, $4) RETURNING id`, e.org, user, role, scope).Scan(&member); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.pool.Exec(ctx, `INSERT INTO organization_member_roles (organization_id, member_id, role_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+		e.org, member, role); err != nil {
+		t.Fatal(err)
+	}
+	if branch > 0 {
+		if _, err := e.pool.Exec(ctx, `INSERT INTO organization_member_branches (organization_id, member_id, branch_id) VALUES ($1, $2, $3)`,
+			e.org, member, branch); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return user
+}
+
+func (e *env) staffDispatches(t *testing.T, code string) map[int64]string {
+	t.Helper()
+	rows, err := e.pool.Query(e.ctx, `SELECT user_id, vars->>'link' FROM notification_dispatches
+		WHERE organization_id = $1 AND event_code = $2`, e.org, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	out := map[int64]string{}
+	for rows.Next() {
+		var u int64
+		var link string
+		if err := rows.Scan(&u, &link); err != nil {
+			t.Fatal(err)
+		}
+		out[u] = link
+	}
+	return out
+}
+
+// Staff pushes of the mobile app (TEC-1140): a reservation waiting for a
+// decision reaches every member who may approve it in its branch, once;
+// a handover task reminds its assignee before the due time, once.
+func TestStaffApprovalAndHandoverReminders(t *testing.T) {
+	e := newEnv(t, false)
+	now := time.Now().UTC().Truncate(time.Second)
+	e.eng.SetClock(func() time.Time { return now })
+	resUUID := e.seedReservation(t, now.Add(48*time.Hour))
+	var branch int64
+	if _, err := e.pool.Exec(e.ctx, `UPDATE reservations SET status = 'request' WHERE organization_id = $1 AND uuid = $2`, e.org, resUUID); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.pool.QueryRow(e.ctx, `SELECT pickup_branch_id FROM reservations WHERE organization_id = $1 AND uuid = $2`, e.org, resUUID).Scan(&branch); err != nil {
+		t.Fatal(err)
+	}
+	var other int64
+	if err := e.pool.QueryRow(e.ctx, `INSERT INTO branches (organization_id, code, name) VALUES ($1, 'DGR', 'Diğer') RETURNING id`, e.org).Scan(&other); err != nil {
+		t.Fatal(err)
+	}
+	approver := e.seedMember(t, true, 0)
+	branchApprover := e.seedMember(t, true, branch)
+	otherBranch := e.seedMember(t, true, other)
+	clerk := e.seedMember(t, false, 0)
+
+	e.eng.RemindOrganization(e.ctx, e.org)
+	e.eng.RemindOrganization(e.ctx, e.org)
+	got := e.staffDispatches(t, catalog.ReservationApprovalWaiting)
+	if len(got) != 2 || got[approver] == "" || got[branchApprover] == "" {
+		t.Fatalf("approval waiting recipients: %v", got)
+	}
+	if _, ok := got[otherBranch]; ok {
+		t.Fatal("a member of another branch was notified")
+	}
+	if _, ok := got[clerk]; ok {
+		t.Fatal("a member without the approve permission was notified")
+	}
+	if want := "https://app.example.test/t/" + e.slug + "/reservations/" + resUUID.String(); got[approver] != want {
+		t.Fatalf("link %q, want %q", got[approver], want)
+	}
+
+	// Handover in 45 minutes: inside the default 60-minute reminder.
+	var task uuid.UUID
+	if err := e.pool.QueryRow(e.ctx, `INSERT INTO operation_tasks (organization_id, task_type, status, branch_id, due_at, assignee_id, origin)
+		VALUES ($1, 'handover', 'assigned', $2, $3, $4, 'manual') RETURNING uuid`,
+		e.org, branch, now.Add(45*time.Minute), clerk).Scan(&task); err != nil {
+		t.Fatal(err)
+	}
+	e.eng.RemindOrganization(e.ctx, e.org)
+	e.eng.RemindOrganization(e.ctx, e.org)
+	hand := e.staffDispatches(t, catalog.FieldTaskHandoverUpcoming)
+	if want := "https://app.example.test/t/" + e.slug + "/field/my/" + task.String(); len(hand) != 1 || hand[clerk] != want {
+		t.Fatalf("handover reminders: %v", hand)
+	}
+}
+
 var _ = channel.Known

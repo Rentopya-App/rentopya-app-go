@@ -1680,8 +1680,16 @@ type Querier interface {
 	// Customer accounts with an open (positive) balance and a debit falling
 	// due within the window: the earliest such due date per account.
 	ListNotifyAccountDue(ctx context.Context, arg ListNotifyAccountDueParams) ([]ListNotifyAccountDueRow, error)
+	// Reservations waiting for a staff decision (request / awaiting_review)
+	// created recently, once per member who may approve them: a role with
+	// tenant.reservations.approve and a branch scope that covers the pickup
+	// branch.
+	ListNotifyApprovalWaiting(ctx context.Context, arg ListNotifyApprovalWaitingParams) ([]ListNotifyApprovalWaitingRow, error)
 	// Field tasks assigned recently that are still open.
 	ListNotifyAssignedTasks(ctx context.Context, arg ListNotifyAssignedTasksParams) ([]ListNotifyAssignedTasksRow, error)
+	// Open handover field tasks with an assignee whose due time is within the
+	// horizon (the staff member's "handover approaching" reminder).
+	ListNotifyHandoverTasks(ctx context.Context, arg ListNotifyHandoverTasksParams) ([]ListNotifyHandoverTasksRow, error)
 	// Invoices issued (accepted by the integrator) recently, for a customer.
 	ListNotifyIssuedInvoices(ctx context.Context, arg ListNotifyIssuedInvoicesParams) ([]ListNotifyIssuedInvoicesRow, error)
 	// Active rentals that became overdue recently.

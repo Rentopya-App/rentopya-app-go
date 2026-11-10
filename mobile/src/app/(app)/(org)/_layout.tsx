@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useTenantContext } from '@/core/tenant';
+import { PushRegistration } from '@/features/push/push-notifications';
 
 // A deep link (`rentopya://vehicle/{uuid}`) opens on top of the tabs, so back leads home.
 export const unstable_settings = { initialRouteName: '(tabs)' };
@@ -16,8 +17,11 @@ export default function OrgLayout() {
   const { t } = useTranslation();
   useTenantContext();
   return (
-    <Stack screenOptions={{ headerBackTitle: t('common:back'), headerShadowVisible: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-    </Stack>
+    <>
+      <PushRegistration />
+      <Stack screenOptions={{ headerBackTitle: t('common:back'), headerShadowVisible: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+    </>
   );
 }

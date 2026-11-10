@@ -29,3 +29,20 @@ func TestForFallsBackWhenVarMissing(t *testing.T) {
 		t.Fatal("Known mismatch")
 	}
 }
+
+// Staff pushes of the company panel get their own lock-screen text, with
+// no variables (references and names stay inside the app).
+func TestStaffKindsHaveFixedTexts(t *testing.T) {
+	for _, kind := range []string{"field_tasks.assigned", "field_task.assigned", "field_task.overdue",
+		"field_task.handover_upcoming", "reservation.approval_waiting"} {
+		if !Known(kind) {
+			t.Fatalf("%s: no push text", kind)
+		}
+		for _, lang := range []string{"tr", "en"} {
+			got := For(kind, lang, map[string]string{"resource": "x"})
+			if got.Title == "" || strings.Contains(got.Title+got.Body, "{{") || got.Body == fallback.tr.Body || got.Body == fallback.en.Body {
+				t.Fatalf("%s/%s: %+v", kind, lang, got)
+			}
+		}
+	}
+}

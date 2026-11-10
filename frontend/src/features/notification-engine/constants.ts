@@ -93,6 +93,10 @@ export const EVENT_LABEL_KEYS: Record<string, string> = {
   "account.payment_due": "notification_engine.events.account_payment_due",
   "field_task.assigned": "notification_engine.events.field_task_assigned",
   "field_task.overdue": "notification_engine.events.field_task_overdue",
+  "field_task.handover_upcoming":
+    "notification_engine.events.field_task_handover_upcoming",
+  "reservation.approval_waiting":
+    "notification_engine.events.reservation_approval_waiting",
   "site_lead.created": "notification_engine.events.site_lead_created",
 };
 

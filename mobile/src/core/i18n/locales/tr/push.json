@@ -1,0 +1,9 @@
+{
+  "channel_name": "Bildirimler",
+  "row_title": "Bildirimler",
+  "on": "Bu telefona anlık bildirim gönderiliyor.",
+  "denied": "Bildirimler kapalı. Açmak için sistem ayarlarına gidin.",
+  "ask_hint": "Saha görevleri, teslimler ve onay bekleyen rezervasyonlar için bildirim alın.",
+  "allow": "Aç",
+  "open_settings": "Ayarlar"
+}
