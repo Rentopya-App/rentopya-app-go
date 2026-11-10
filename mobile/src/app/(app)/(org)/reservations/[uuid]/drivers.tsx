@@ -1,0 +1,3 @@
+import { DriversScreen } from '@/features/reservations/action-screens';
+
+export default DriversScreen;
