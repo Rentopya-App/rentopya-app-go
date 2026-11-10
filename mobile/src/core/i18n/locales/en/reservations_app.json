@@ -1,0 +1,15 @@
+{
+  "menu_subtitle": "List, approval queue, customer requests, quotes and resolution tasks",
+  "search": "Search reference, customer or plate",
+  "payment_filter": "Payment status",
+  "sort": "Sort",
+  "sorts.-created_at": "Newest",
+  "sorts.starts_at": "Pick-up time",
+  "branch_filtered": "Branch filter: {{branch}}",
+  "assign.nobody": "Nobody",
+  "links.message": "Payment link for your reservation {{reference}} ({{amount}}): {{url}}",
+  "links.sms": "Send by SMS",
+  "links.sms_failed": "Could not open the messages app",
+  "links.share": "Share",
+  "valid_until": "Valid until {{at}}"
+}

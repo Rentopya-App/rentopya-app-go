@@ -65,19 +65,6 @@ export function useRentalSummary(uuid: string | undefined) {
   });
 }
 
-/** Read-only reservation summary (`tenant.reservations.read`). */
-export function useReservationSummary(uuid: string | undefined) {
-  const org = useSession((s) => s.organization);
-  return useQuery({
-    queryKey: ['tenant', org?.slug ?? '', 'reservations', 'detail', uuid],
-    enabled: !!org && !!uuid,
-    queryFn: ({ signal }) =>
-      unwrap(
-        api.GET('/v1/tenant/reservations/{uuid}', { params: { header: orgHeader(), path: { uuid: uuid! } }, signal }),
-      ),
-  });
-}
-
 /**
  * Refetches when the screen comes back into focus (back from a detail, tab
  * switch), not on the first focus: the mount already loads.

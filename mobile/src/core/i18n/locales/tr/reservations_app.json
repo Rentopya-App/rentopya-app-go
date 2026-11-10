@@ -1,0 +1,15 @@
+{
+  "menu_subtitle": "Liste, onay kuyruğu, müşteri talepleri, teklifler ve çözüm görevleri",
+  "search": "Referans, müşteri veya plaka ara",
+  "payment_filter": "Ödeme durumu",
+  "sort": "Sıralama",
+  "sorts.-created_at": "En yeni",
+  "sorts.starts_at": "Alış zamanı",
+  "branch_filtered": "Şube filtresi: {{branch}}",
+  "assign.nobody": "Atama yok",
+  "links.message": "{{reference}} rezervasyonunuz için {{amount}} tutarındaki ödeme linkiniz: {{url}}",
+  "links.sms": "SMS ile gönder",
+  "links.sms_failed": "Mesajlar uygulaması açılamadı",
+  "links.share": "Paylaş",
+  "valid_until": "Geçerli: {{at}}"
+}
