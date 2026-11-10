@@ -15,6 +15,7 @@ import tr_push from './locales/tr/push.json';
 import tr_qr_login from './locales/tr/qr_login.json';
 import tr_quick_reservation from './locales/tr/quick_reservation.json';
 import tr_rentals_app from './locales/tr/rentals_app.json';
+import tr_reports_app from './locales/tr/reports_app.json';
 import tr_reservations_app from './locales/tr/reservations_app.json';
 import tr_returns from './locales/tr/returns.json';
 import tr_search from './locales/tr/search.json';
@@ -41,6 +42,10 @@ import tr_finance from '../../../../frontend/src/locales/tr/finance.json';
 import tr_deposits from '../../../../frontend/src/locales/tr/deposits.json';
 import tr_transfers from '../../../../frontend/src/locales/tr/transfers.json';
 import tr_fleet_calendar from '../../../../frontend/src/locales/tr/fleet_calendar.json';
+import tr_reports from '../../../../frontend/src/locales/tr/reports.json';
+import tr_invoices from '../../../../frontend/src/locales/tr/invoices.json';
+import tr_suppliers from '../../../../frontend/src/locales/tr/suppliers.json';
+import tr_profitability from '../../../../frontend/src/locales/tr/profitability.json';
 import en_common from './locales/en/common.json';
 import en_account from './locales/en/account.json';
 import en_auth from './locales/en/auth.json';
@@ -56,6 +61,7 @@ import en_push from './locales/en/push.json';
 import en_qr_login from './locales/en/qr_login.json';
 import en_quick_reservation from './locales/en/quick_reservation.json';
 import en_rentals_app from './locales/en/rentals_app.json';
+import en_reports_app from './locales/en/reports_app.json';
 import en_reservations_app from './locales/en/reservations_app.json';
 import en_returns from './locales/en/returns.json';
 import en_search from './locales/en/search.json';
@@ -82,10 +88,14 @@ import en_finance from '../../../../frontend/src/locales/en/finance.json';
 import en_deposits from '../../../../frontend/src/locales/en/deposits.json';
 import en_transfers from '../../../../frontend/src/locales/en/transfers.json';
 import en_fleet_calendar from '../../../../frontend/src/locales/en/fleet_calendar.json';
+import en_reports from '../../../../frontend/src/locales/en/reports.json';
+import en_invoices from '../../../../frontend/src/locales/en/invoices.json';
+import en_suppliers from '../../../../frontend/src/locales/en/suppliers.json';
+import en_profitability from '../../../../frontend/src/locales/en/profitability.json';
 
-export const NAMESPACES = ['common', 'account', 'auth', 'customers_app', 'field_tasks', 'finance_app', 'fleet_ops_app', 'glance', 'inspections', 'nav', 'notifications', 'push', 'qr_login', 'quick_reservation', 'rentals_app', 'reservations_app', 'returns', 'search', 'settings', 'today', 'transfers_app', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'customers', 'agreements', 'vehicles', 'vehicle_blocks', 'vehicle_records', 'rentals', 'inspections_web', 'reservations', 'availability', 'payments', 'customer_portal', 'finance', 'deposits', 'transfers', 'fleet_calendar'] as const;
+export const NAMESPACES = ['common', 'account', 'auth', 'customers_app', 'field_tasks', 'finance_app', 'fleet_ops_app', 'glance', 'inspections', 'nav', 'notifications', 'push', 'qr_login', 'quick_reservation', 'rentals_app', 'reports_app', 'reservations_app', 'returns', 'search', 'settings', 'today', 'transfers_app', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'customers', 'agreements', 'vehicles', 'vehicle_blocks', 'vehicle_records', 'rentals', 'inspections_web', 'reservations', 'availability', 'payments', 'customer_portal', 'finance', 'deposits', 'transfers', 'fleet_calendar', 'reports', 'invoices', 'suppliers', 'profitability'] as const;
 
 export const resources = {
-  tr: { common: tr_common, account: tr_account, auth: tr_auth, customers_app: tr_customers_app, field_tasks: tr_field_tasks, finance_app: tr_finance_app, fleet_ops_app: tr_fleet_ops_app, glance: tr_glance, inspections: tr_inspections, nav: tr_nav, notifications: tr_notifications, push: tr_push, qr_login: tr_qr_login, quick_reservation: tr_quick_reservation, rentals_app: tr_rentals_app, reservations_app: tr_reservations_app, returns: tr_returns, search: tr_search, settings: tr_settings, today: tr_today, transfers_app: tr_transfers_app, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, customers: tr_customers, agreements: tr_agreements, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records, rentals: tr_rentals, inspections_web: tr_inspections_web, reservations: tr_reservations, availability: tr_availability, payments: tr_payments, customer_portal: tr_customer_portal, finance: tr_finance, deposits: tr_deposits, transfers: tr_transfers, fleet_calendar: tr_fleet_calendar },
-  en: { common: en_common, account: en_account, auth: en_auth, customers_app: en_customers_app, field_tasks: en_field_tasks, finance_app: en_finance_app, fleet_ops_app: en_fleet_ops_app, glance: en_glance, inspections: en_inspections, nav: en_nav, notifications: en_notifications, push: en_push, qr_login: en_qr_login, quick_reservation: en_quick_reservation, rentals_app: en_rentals_app, reservations_app: en_reservations_app, returns: en_returns, search: en_search, settings: en_settings, today: en_today, transfers_app: en_transfers_app, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, customers: en_customers, agreements: en_agreements, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records, rentals: en_rentals, inspections_web: en_inspections_web, reservations: en_reservations, availability: en_availability, payments: en_payments, customer_portal: en_customer_portal, finance: en_finance, deposits: en_deposits, transfers: en_transfers, fleet_calendar: en_fleet_calendar },
+  tr: { common: tr_common, account: tr_account, auth: tr_auth, customers_app: tr_customers_app, field_tasks: tr_field_tasks, finance_app: tr_finance_app, fleet_ops_app: tr_fleet_ops_app, glance: tr_glance, inspections: tr_inspections, nav: tr_nav, notifications: tr_notifications, push: tr_push, qr_login: tr_qr_login, quick_reservation: tr_quick_reservation, rentals_app: tr_rentals_app, reports_app: tr_reports_app, reservations_app: tr_reservations_app, returns: tr_returns, search: tr_search, settings: tr_settings, today: tr_today, transfers_app: tr_transfers_app, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, customers: tr_customers, agreements: tr_agreements, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records, rentals: tr_rentals, inspections_web: tr_inspections_web, reservations: tr_reservations, availability: tr_availability, payments: tr_payments, customer_portal: tr_customer_portal, finance: tr_finance, deposits: tr_deposits, transfers: tr_transfers, fleet_calendar: tr_fleet_calendar, reports: tr_reports, invoices: tr_invoices, suppliers: tr_suppliers, profitability: tr_profitability },
+  en: { common: en_common, account: en_account, auth: en_auth, customers_app: en_customers_app, field_tasks: en_field_tasks, finance_app: en_finance_app, fleet_ops_app: en_fleet_ops_app, glance: en_glance, inspections: en_inspections, nav: en_nav, notifications: en_notifications, push: en_push, qr_login: en_qr_login, quick_reservation: en_quick_reservation, rentals_app: en_rentals_app, reports_app: en_reports_app, reservations_app: en_reservations_app, returns: en_returns, search: en_search, settings: en_settings, today: en_today, transfers_app: en_transfers_app, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, customers: en_customers, agreements: en_agreements, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records, rentals: en_rentals, inspections_web: en_inspections_web, reservations: en_reservations, availability: en_availability, payments: en_payments, customer_portal: en_customer_portal, finance: en_finance, deposits: en_deposits, transfers: en_transfers, fleet_calendar: en_fleet_calendar, reports: en_reports, invoices: en_invoices, suppliers: en_suppliers, profitability: en_profitability },
 };

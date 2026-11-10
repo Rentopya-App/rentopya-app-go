@@ -35,6 +35,10 @@ const WEB = {
   deposits: 'deposits',
   transfers: 'transfers',
   fleet_calendar: 'fleet_calendar',
+  reports: 'reports',
+  invoices: 'invoices',
+  suppliers: 'suppliers',
+  profitability: 'profitability',
 };
 const WEB_NS = Object.values(WEB);
 
