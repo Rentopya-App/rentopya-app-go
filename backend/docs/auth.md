@@ -154,9 +154,9 @@ Redis INCR, 15-minute window, fail-open if Redis is down. `429 RATE_LIMITED` + `
 
 | Endpoint | Key | Max |
 |----------|-----|-----|
-| Login | IP + email | 10 |
+| Login | IP + email 10, IP 100; refused while the email has 30 failed logins (wrong password or 2FA code, any IP) | |
 | Register | IP | 5 |
-| Forgot password | IP + email | 5 |
+| Forgot password | IP + email 5, email 10 | |
 | Reset password | IP | 10 |
 | Verify email (`/auth/email/verify`) | IP | 10 |
 | Verification email request | user | 5 |

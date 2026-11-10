@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { apiOrigin } from "@/lib/api";
+import { MEDIA_HEADERS, safeImageType } from "@/lib/media-type";
 import { PREVIEW_COOKIE, previewToken } from "@/lib/preview";
 import { forwardedForFrom } from "@/lib/request";
 import { resolveSite } from "@/lib/resolve";
@@ -58,15 +59,18 @@ export async function GET(
   }
   if (!upstream.ok || !upstream.body)
     return new Response(null, { status: upstream.status === 404 ? 404 : 502 });
-  const type = upstream.headers.get("content-type") ?? "";
-  if (!type.startsWith("image/")) return new Response(null, { status: 404 });
+  const type = safeImageType(upstream.headers.get("content-type"));
+  if (!type) {
+    await upstream.body.cancel().catch(() => undefined);
+    return new Response(null, { status: 404 });
+  }
   return new Response(upstream.body, {
     headers: {
+      ...MEDIA_HEADERS,
       "Content-Type": type,
       "Cache-Control": preview
         ? "private, no-store"
         : (upstream.headers.get("cache-control") ?? "public, max-age=3600"),
-      "X-Content-Type-Options": "nosniff",
     },
   });
 }
