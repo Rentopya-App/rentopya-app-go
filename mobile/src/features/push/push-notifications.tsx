@@ -49,6 +49,10 @@ export function PushNotifications() {
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener(() => {
       void queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      // The Today board refetches (if mounted) and rewrites the iOS widget / Siri summary.
+      void queryClient.invalidateQueries({
+        queryKey: ['tenant', useSession.getState().organization?.slug ?? '', 'overview'],
+      });
     });
     return () => sub.remove();
   }, []);
