@@ -14,6 +14,7 @@ import { NotificationCenterRow } from '@/features/notifications/bell';
 import { FinanceMenuEntry } from '@/features/finance/menu-entry';
 import { CustomersMenuRows } from '@/features/customers/menu-rows';
 import { TransfersMenuEntry } from '@/features/transfers/menu-entry';
+import { ReportsMenuEntry } from '@/features/reports/menu-entry';
 import { UploadQueueRow } from '@/features/uploads/queue-row';
 import { PushSettingsRow } from '@/features/push/push-settings-row';
 import { Chips } from '@/ui/chips';
@@ -103,6 +104,7 @@ export function MenuScreen() {
         <CustomersMenuRows />
         <TransfersMenuEntry />
         <FleetOpsMenuEntry />
+        <ReportsMenuEntry />
         <View>
           <SectionHeader title={t('section_account')} />
           <List>
