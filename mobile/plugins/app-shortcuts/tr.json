@@ -1,0 +1,14 @@
+{
+  "Today's handovers in ${applicationName}": "${applicationName} bugünkü teslimler",
+  "${applicationName} handovers today": "${applicationName}'da bugünkü teslimler",
+  "How many handovers today in ${applicationName}": "${applicationName}'da bugün kaç teslim var",
+  "${applicationName} today": "${applicationName} bugün",
+  "What's my next job in ${applicationName}": "${applicationName}'da sıradaki işim ne",
+  "Next job in ${applicationName}": "${applicationName} sıradaki iş",
+  "Next handover in ${applicationName}": "${applicationName}'da sıradaki teslim",
+  "Open today in ${applicationName}": "${applicationName}'da bugünü aç",
+  "Show today's handovers in ${applicationName}": "${applicationName}'da bugünkü teslimleri göster",
+  "Find a vehicle in ${applicationName}": "${applicationName}'da araç bul",
+  "Find a car in ${applicationName}": "${applicationName} araç bul",
+  "Search a plate in ${applicationName}": "${applicationName}'da plaka ara"
+}
