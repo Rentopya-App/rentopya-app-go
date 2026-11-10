@@ -12,6 +12,7 @@ import tr_nav from './locales/tr/nav.json';
 import tr_notifications from './locales/tr/notifications.json';
 import tr_push from './locales/tr/push.json';
 import tr_qr_login from './locales/tr/qr_login.json';
+import tr_quick_reservation from './locales/tr/quick_reservation.json';
 import tr_rentals_app from './locales/tr/rentals_app.json';
 import tr_reservations_app from './locales/tr/reservations_app.json';
 import tr_returns from './locales/tr/returns.json';
@@ -32,6 +33,7 @@ import tr_vehicle_records from '../../../../frontend/src/locales/tr/vehicle_reco
 import tr_rentals from '../../../../frontend/src/locales/tr/rentals.json';
 import tr_inspections_web from '../../../../frontend/src/locales/tr/inspections.json';
 import tr_reservations from '../../../../frontend/src/locales/tr/reservations.json';
+import tr_availability from '../../../../frontend/src/locales/tr/availability.json';
 import tr_payments from '../../../../frontend/src/locales/tr/payments.json';
 import tr_customer_portal from '../../../../frontend/src/locales/tr/customer_portal.json';
 import tr_finance from '../../../../frontend/src/locales/tr/finance.json';
@@ -50,6 +52,7 @@ import en_nav from './locales/en/nav.json';
 import en_notifications from './locales/en/notifications.json';
 import en_push from './locales/en/push.json';
 import en_qr_login from './locales/en/qr_login.json';
+import en_quick_reservation from './locales/en/quick_reservation.json';
 import en_rentals_app from './locales/en/rentals_app.json';
 import en_reservations_app from './locales/en/reservations_app.json';
 import en_returns from './locales/en/returns.json';
@@ -70,6 +73,7 @@ import en_vehicle_records from '../../../../frontend/src/locales/en/vehicle_reco
 import en_rentals from '../../../../frontend/src/locales/en/rentals.json';
 import en_inspections_web from '../../../../frontend/src/locales/en/inspections.json';
 import en_reservations from '../../../../frontend/src/locales/en/reservations.json';
+import en_availability from '../../../../frontend/src/locales/en/availability.json';
 import en_payments from '../../../../frontend/src/locales/en/payments.json';
 import en_customer_portal from '../../../../frontend/src/locales/en/customer_portal.json';
 import en_finance from '../../../../frontend/src/locales/en/finance.json';
@@ -77,9 +81,9 @@ import en_deposits from '../../../../frontend/src/locales/en/deposits.json';
 import en_transfers from '../../../../frontend/src/locales/en/transfers.json';
 import en_fleet_calendar from '../../../../frontend/src/locales/en/fleet_calendar.json';
 
-export const NAMESPACES = ['common', 'account', 'auth', 'customers_app', 'field_tasks', 'finance_app', 'fleet_ops_app', 'inspections', 'nav', 'notifications', 'push', 'qr_login', 'rentals_app', 'reservations_app', 'returns', 'search', 'settings', 'today', 'transfers_app', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'customers', 'agreements', 'vehicles', 'vehicle_blocks', 'vehicle_records', 'rentals', 'inspections_web', 'reservations', 'payments', 'customer_portal', 'finance', 'deposits', 'transfers', 'fleet_calendar'] as const;
+export const NAMESPACES = ['common', 'account', 'auth', 'customers_app', 'field_tasks', 'finance_app', 'fleet_ops_app', 'inspections', 'nav', 'notifications', 'push', 'qr_login', 'quick_reservation', 'rentals_app', 'reservations_app', 'returns', 'search', 'settings', 'today', 'transfers_app', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'customers', 'agreements', 'vehicles', 'vehicle_blocks', 'vehicle_records', 'rentals', 'inspections_web', 'reservations', 'availability', 'payments', 'customer_portal', 'finance', 'deposits', 'transfers', 'fleet_calendar'] as const;
 
 export const resources = {
-  tr: { common: tr_common, account: tr_account, auth: tr_auth, customers_app: tr_customers_app, field_tasks: tr_field_tasks, finance_app: tr_finance_app, fleet_ops_app: tr_fleet_ops_app, inspections: tr_inspections, nav: tr_nav, notifications: tr_notifications, push: tr_push, qr_login: tr_qr_login, rentals_app: tr_rentals_app, reservations_app: tr_reservations_app, returns: tr_returns, search: tr_search, settings: tr_settings, today: tr_today, transfers_app: tr_transfers_app, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, customers: tr_customers, agreements: tr_agreements, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records, rentals: tr_rentals, inspections_web: tr_inspections_web, reservations: tr_reservations, payments: tr_payments, customer_portal: tr_customer_portal, finance: tr_finance, deposits: tr_deposits, transfers: tr_transfers, fleet_calendar: tr_fleet_calendar },
-  en: { common: en_common, account: en_account, auth: en_auth, customers_app: en_customers_app, field_tasks: en_field_tasks, finance_app: en_finance_app, fleet_ops_app: en_fleet_ops_app, inspections: en_inspections, nav: en_nav, notifications: en_notifications, push: en_push, qr_login: en_qr_login, rentals_app: en_rentals_app, reservations_app: en_reservations_app, returns: en_returns, search: en_search, settings: en_settings, today: en_today, transfers_app: en_transfers_app, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, customers: en_customers, agreements: en_agreements, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records, rentals: en_rentals, inspections_web: en_inspections_web, reservations: en_reservations, payments: en_payments, customer_portal: en_customer_portal, finance: en_finance, deposits: en_deposits, transfers: en_transfers, fleet_calendar: en_fleet_calendar },
+  tr: { common: tr_common, account: tr_account, auth: tr_auth, customers_app: tr_customers_app, field_tasks: tr_field_tasks, finance_app: tr_finance_app, fleet_ops_app: tr_fleet_ops_app, inspections: tr_inspections, nav: tr_nav, notifications: tr_notifications, push: tr_push, qr_login: tr_qr_login, quick_reservation: tr_quick_reservation, rentals_app: tr_rentals_app, reservations_app: tr_reservations_app, returns: tr_returns, search: tr_search, settings: tr_settings, today: tr_today, transfers_app: tr_transfers_app, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, customers: tr_customers, agreements: tr_agreements, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records, rentals: tr_rentals, inspections_web: tr_inspections_web, reservations: tr_reservations, availability: tr_availability, payments: tr_payments, customer_portal: tr_customer_portal, finance: tr_finance, deposits: tr_deposits, transfers: tr_transfers, fleet_calendar: tr_fleet_calendar },
+  en: { common: en_common, account: en_account, auth: en_auth, customers_app: en_customers_app, field_tasks: en_field_tasks, finance_app: en_finance_app, fleet_ops_app: en_fleet_ops_app, inspections: en_inspections, nav: en_nav, notifications: en_notifications, push: en_push, qr_login: en_qr_login, quick_reservation: en_quick_reservation, rentals_app: en_rentals_app, reservations_app: en_reservations_app, returns: en_returns, search: en_search, settings: en_settings, today: en_today, transfers_app: en_transfers_app, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, customers: en_customers, agreements: en_agreements, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records, rentals: en_rentals, inspections_web: en_inspections_web, reservations: en_reservations, availability: en_availability, payments: en_payments, customer_portal: en_customer_portal, finance: en_finance, deposits: en_deposits, transfers: en_transfers, fleet_calendar: en_fleet_calendar },
 };

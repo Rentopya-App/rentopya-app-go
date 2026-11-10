@@ -1,0 +1,12 @@
+{
+  "menu.new": "New reservation",
+  "menu.new_subtitle": "Availability, quote and reservation in one flow",
+  "menu.availability": "Availability",
+  "menu.availability_subtitle": "Capacity per product and holds",
+  "availability_hint": "Times are in {{zone}}. A search consumes no capacity; the sales channel is Branch.",
+  "search_hint": "Times are in {{zone}}. Billing days and the price are computed on the server (the 24-hour rule comes from the API).",
+  "steps.discount": "Coupon and discount",
+  "customer": "Customer",
+  "customers_forbidden": "You cannot view the customer list.",
+  "quote_forbidden": "You cannot create quotes."
+}
