@@ -20,6 +20,8 @@ const out = path.join(root, 'src/core/i18n/resources.ts');
 const WEB = {
   errors: 'errors',
   activity: 'activity',
+  customers: 'customers',
+  agreements: 'agreements',
   vehicles: 'vehicles',
   vehicle_blocks: 'vehicle_blocks',
   vehicle_records: 'vehicle_records',
