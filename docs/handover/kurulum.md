@@ -49,11 +49,11 @@ make site-dev             # markalı site :3100 → http://{subdomain}.localhost
 |------|-------------|
 | 1. Env üret | `make prod-env` = `scripts/prod-env.sh init -o .env.server` (yalnız uygulama URL'ini sorar; `--app-url URL` ile sorusuz). Dosya mod 600 |
 | 2. Kontrol | `make prod-config` (`docker compose … config`) |
-| 3. Başlat | `make prod-up` (`up -d --build`); Dokploy'da `.env.server` içeriği compose uygulamasının env'ine yapıştırılır |
+| 3. Başlat | `IMAGE_TAG=v0.N` ayarlanır, sonra `make prod-up` (GHCR imajlarını çeker, sunucuda build yok; yerel build: `make prod-up-build`); Dokploy'da `.env.server` içeriği compose uygulamasının env'ine yapıştırılır |
 | 4. Domain'ler (Dokploy) | panel → `frontend` :3000; `realtime.<app host>` → `centrifugo` :8000; `*.<app host>` (wildcard sertifika, DNS challenge) → `site` :3000 |
 | 5. İlk yönetici | `make prod-super-admin SA_EMAIL=…` (backend container'ında `/app/create-super-admin`; `SA_PASSWORD` yoksa üretilen parola bir kez yazılır) |
 | 6. TSB kataloğu | `docker compose --env-file .env.server -f compose.prod.yml exec backend /app/catalog-import -file <container içi yol>.xlsx -apply` (önce `-apply` olmadan kuru çalıştırma) ya da Platform → Araç kataloğu → Aktarımlar |
-| Düz Docker host | `docker network create dokploy-network` bir kez; otomatik güncelleme `scripts/server-sync.sh` / `make prod-sync` (cron örneği DEVELOPMENT.md'de) |
+| Düz Docker host | `docker network create dokploy-network` bir kez; otomatik güncelleme `scripts/server-sync.sh` / `make prod-sync` (eskidi, Dokploy'a geçene kadar duruyor; cron örneği DEVELOPMENT.md'de) |
 
 Ağ: yalnız `frontend`, `site`, `centrifugo` `dokploy-network`'e katılır; backend, worker, Postgres, Redis, SeaweedFS, Meilisearch, wuzapi özel ağda kalır, hiçbir servis host portu açmaz. Tarayıcı API'ye yalnız panelin `/api/v1` proxy'si üzerinden ulaşır.
 
