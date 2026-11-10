@@ -51,6 +51,13 @@ const WEB = {
   site_leads: 'site_leads',
   kabis: 'kabis',
   tolls: 'tolls',
+  branches: 'branches',
+  fleet: 'fleet',
+  pricing: 'pricing',
+  extras: 'extras',
+  campaigns: 'campaigns',
+  one_way_rules: 'one_way_rules',
+  channels: 'channels',
 };
 const WEB_NS = Object.values(WEB);
 

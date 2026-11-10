@@ -11,6 +11,7 @@ import { signOutGoogle } from '@/features/auth/social';
 import { FleetOpsMenuEntry } from '@/features/fleet-ops/menu-entry';
 import { OrgSettingsMenuEntry } from '@/features/org-settings/menu-entry';
 import { ComplianceMenuEntry } from '@/features/compliance/menu-entry';
+import { ConfigMenuEntry } from '@/features/config/menu-entry';
 import { ReservationsMenuEntry } from '@/features/reservations/menu-entry';
 import { NotificationCenterRow } from '@/features/notifications/bell';
 import { FinanceMenuEntry } from '@/features/finance/menu-entry';
@@ -109,6 +110,7 @@ export function MenuScreen() {
         <ReportsMenuEntry />
         <OrgSettingsMenuEntry />
         <ComplianceMenuEntry />
+        <ConfigMenuEntry />
         <View>
           <SectionHeader title={t('section_account')} />
           <List>
