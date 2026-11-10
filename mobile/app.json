@@ -35,7 +35,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json"
     },
     "locales": {
       "tr": "./assets/locales/tr.json",
@@ -127,6 +128,31 @@
     "updates": {
       "checkAutomatically": "NEVER",
       "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ExpoWidgetsTarget",
+                  "bundleIdentifier": "com.rentopya.app.widgets",
+                  "entitlements": {
+                    "com.apple.security.application-groups": ["group.com.rentopya.app"]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "24455b4a-ad5a-4008-94e2-5e2ca94b9d94"
+      }
     }
   }
 }

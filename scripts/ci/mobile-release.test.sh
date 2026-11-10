@@ -54,8 +54,9 @@ echo "{\"hash\":\"${MOCK_IOS_FP}\",\"platform\":\"$2\",\"appEnv\":\"${EXPO_PUBLI
 EOF
 chmod +x "$T/bin/eas" "$T/bin/fingerprint"
 
-GOOD_ENV="EXPO_PUBLIC_APP_ENV=production
-EXPO_PUBLIC_API_MODE=live
+# A complete EAS production env: every non-empty release.env value plus the
+# URLs that live only in EAS.
+GOOD_ENV="$(grep -E '^[A-Z0-9_]+=.+' "$ROOT/mobile/release.env")
 EXPO_PUBLIC_API_URL=https://api.rentopya.example
 EXPO_PUBLIC_WEB_URL=https://panel.rentopya.example"
 
@@ -131,7 +132,7 @@ for broken in \
   "EXPO_PUBLIC_APP_ENV=preview|EXPO_PUBLIC_API_MODE=live|EXPO_PUBLIC_API_URL=https://api.rentopya.example" \
   "EXPO_PUBLIC_APP_ENV=production|EXPO_PUBLIC_API_MODE=live|EXPO_PUBLIC_API_URL=http://api.rentopya.example" \
   "EXPO_PUBLIC_APP_ENV=production|EXPO_PUBLIC_API_URL=https://api.rentopya.example" \
-  "EXPO_PUBLIC_APP_ENV=production|EXPO_PUBLIC_API_MODE=live|EXPO_PUBLIC_API_URL=https://api.rentopya.example|EXPO_PUBLIC_APPLE_SIGN_IN=1"; do
+  "EXPO_PUBLIC_APP_ENV=production|EXPO_PUBLIC_API_MODE=live|EXPO_PUBLIC_API_URL=https://api.rentopya.example|EXPO_PUBLIC_APPLE_SIGN_IN=0"; do
   setup
   run MOCK_ENV_LIST="${broken//|/$'\n'}" MOCK_LOCAL_FP=other
   if [ "$code" != 0 ] && [ -z "$(published)" ] && [ -z "$(tags)" ] && grep -q 'EAS production environment' <<<"$out"; then
