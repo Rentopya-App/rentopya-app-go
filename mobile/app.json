@@ -92,11 +92,34 @@
           "defaultChannel": "default"
         }
       ],
-      "./plugins/with-xcode-cloud"
+      "./plugins/with-xcode-cloud",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.rentopya.app.widgets",
+          "groupIdentifier": "group.com.rentopya.app",
+          "widgets": [
+            {
+              "name": "RentopyaToday",
+              "displayName": "Rentopya · Bugün",
+              "description": "Bugünkü teslim ve iade sayıları ve sıradaki iş.",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium"]
+              },
+              "android": null
+            }
+          ]
+        }
+      ],
+      "expo-app-intents",
+      "./plugins/with-app-shortcuts-strings"
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "inlineModules": {
+        "watchedDirectories": ["app-intents"]
+      }
     },
     "runtimeVersion": {
       "policy": "fingerprint"
