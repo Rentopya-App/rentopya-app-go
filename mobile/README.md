@@ -7,14 +7,34 @@ and the brand tokens, in the panel's look (Plus Jakarta Sans, Rentopya indigo
 and ink; `docs/brand.md`). The structure follows the Takwim app this shell was
 taken from.
 
-So far: sign-in (e-mail + password, 2FA code, Sign in with Apple and Google
-when configured), the organization picker, the branch filter, permission
-checks, the "Bugün" home tab (today's handovers, returns, overdue returns and KPIs from `/v1/tenant/overview`), the "Kiralamalar" tab (rentals list and detail with extend, vehicle swap, cancel and charge approval; operation tasks; handover / return form records), the reservations module (list, detail and its actions, approval queue, customer requests, quotes, resolution tasks; from the menu), the menu (company, branch, account,
-language, appearance, version), "Hesap ve güvenlik" (profile, sessions, authenticator
-2FA, passkey list, notification preferences, account deletion with the e-mailed code
-or a password step-up), the notification center (bell with the unread count on
-"Bugün"), search (`/v1/tenant/search`) and approving a web sign-in by QR
-(`rentopya://login/qr/{id}` or the scanner). Module screens come next.
+What the app has now:
+
+- **Sign-in**: e-mail + password, 2FA code, Sign in with Apple and Google when
+  configured; approving a web sign-in by QR (`rentopya://login/qr/{id}` or the scanner).
+- **Organization and branch**: the organization picker, the branch filter, permission checks.
+- **Bugün**: today's handovers, returns, overdue returns and KPIs (`/v1/tenant/overview`).
+- **Field tasks** (Görevlerim tab) and the **handover and return wizards**.
+- **Vehicles** (tab): list, plate scan, detail, edit, status, block, history, maintenance.
+- **Rentals** (tab): list and detail with extend, vehicle swap, cancel and charge
+  approval; operation tasks; inspections (handover / return records).
+- **Reservations**: list, detail and its actions, approval queue, customer
+  requests, quotes, resolution tasks; **quick reservation** with availability and holds.
+- **Customers and corporate agreements**.
+- **Finance**: collections (refund, void), payment links, deposits, unmatched payments.
+- **Reports and accounting**: reports; accounts, cash, invoices, movements,
+  suppliers and supplier invoices / payments, payables, profitability.
+- **Transfers**, the **field board** and the **fleet calendar**.
+- **Fleet alerts, maintenance and expenses** (expense categories included).
+- **KABİS** and **HGS / OGS** tolls.
+- **Company settings**: organization, members and invitations, roles,
+  integrations, notifications, WhatsApp, site, public API, templates, support access.
+- **Account and security**: profile, sessions, authenticator 2FA, passkey list,
+  notification preferences, account deletion (e-mailed code or a password step-up).
+- **Notifications and search**: the notification center (bell with the unread
+  count on Bugün) and search (`/v1/tenant/search`).
+- **Push** notifications with deep links, the **offline upload queue**, and the
+  **iOS widget and Siri** (below).
+- The menu: company, branch, account, language, appearance, version.
 
 The app calls the Go API directly: `<EXPO_PUBLIC_API_URL>/v1/*` with its own
 Bearer token pair (`backend/docs/openapi.yaml`), the organization in
@@ -67,12 +87,14 @@ of `frontend/src/assets/brand`) with
 ```
 src/
   app/                 expo-router routes, one-line files
-    (app)/(tabs)/      Home, Menu (native tabs, a stack in each)
     (public)/          sign-in (index) and oauth-link (Apple relay e-mail: link or create)
-    (app)/             signed in: organizations (picker), (org)/(tabs) once one is picked
+    (app)/             signed in: organizations (picker), login/qr, and (org)/ once one is picked
+    (app)/(org)/(tabs)/ Bugün, Görevlerim, Araçlar, Kiralamalar, Menü (native tabs, a stack in each)
+    (app)/(org)/<area>/ module stacks (reservations, finance, customers, settings, ...)
   core/                no UI: config, i18n, storage, preferences, query client, formatting, OTA,
                        api/ (typed client, refresh, errors), auth/ (tokens, session, permissions), tenant, branch
-  features/            screens, one folder per area (shell, today, rentals, settings, auth, ...)
+  features/            screens, one folder per area (shell, today, rentals, settings, auth, ...);
+                       adding one: the `mobile-app` skill (`../.agents/skills/mobile-app`)
   ui/                  design system (tokens in src/global.css mirror the panel theme)
   widgets/             iOS Home Screen widget layouts (expo-widgets, run in the widget runtime)
 app-intents/         Siri / Shortcuts Swift (App Intents, inline modules)
