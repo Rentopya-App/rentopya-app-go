@@ -28,6 +28,7 @@ const WEB = {
   rentals: 'rentals',
   inspections: 'inspections_web',
   reservations: 'reservations',
+  availability: 'availability',
   payments: 'payments',
   customer_portal: 'customer_portal',
   finance: 'finance',

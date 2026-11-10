@@ -1,0 +1,12 @@
+{
+  "menu.new": "Yeni rezervasyon",
+  "menu.new_subtitle": "Müsaitlik, teklif ve rezervasyon tek akışta",
+  "menu.availability": "Müsaitlik",
+  "menu.availability_subtitle": "Ürün bazında kapasite ve opsiyonlar",
+  "availability_hint": "Saatler {{zone}} saatine göredir. Sorgu kapasite tüketmez; satış kanalı Şube.",
+  "search_hint": "Saatler {{zone}} saatine göredir. Gün sayısı ve fiyat sunucuda hesaplanır (24 saat kuralı API'den gelir).",
+  "steps.discount": "Kupon ve indirim",
+  "customer": "Müşteri",
+  "customers_forbidden": "Müşteri listesini görme yetkiniz yok.",
+  "quote_forbidden": "Teklif oluşturma yetkiniz yok."
+}
