@@ -546,7 +546,8 @@ func (s *Service) UpdateDraft(ctx context.Context, orgID int64, id uuid.UUID, in
 	}
 	if in.BranchUUID != nil {
 		b, err := s.q.GetRentalBranch(ctx, db.GetRentalBranchParams{OrganizationID: orgID, Uuid: *in.BranchUUID})
-		if notFound(err) {
+		if notFound(err) || (err == nil && !s.placeAllowed(ctx, orgID, row, r, b.ID)) {
+			// Outside the caller's branch scope reads like an unknown branch.
 			ve.add("branch_uuid", "not_found", "branch was not found")
 		} else if err != nil {
 			return model.Inspection{}, err
@@ -558,7 +559,8 @@ func (s *Service) UpdateDraft(ctx context.Context, orgID int64, id uuid.UUID, in
 	if in.PointUUID != nil {
 		pt, err := s.q.GetReservationPointByUUID(ctx, db.GetReservationPointByUUIDParams{OrganizationID: orgID, Uuid: *in.PointUUID})
 		switch {
-		case notFound(err) || (err == nil && p.BranchID.Valid && pt.BranchID != p.BranchID.Int64):
+		case notFound(err) || (err == nil && p.BranchID.Valid && pt.BranchID != p.BranchID.Int64) ||
+			(err == nil && !s.placeAllowed(ctx, orgID, row, r, pt.BranchID)):
 			ve.add("point_uuid", "not_found", "service point was not found at the branch")
 		case err != nil:
 			return model.Inspection{}, err
@@ -861,4 +863,23 @@ func (s *Service) DeleteDamage(ctx context.Context, orgID int64, id, damageID uu
 		}
 	}
 	return s.after(ctx, orgID, id)
+}
+
+// placeAllowed reports whether a draft may be placed at branchID: its
+// current branch, one of the rental's planned branches (the caller already
+// acts on the rental) or a branch in the caller's scope.
+func (s *Service) placeAllowed(ctx context.Context, orgID int64, row db.GetInspectionRow, r rentalmodel.Rental, branchID int64) bool {
+	if (row.BranchID.Valid && row.BranchID.Int64 == branchID) || orgctx.CheckBranch(ctx, branchID) == nil {
+		return true
+	}
+	b, err := s.q.GetRentalBranchByID(ctx, db.GetRentalBranchByIDParams{OrganizationID: orgID, ID: branchID})
+	if err != nil {
+		return false
+	}
+	for _, pl := range []rentalmodel.Place{r.PlannedPickup, r.PlannedReturn} {
+		if pl.Branch != nil && pl.Branch.UUID == b.Uuid {
+			return true
+		}
+	}
+	return false
 }

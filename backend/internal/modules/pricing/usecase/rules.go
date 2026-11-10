@@ -9,6 +9,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/pricing/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/pricing/repository"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/pricing"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/pkg/money"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/pkg/rentaltime"
@@ -350,7 +351,8 @@ func (s *Service) applyRuleFields(ctx context.Context, q *db.Queries, orgID int6
 		st.Branches = nil
 		if ids := dedupe(*in.BranchUUIDs); len(ids) > 0 {
 			rows, err := q.ListPricingBranchesByUUIDs(ctx, db.ListPricingBranchesByUUIDsParams{OrganizationID: orgID, Uuids: ids})
-			if err != nil || len(rows) != len(ids) {
+			if err != nil || len(rows) != len(ids) || !branchesInScope(ctx, rows) {
+				// Outside the caller's branch scope reads like an unknown branch.
 				ve.add(f("branch_uuids"), "not_found", "branch was not found")
 			}
 			st.Branches = rows
@@ -412,6 +414,31 @@ func (s *Service) applyRuleFields(ctx context.Context, q *db.Queries, orgID int6
 	}
 	if in.ChangeNote != nil {
 		st.Note = checkText(ve, f("change_note"), *in.ChangeNote, 2000)
+	}
+}
+
+// branchesInScope reports whether every branch is in the caller's branch
+// scope.
+func branchesInScope(ctx context.Context, rows []db.ListPricingBranchesByUUIDsRow) bool {
+	for _, b := range rows {
+		if orgctx.CheckBranch(ctx, b.ID) != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// checkRuleBranches: a rule for every branch is head office data; a member
+// limited to some branches writes rules of their own branches only (the
+// branches a patch keeps included).
+func checkRuleBranches(ctx context.Context, ve *ValidationError, st ruleState) {
+	switch {
+	case st.AllBranches:
+		if orgctx.RequireAllBranches(ctx) != nil {
+			ve.add("all_branches", "not_allowed", "a rule for every branch needs access to every branch")
+		}
+	case !ve.has("branch_uuids") && !branchesInScope(ctx, st.Branches):
+		ve.add("branch_uuids", "not_found", "branch was not found")
 	}
 }
 
@@ -486,6 +513,7 @@ func (s *Service) CreateRule(ctx context.Context, orgID int64, in model.DateRule
 	name := checkRuleName(ve, in.Name, true)
 	st := defaultRuleState()
 	s.applyRuleFields(ctx, q, orgID, ve, "", &st, in.DateRuleFields, true)
+	checkRuleBranches(ctx, ve, st)
 	if err := ve.orNil(); err != nil {
 		return model.DateRule{}, err
 	}
@@ -606,6 +634,7 @@ func (s *Service) PatchRule(ctx context.Context, orgID int64, id uuid.UUID, in m
 		st := stateFromVersion(draft, targets[draft.ID])
 		fve := &ValidationError{}
 		s.applyRuleFields(ctx, q, orgID, fve, "", &st, in.DateRuleFields, false)
+		checkRuleBranches(ctx, fve, st)
 		if err := fve.orNil(); err != nil {
 			return err
 		}
