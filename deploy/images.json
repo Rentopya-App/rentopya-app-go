@@ -1,0 +1,9 @@
+{
+  "_comment": "Every compose.prod.yml service with a build context. CI (image-build, image-test-push and publish-images in .github/workflows/ci.yml) runs a matrix over `images`, so nothing is hardcoded: add an entry here (and the service in compose.prod.yml) to build and ship a new container. `service` becomes the GHCR image suffix: ghcr.io/<owner>/<repo>-<service>, lower-cased from the repository name. `context` and `dockerfile` are repo-relative. migrate and worker run the backend image; postgres, redis, seaweedfs, meilisearch, centrifugo and wuzapi are upstream images and are not listed.",
+  "images": [
+    { "service": "backend", "context": "backend", "dockerfile": "backend/Dockerfile" },
+    { "service": "frontend", "context": "frontend", "dockerfile": "frontend/Dockerfile" },
+    { "service": "site", "context": "site", "dockerfile": "site/Dockerfile" },
+    { "service": "backup", "context": ".", "dockerfile": "deploy/backup/Dockerfile" }
+  ]
+}

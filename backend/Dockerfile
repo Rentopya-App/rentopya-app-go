@@ -11,20 +11,36 @@ RUN go mod download
 
 COPY . .
 
+# Ops tools (messaging-reconcile: restore runbook, docs/operations/backup-restore.md
+# "Mesaj mutabakatı"). No release provenance, so this layer stays cached across releases.
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o /out/worker ./cmd/worker && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -trimpath -ldflags="-s -w" -o /out/create-super-admin ./cmd/create-super-admin && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -trimpath -ldflags="-s -w" -o /out/catalog-import ./cmd/catalog-import && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o /out/integration-jobs-reconcile ./cmd/integration-jobs-reconcile
-
-# Restore runbook tool (docs/operations/backup-restore.md "Mesaj mutabakatı").
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -ldflags="-s -w" -o /out/integration-jobs-reconcile ./cmd/integration-jobs-reconcile && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -trimpath -ldflags="-s -w" -o /out/messaging-reconcile ./cmd/messaging-reconcile
+
+# Release provenance (set by CI; local builds keep the defaults and report
+# "dev"). RELEASE_JSON_B64 is base64 so multi-line notes survive as one build
+# arg; it replaces the `{}` placeholder that internal/buildinfo embeds via
+# go:embed. Declared after the tool binaries above (a changed ARG invalidates
+# every later RUN), so only server/worker/release-record rebuild per release.
+ARG VERSION=
+ARG GIT_SHA=
+ARG BUILD_TIME=
+ARG RELEASE_JSON_B64=
+
+RUN if [ -n "${RELEASE_JSON_B64}" ]; then \
+      printf '%s' "${RELEASE_JSON_B64}" | base64 -d > internal/buildinfo/release.json; \
+    fi && \
+    BI="$(go list -m)/internal/buildinfo" && \
+    LDFLAGS="-s -w -X ${BI}.Version=${VERSION} -X ${BI}.GitSHA=${GIT_SHA} -X ${BI}.BuildTime=${BUILD_TIME}" && \
+    for cmd in server worker release-record; do \
+      CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+      go build -trimpath -ldflags="${LDFLAGS}" -o "/out/${cmd}" "./cmd/${cmd}" || exit 1; \
+    done
 
 FROM migrate/migrate:v4.19.1 AS migrate
 
@@ -46,6 +62,7 @@ WORKDIR /app
 COPY --from=migrate /usr/local/bin/migrate /usr/local/bin/migrate
 COPY --from=builder /out/server /app/server
 COPY --from=builder /out/worker /app/worker
+COPY --from=builder /out/release-record /app/release-record
 COPY --from=builder /out/create-super-admin /app/create-super-admin
 COPY --from=builder /out/catalog-import /app/catalog-import
 COPY --from=builder /out/integration-jobs-reconcile /app/integration-jobs-reconcile

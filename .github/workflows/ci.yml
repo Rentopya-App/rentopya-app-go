@@ -14,6 +14,10 @@ on:
         description: "Run the Playwright acceptance scenarios (full stack)"
         type: boolean
         default: true
+      push_test_images:
+        description: "Also push every image to GHCR as :test-<short-sha> (never latest / v0.*)"
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -65,6 +69,7 @@ jobs:
       mobile_release: ${{ steps.f.outputs.mobile_release }}
       workflows: ${{ steps.f.outputs.workflows }}
       full: ${{ steps.f.outputs.full }}
+      images: ${{ steps.f.outputs.images }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -151,7 +156,11 @@ jobs:
             done <<< "$pushed"
           fi
 
+          # Build-context images (deploy/images.json) for the image matrices.
+          images="$(jq -c '.images' deploy/images.json)"
+
           {
+            echo "images=$images"
             echo "backend=$backend"
             echo "frontend=$frontend"
             echo "site=$site"
@@ -496,6 +505,277 @@ jobs:
     secrets:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
+  # ---------------------------------------------------------------------------
+  # Images (TEC-1132). Every build-context service in deploy/images.json, as a
+  # matrix (nothing hardcoded). Image path is repo-derived and lower-cased:
+  # ghcr.io/<owner>/<repo>-<service>. Provenance goes in as build args
+  # (VERSION, GIT_SHA, BUILD_TIME, RELEASE_JSON_B64; only backend/Dockerfile
+  # consumes them) and OCI labels on every image.
+  # ---------------------------------------------------------------------------
+
+  # Every branch push (and dispatch): build every image, NO push. Part of the
+  # `ci` gate, so a broken Dockerfile or production build (the panel's
+  # `next build` runs only here) turns the branch red. Skipped on main pushes,
+  # where publish-images builds the same images.
+  image-build:
+    needs: changes
+    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - id: meta
+        run: |
+          echo "version=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Build ${{ matrix.image.service }} (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: false
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ steps.meta.outputs.built_at }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.built_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.service }}
+
+  # Optional test push, manual only: Actions → CI → Run workflow with
+  # "push_test_images" ticked. Pushes :test-<short-sha> and nothing else (never
+  # latest, :sha-*, or v0.*). Reuses image-build's gha cache.
+  image-test-push:
+    needs: [changes, image-build]
+    if: github.event_name == 'workflow_dispatch' && inputs.push_test_images && needs.image-build.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        env:
+          SERVICE: ${{ matrix.image.service }}
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY,,}"            # ghcr.io requires lowercase
+          {
+            echo "image=ghcr.io/${repo}-${SERVICE}"
+            echo "sha=${GITHUB_SHA::7}"
+            echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+      - name: Build and push ${{ matrix.image.service }}:test-${{ steps.meta.outputs.sha }}
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.image }}:test-${{ steps.meta.outputs.sha }}
+          build-args: |
+            VERSION=test-${{ steps.meta.outputs.sha }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ steps.meta.outputs.built_at }}
+          labels: |
+            org.opencontainers.image.version=test-${{ steps.meta.outputs.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.built_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image.service }}
+
+  # Main push: decide the release ONCE, before any image is built, so every
+  # image bakes the same provenance and release-tag cuts exactly this version.
+  #   version  next v0.N after the highest existing v0.* tag (none -> v0.1)
+  #   notes    `git log --no-merges` since the previous v0.* tag (whole history
+  #            for the first release), capped at 200 lines; no hand-kept CHANGELOG
+  #   release  base64 release.json {version, git_sha, built_at, notes}: the
+  #            backend embeds it (internal/buildinfo); cmd/release-record writes
+  #            it to app_releases when the migrate service runs on deploy.
+  #   label    the notes on one line, cut to 900 characters, for the
+  #            org.opencontainers.image.description label
+  release-meta:
+    needs: changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.m.outputs.version }}
+      built_at: ${{ steps.m.outputs.built_at }}
+      release_b64: ${{ steps.m.outputs.release_b64 }}
+      notes_b64: ${{ steps.m.outputs.notes_b64 }}
+      notes_label: ${{ steps.m.outputs.notes_label }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: m
+        env:
+          LC_ALL: C.UTF-8
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          last="$(git tag -l 'v0.*' | sed -n 's/^v0\.\([0-9]\+\)$/\1/p' | sort -n | tail -1)"
+          version="v0.$(( ${last:-0} + 1 ))"
+          if [ -n "$last" ]; then
+            range="v0.${last}..${GITHUB_SHA}"; since="since v0.${last}"
+          else
+            range="${GITHUB_SHA}"; since="(first release)"
+          fi
+          log="$(git log --no-merges --pretty='- %s (%h)' "$range")"
+          total="$(printf '%s\n' "$log" | grep -c '^- ' || true)"
+          notes="$(printf '%s\n' "$log" | head -n 200)"
+          if [ "${total:-0}" -gt 200 ]; then
+            notes="${notes}"$'\n'"- …and $(( total - 200 )) more commits ${since}."
+          fi
+          [ -n "$log" ] || notes="- No code changes ${since} (redeploy)."
+          built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          release_b64="$(jq -nc --arg v "$version" --arg s "$GITHUB_SHA" --arg b "$built_at" --arg n "$notes" \
+            '{version:$v, git_sha:$s, built_at:$b, notes:$n}' | base64 -w0)"
+          notes_b64="$(printf '%s\n' "$notes" | base64 -w0)"
+          # One line, no quotes or commas (the action parses the labels input as
+          # CSV), cut on a character boundary (C.UTF-8).
+          label="$(printf '%s' "$notes" | tr '\n' ' ' | tr -d '"' | tr ',' ';' | tr -s ' ')"
+          [ "${#label}" -le 900 ] || label="${label:0:897}..."
+          {
+            echo "version=$version"
+            echo "built_at=$built_at"
+            echo "release_b64=$release_b64"
+            echo "notes_b64=$notes_b64"
+            echo "notes_label=$label"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release $version ($since)"
+            echo
+            echo "$notes"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Main push, every test job green: build + push every image to GHCR as
+  # :sha-<short> and :v0.N (never latest). Any test job that failed, was
+  # cancelled OR was skipped blocks the publish (main always runs the full
+  # suite, so a skip means something went wrong). mobile has its own release
+  # track and does not gate the server images.
+  publish-images:
+    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, acceptance, release-meta]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      needs.commit-policy.result == 'success' &&
+      needs.prod-env.result == 'success' &&
+      needs.env.result == 'success' &&
+      needs.backend.result == 'success' &&
+      needs.frontend.result == 'success' &&
+      needs.site.result == 'success' &&
+      needs.acceptance.result == 'success' &&
+      needs.release-meta.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        env:
+          SERVICE: ${{ matrix.image.service }}
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY,,}"            # ghcr.io requires lowercase
+          echo "image=ghcr.io/${repo}-${SERVICE}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Build and push ${{ matrix.image.service }}
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.image }}:${{ needs.release-meta.outputs.version }}
+          build-args: |
+            VERSION=${{ needs.release-meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ needs.release-meta.outputs.built_at }}
+            RELEASE_JSON_B64=${{ needs.release-meta.outputs.release_b64 }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.release-meta.outputs.version }}
+            org.opencontainers.image.created=${{ needs.release-meta.outputs.built_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=${{ needs.release-meta.outputs.notes_label }}
+          cache-from: type=gha,scope=${{ matrix.image.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.service }}
+
+  # Every image is on GHCR -> cut the version release-meta chose (the one baked
+  # into the images): git tag v0.N plus a GitHub release with the notes.
+  # Re-runs are idempotent (tag at this commit / release already there).
+  release-tag:
+    needs: [release-meta, publish-images]
+    if: always() && needs.release-meta.result == 'success' && needs.publish-images.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Tag and release ${{ needs.release-meta.outputs.version }}
+        env:
+          TAG: ${{ needs.release-meta.outputs.version }}
+          NOTES_B64: ${{ needs.release-meta.outputs.notes_b64 }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          if existing="$(git rev-parse -q --verify "refs/tags/${TAG}^{commit}")"; then
+            if [ "$existing" != "$GITHUB_SHA" ]; then
+              echo "::error title=Tag taken::$TAG already exists at ${existing::7}, but the images were baked as $TAG for ${GITHUB_SHA::7}. Re-run the whole workflow so release-meta picks the next number."
+              exit 1
+            fi
+            echo "$TAG already points at ${GITHUB_SHA::7} (re-run)."
+          else
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$TAG"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+          else
+            printf '%s' "$NOTES_B64" | base64 -d > "$RUNNER_TEMP/notes.md"
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          echo "Released **$TAG** at \`${GITHUB_SHA::7}\`: images \`:$TAG\` and \`:sha-${GITHUB_SHA::7}\`." >> "$GITHUB_STEP_SUMMARY"
+
   # Feature branch pushed and the `ci` gate green → open (or reuse) a PR into
   # main and merge the tested commit. Opt out per push by putting
   # [no-automerge] in the head commit message. Not part of the `ci` gate.
@@ -568,7 +848,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, mobile, acceptance, mobile-release]
+    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, mobile, acceptance, mobile-release, image-build, image-test-push, release-meta, publish-images, release-tag]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate
