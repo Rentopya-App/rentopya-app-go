@@ -68,7 +68,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Rentopya uses the camera to scan vehicle QR labels and plates and to photograph the vehicle and its damage at handover and return.",
+          "cameraPermission": "Rentopya uses the camera to scan vehicle QR labels, plates and web sign-in QR codes and to photograph the vehicle and its damage at handover and return.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
@@ -79,7 +79,7 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Rentopya uses the camera to scan vehicle QR labels and plates and to photograph the vehicle and its damage at handover and return.",
+          "cameraPermission": "Rentopya uses the camera to scan vehicle QR labels, plates and web sign-in QR codes and to photograph the vehicle and its damage at handover and return.",
           "photosPermission": "Rentopya uses your photo library to attach vehicle photos taken earlier to a handover or return form.",
           "microphonePermission": false
         }

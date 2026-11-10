@@ -9,6 +9,7 @@ import { type ThemePreference, usePreferences } from '@/core/preferences';
 import { useSelectedBranch } from '@/core/tenant';
 import { signOutGoogle } from '@/features/auth/social';
 import { ReservationsMenuEntry } from '@/features/reservations/menu-entry';
+import { NotificationCenterRow } from '@/features/notifications/bell';
 import { UploadQueueRow } from '@/features/uploads/queue-row';
 import { PushSettingsRow } from '@/features/push/push-settings-row';
 import { Chips } from '@/ui/chips';
@@ -102,8 +103,10 @@ export function MenuScreen() {
                 icon="user"
                 title={`${me.user.name} ${me.user.surname}`.trim() || me.user.email}
                 subtitle={me.user.email}
+                onPress={() => router.push('/account')}
               />
             ) : null}
+            <NotificationCenterRow />
             <UploadQueueRow />
             <ListRow icon="signOut" title={t('sign_out')} tone="danger" onPress={() => confirmSignOut(t)} last />
           </List>
