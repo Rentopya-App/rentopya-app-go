@@ -85,6 +85,7 @@ Agents never run `eas` commands and never create tags. The owner does these step
 4. **iOS / App Store Connect.**
    - Create the identifier `com.rentopya.app` (team `N5T7KH96U3`) and the App Store Connect app.
    - Put its `ascAppId` under `submit.production.ios` in `eas.json`.
+   - Widget and Siri (TEC-1161): create the identifier `com.rentopya.app.widgets` and the App Group `group.com.rentopya.app`, and enable the App Group on both `com.rentopya.app` and `com.rentopya.app.widgets`. Xcode Cloud signs the extension target `ExpoWidgetsTarget` with these; EAS reads them from `extra.eas.build.experimental.ios.appExtensions`, which `expo-widgets` writes into the resolved config.
 5. **Xcode Cloud.**
    - In App Store Connect → Xcode Cloud, connect the GitHub repo.
    - Create a workflow for the `mobile/ios` project. Point it at the `Rentopya.xcworkspace` that prebuild generates.
@@ -116,5 +117,6 @@ Any change to native code or native configuration needs a new build. Examples:
 - the Expo SDK, React Native or config plugins;
 - permissions, entitlements or URL schemes (`release.env`);
 - icons, splash, Info.plist or AndroidManifest values.
+- the iOS widget list and sizes (`expo-widgets` in `app.json`), the App Intents and Siri phrases (`app-intents/`, `plugins/app-shortcuts/`). A layout change in `src/widgets/*.tsx` alone is JavaScript and ships as an OTA.
 
 With the `fingerprint` policy, these changes produce a new runtime version. CI then builds instead of publishing an OTA. You do not need to bump `expo.version` for this.

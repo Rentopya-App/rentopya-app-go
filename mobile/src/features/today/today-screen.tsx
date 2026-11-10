@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { RefreshControl, View } from 'react-native';
 
 import { useSession } from '@/core/auth/session';
+import { useTodayGlance } from '@/features/glance/use-glance';
 import { DEFAULT_TIME_ZONE, formatDay, formatMoney, formatShort, formatTime, localDate } from '@/core/format';
 import { useSelectedBranch } from '@/core/tenant';
 import { TodayHeaderActions } from '@/features/search/header-actions';
@@ -205,6 +206,7 @@ export function TodayScreen() {
   const now = useNow();
   const [pulling, setPulling] = useState(false);
   useRefetchOnFocus(overview, badges);
+  useTodayGlance(overview.data, overview.data?.branch?.name ?? null);
 
   const refresh = async () => {
     setPulling(true);
