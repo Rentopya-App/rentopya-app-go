@@ -39,6 +39,16 @@ const WEB = {
   invoices: 'invoices',
   suppliers: 'suppliers',
   profitability: 'profitability',
+  tenant_settings: 'tenant_settings',
+  tenant_members: 'tenant_members',
+  tenant_roles: 'tenant_roles',
+  invitations: 'invitations',
+  support_access: 'support_access',
+  permissions: 'permissions',
+  notification_engine: 'notification_engine',
+  whatsapp: 'whatsapp',
+  public_api: 'public_api',
+  site_leads: 'site_leads',
 };
 const WEB_NS = Object.values(WEB);
 

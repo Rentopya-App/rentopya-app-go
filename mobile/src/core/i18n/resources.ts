@@ -20,6 +20,7 @@ import tr_reservations_app from './locales/tr/reservations_app.json';
 import tr_returns from './locales/tr/returns.json';
 import tr_search from './locales/tr/search.json';
 import tr_settings from './locales/tr/settings.json';
+import tr_settings_app from './locales/tr/settings_app.json';
 import tr_today from './locales/tr/today.json';
 import tr_transfers_app from './locales/tr/transfers_app.json';
 import tr_update from './locales/tr/update.json';
@@ -46,6 +47,16 @@ import tr_reports from '../../../../frontend/src/locales/tr/reports.json';
 import tr_invoices from '../../../../frontend/src/locales/tr/invoices.json';
 import tr_suppliers from '../../../../frontend/src/locales/tr/suppliers.json';
 import tr_profitability from '../../../../frontend/src/locales/tr/profitability.json';
+import tr_tenant_settings from '../../../../frontend/src/locales/tr/tenant_settings.json';
+import tr_tenant_members from '../../../../frontend/src/locales/tr/tenant_members.json';
+import tr_tenant_roles from '../../../../frontend/src/locales/tr/tenant_roles.json';
+import tr_invitations from '../../../../frontend/src/locales/tr/invitations.json';
+import tr_support_access from '../../../../frontend/src/locales/tr/support_access.json';
+import tr_permissions from '../../../../frontend/src/locales/tr/permissions.json';
+import tr_notification_engine from '../../../../frontend/src/locales/tr/notification_engine.json';
+import tr_whatsapp from '../../../../frontend/src/locales/tr/whatsapp.json';
+import tr_public_api from '../../../../frontend/src/locales/tr/public_api.json';
+import tr_site_leads from '../../../../frontend/src/locales/tr/site_leads.json';
 import en_common from './locales/en/common.json';
 import en_account from './locales/en/account.json';
 import en_auth from './locales/en/auth.json';
@@ -66,6 +77,7 @@ import en_reservations_app from './locales/en/reservations_app.json';
 import en_returns from './locales/en/returns.json';
 import en_search from './locales/en/search.json';
 import en_settings from './locales/en/settings.json';
+import en_settings_app from './locales/en/settings_app.json';
 import en_today from './locales/en/today.json';
 import en_transfers_app from './locales/en/transfers_app.json';
 import en_update from './locales/en/update.json';
@@ -92,10 +104,20 @@ import en_reports from '../../../../frontend/src/locales/en/reports.json';
 import en_invoices from '../../../../frontend/src/locales/en/invoices.json';
 import en_suppliers from '../../../../frontend/src/locales/en/suppliers.json';
 import en_profitability from '../../../../frontend/src/locales/en/profitability.json';
+import en_tenant_settings from '../../../../frontend/src/locales/en/tenant_settings.json';
+import en_tenant_members from '../../../../frontend/src/locales/en/tenant_members.json';
+import en_tenant_roles from '../../../../frontend/src/locales/en/tenant_roles.json';
+import en_invitations from '../../../../frontend/src/locales/en/invitations.json';
+import en_support_access from '../../../../frontend/src/locales/en/support_access.json';
+import en_permissions from '../../../../frontend/src/locales/en/permissions.json';
+import en_notification_engine from '../../../../frontend/src/locales/en/notification_engine.json';
+import en_whatsapp from '../../../../frontend/src/locales/en/whatsapp.json';
+import en_public_api from '../../../../frontend/src/locales/en/public_api.json';
+import en_site_leads from '../../../../frontend/src/locales/en/site_leads.json';
 
-export const NAMESPACES = ['common', 'account', 'auth', 'customers_app', 'field_tasks', 'finance_app', 'fleet_ops_app', 'glance', 'inspections', 'nav', 'notifications', 'push', 'qr_login', 'quick_reservation', 'rentals_app', 'reports_app', 'reservations_app', 'returns', 'search', 'settings', 'today', 'transfers_app', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'customers', 'agreements', 'vehicles', 'vehicle_blocks', 'vehicle_records', 'rentals', 'inspections_web', 'reservations', 'availability', 'payments', 'customer_portal', 'finance', 'deposits', 'transfers', 'fleet_calendar', 'reports', 'invoices', 'suppliers', 'profitability'] as const;
+export const NAMESPACES = ['common', 'account', 'auth', 'customers_app', 'field_tasks', 'finance_app', 'fleet_ops_app', 'glance', 'inspections', 'nav', 'notifications', 'push', 'qr_login', 'quick_reservation', 'rentals_app', 'reports_app', 'reservations_app', 'returns', 'search', 'settings', 'settings_app', 'today', 'transfers_app', 'update', 'uploads', 'vehicles_app', 'errors', 'activity', 'customers', 'agreements', 'vehicles', 'vehicle_blocks', 'vehicle_records', 'rentals', 'inspections_web', 'reservations', 'availability', 'payments', 'customer_portal', 'finance', 'deposits', 'transfers', 'fleet_calendar', 'reports', 'invoices', 'suppliers', 'profitability', 'tenant_settings', 'tenant_members', 'tenant_roles', 'invitations', 'support_access', 'permissions', 'notification_engine', 'whatsapp', 'public_api', 'site_leads'] as const;
 
 export const resources = {
-  tr: { common: tr_common, account: tr_account, auth: tr_auth, customers_app: tr_customers_app, field_tasks: tr_field_tasks, finance_app: tr_finance_app, fleet_ops_app: tr_fleet_ops_app, glance: tr_glance, inspections: tr_inspections, nav: tr_nav, notifications: tr_notifications, push: tr_push, qr_login: tr_qr_login, quick_reservation: tr_quick_reservation, rentals_app: tr_rentals_app, reports_app: tr_reports_app, reservations_app: tr_reservations_app, returns: tr_returns, search: tr_search, settings: tr_settings, today: tr_today, transfers_app: tr_transfers_app, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, customers: tr_customers, agreements: tr_agreements, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records, rentals: tr_rentals, inspections_web: tr_inspections_web, reservations: tr_reservations, availability: tr_availability, payments: tr_payments, customer_portal: tr_customer_portal, finance: tr_finance, deposits: tr_deposits, transfers: tr_transfers, fleet_calendar: tr_fleet_calendar, reports: tr_reports, invoices: tr_invoices, suppliers: tr_suppliers, profitability: tr_profitability },
-  en: { common: en_common, account: en_account, auth: en_auth, customers_app: en_customers_app, field_tasks: en_field_tasks, finance_app: en_finance_app, fleet_ops_app: en_fleet_ops_app, glance: en_glance, inspections: en_inspections, nav: en_nav, notifications: en_notifications, push: en_push, qr_login: en_qr_login, quick_reservation: en_quick_reservation, rentals_app: en_rentals_app, reports_app: en_reports_app, reservations_app: en_reservations_app, returns: en_returns, search: en_search, settings: en_settings, today: en_today, transfers_app: en_transfers_app, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, customers: en_customers, agreements: en_agreements, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records, rentals: en_rentals, inspections_web: en_inspections_web, reservations: en_reservations, availability: en_availability, payments: en_payments, customer_portal: en_customer_portal, finance: en_finance, deposits: en_deposits, transfers: en_transfers, fleet_calendar: en_fleet_calendar, reports: en_reports, invoices: en_invoices, suppliers: en_suppliers, profitability: en_profitability },
+  tr: { common: tr_common, account: tr_account, auth: tr_auth, customers_app: tr_customers_app, field_tasks: tr_field_tasks, finance_app: tr_finance_app, fleet_ops_app: tr_fleet_ops_app, glance: tr_glance, inspections: tr_inspections, nav: tr_nav, notifications: tr_notifications, push: tr_push, qr_login: tr_qr_login, quick_reservation: tr_quick_reservation, rentals_app: tr_rentals_app, reports_app: tr_reports_app, reservations_app: tr_reservations_app, returns: tr_returns, search: tr_search, settings: tr_settings, settings_app: tr_settings_app, today: tr_today, transfers_app: tr_transfers_app, update: tr_update, uploads: tr_uploads, vehicles_app: tr_vehicles_app, errors: tr_errors, activity: tr_activity, customers: tr_customers, agreements: tr_agreements, vehicles: tr_vehicles, vehicle_blocks: tr_vehicle_blocks, vehicle_records: tr_vehicle_records, rentals: tr_rentals, inspections_web: tr_inspections_web, reservations: tr_reservations, availability: tr_availability, payments: tr_payments, customer_portal: tr_customer_portal, finance: tr_finance, deposits: tr_deposits, transfers: tr_transfers, fleet_calendar: tr_fleet_calendar, reports: tr_reports, invoices: tr_invoices, suppliers: tr_suppliers, profitability: tr_profitability, tenant_settings: tr_tenant_settings, tenant_members: tr_tenant_members, tenant_roles: tr_tenant_roles, invitations: tr_invitations, support_access: tr_support_access, permissions: tr_permissions, notification_engine: tr_notification_engine, whatsapp: tr_whatsapp, public_api: tr_public_api, site_leads: tr_site_leads },
+  en: { common: en_common, account: en_account, auth: en_auth, customers_app: en_customers_app, field_tasks: en_field_tasks, finance_app: en_finance_app, fleet_ops_app: en_fleet_ops_app, glance: en_glance, inspections: en_inspections, nav: en_nav, notifications: en_notifications, push: en_push, qr_login: en_qr_login, quick_reservation: en_quick_reservation, rentals_app: en_rentals_app, reports_app: en_reports_app, reservations_app: en_reservations_app, returns: en_returns, search: en_search, settings: en_settings, settings_app: en_settings_app, today: en_today, transfers_app: en_transfers_app, update: en_update, uploads: en_uploads, vehicles_app: en_vehicles_app, errors: en_errors, activity: en_activity, customers: en_customers, agreements: en_agreements, vehicles: en_vehicles, vehicle_blocks: en_vehicle_blocks, vehicle_records: en_vehicle_records, rentals: en_rentals, inspections_web: en_inspections_web, reservations: en_reservations, availability: en_availability, payments: en_payments, customer_portal: en_customer_portal, finance: en_finance, deposits: en_deposits, transfers: en_transfers, fleet_calendar: en_fleet_calendar, reports: en_reports, invoices: en_invoices, suppliers: en_suppliers, profitability: en_profitability, tenant_settings: en_tenant_settings, tenant_members: en_tenant_members, tenant_roles: en_tenant_roles, invitations: en_invitations, support_access: en_support_access, permissions: en_permissions, notification_engine: en_notification_engine, whatsapp: en_whatsapp, public_api: en_public_api, site_leads: en_site_leads },
 };
