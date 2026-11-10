@@ -16,6 +16,7 @@ import { i18n } from '@/core/i18n';
 import { applyThemePreference } from '@/core/preferences';
 import { persistOptions, queryClient } from '@/core/query';
 import { startUpdateChecks } from '@/core/updates';
+import { GlanceHost } from '@/features/glance/host';
 import { ErrorFallback } from '@/features/shell/error-fallback';
 import { LaunchVeil } from '@/features/shell/launch-veil';
 import { useNavigationTheme } from '@/features/shell/navigation-theme';
@@ -75,6 +76,7 @@ export default function RootLayout() {
               </Stack>
               <PushNotifications />
               <UpdateBanner />
+              <GlanceHost />
               <Toaster />
               <LaunchVeil />
             </ThemeProvider>

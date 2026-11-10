@@ -74,7 +74,10 @@ src/
                        api/ (typed client, refresh, errors), auth/ (tokens, session, permissions), tenant, branch
   features/            screens, one folder per area (shell, today, rentals, settings, auth, ...)
   ui/                  design system (tokens in src/global.css mirror the panel theme)
-app-intents/  modules/  plugins/  patches/  targets/   native scaffolds, empty for now (README in each)
+  widgets/             iOS Home Screen widget layouts (expo-widgets, run in the widget runtime)
+app-intents/         Siri / Shortcuts Swift (App Intents, inline modules)
+plugins/             config plugins (Siri phrases in Turkish)
+modules/  patches/  targets/   native scaffolds, empty for now (README in each)
 ```
 
 Rules (the same as the Takwim app):
@@ -118,14 +121,52 @@ Rules (the same as the Takwim app):
 
 ## Identities
 
-|                          | Value                                   |
-| ------------------------ | --------------------------------------- |
-| Name / slug / scheme     | `Rentopya` / `rentopya` / `rentopya://` |
-| Expo owner               | `furkanmeclis`                          |
-| iOS bundle id            | `com.rentopya.app` (team `N5T7KH96U3`)  |
-| Android package          | `com.rentopya.app`                      |
-| Widget extension (later) | `com.rentopya.app.widgets`              |
-| App Group (later)        | `group.com.rentopya.app`                |
+|                      | Value                                   |
+| -------------------- | --------------------------------------- |
+| Name / slug / scheme | `Rentopya` / `rentopya` / `rentopya://` |
+| Expo owner           | `furkanmeclis`                          |
+| iOS bundle id        | `com.rentopya.app` (team `N5T7KH96U3`)  |
+| Android package      | `com.rentopya.app`                      |
+| Widget extension     | `com.rentopya.app.widgets`              |
+| App Group            | `group.com.rentopya.app`                |
+
+## Widget and Siri (iOS)
+
+- **Widget** "Rentopya · Bugün" (small, medium; `src/widgets/today-widget.tsx`,
+  `expo-widgets`, extension `ExpoWidgetsTarget` = `com.rentopya.app.widgets`):
+  today's handover and return counts (`done/total`) and the next open job
+  (time, plate, customer initials, handover / return, "late" once due). Tap
+  opens `rentopya://` (Today); the medium widget's job opens
+  `rentopya://rentals/<uuid>`. Brand colours from `docs/brand.md`.
+- **Data**: the widget and Siri never call the API or hold a token. Whenever
+  the Today screen's `/v1/tenant/overview` loads (mount, focus, pull, 5 min
+  poll, branch or language change) `src/features/glance` writes a compact
+  JSON summary to the App Group `group.com.rentopya.app`: the widget timeline
+  (reloaded on each changed write) and a copy for the App Intents
+  (`RentopyaGlance` inline module). The serializer is pure and tested
+  (`summary.ts`). Timeline: an entry now, every 15 minutes and at each job's
+  due time until the organization's day ends, then a "open the app" entry.
+  Sign-out or another organization clears it. Not written on push receipt
+  yet (the app has no push handler on this base).
+- **Siri / Shortcuts** (`app-intents/`, tr + en phrases): "Rentopya bugünkü
+  teslimler" (counts + next job, spoken and as a card, app stays shut),
+  "Rentopya sıradaki iş", "Rentopya'da bugünü aç", "Rentopya'da araç bul"
+  (asks for the plate; one hit opens `/vehicle/<uuid>`, else `/vehicles?q=`,
+  needs `tenant.vehicles.read`).
+- **Android**: no widget yet (`expo-widgets` Android support stays off); the
+  writer is a no-op on Android and web.
+- **Native fingerprint**: the widget extension, App Group entitlement, App
+  Intents and phrases are native: the first release with them, and any change
+  to `app-intents/`, `plugins/` or the `expo-widgets` / `expo-app-intents`
+  entries in `app.json` (a new widget, a new size), changes the runtime
+  fingerprint and needs a store build, not an OTA update. A layout change in
+  `src/widgets/*.tsx` is JavaScript (the app registers the layout at run time)
+  and reaches the widget with the next OTA and app write. The Apple identifier
+  `com.rentopya.app.widgets` and the App Group `group.com.rentopya.app` must
+  exist on the team and be enabled on both identifiers (EAS creates them with
+  `eas credentials`; Xcode Cloud needs them in the provisioning profiles).
+  Verified so far by `expo prebuild` only (targets, entitlements, Siri strings);
+  the Swift and widget have not been compiled or run on a device yet.
 
 ## Release
 
