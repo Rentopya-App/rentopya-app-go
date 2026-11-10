@@ -157,7 +157,7 @@ prod-config:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml config
 
 # Prebuilt images (TEC-1133): CI publishes them to GHCR and the server pulls
-# ${IMAGE_REPO}-<service>:${IMAGE_TAG} (set IMAGE_TAG=v0.N in the env file);
+# ${IMAGE_REPO}-<service>:${IMAGE_TAG} (IMAGE_TAG=latest from the schema, or v0.N to pin);
 # nothing is built on the host.
 prod-up:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml up -d

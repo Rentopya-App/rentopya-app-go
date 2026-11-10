@@ -30,9 +30,10 @@
 ## Yolcu360, Obilet, WhatsApp sessions) are per organization, sealed in the
 ## integration vault: never add env keys for them.
 
-@version 14
+@version 15
 
 ## v14 (TEC-1133): images are pulled from GHCR, never built on the server.
+## v15: IMAGE_TAG defaults to latest (CI moves it after every green main push).
 @remove BACKEND_IMAGE 14
 @remove FRONTEND_IMAGE 14
 @remove SITE_IMAGE 14
@@ -42,12 +43,13 @@ NAME_PREFIX | const:rentopia
 # Images are prebuilt by CI and pulled, never built on the server (TEC-1133):
 # compose.prod.yml runs {IMAGE_REPO}-<service>:{IMAGE_TAG} for backend
 # (also migrate, worker), frontend, site and backup (deploy/images.json).
-# CI publishes :sha-<short> and :v0.N on every green main push (never latest).
-# IMAGE_TAG has no default on purpose: set it to the release to run (v0.N);
-# Dokploy sets it per deploy, compose refuses to start without it.
+# CI publishes :sha-<short> and :v0.N on every green main push, then moves
+# :latest to that commit and only after that pushes the v0.N git tag that
+# triggers the Dokploy deploy. IMAGE_TAG=latest: every release deploys itself.
+# To pin or roll back, set IMAGE_TAG=v0.N; set latest again to resume.
 # Private packages: add a ghcr.io registry (read:packages token) in Dokploy.
 IMAGE_REPO | const:ghcr.io/rentopya-app/rentopya-app-go
-IMAGE_TAG | empty
+IMAGE_TAG | const:latest
 
 # --- Public URLs (from APP_URL) ---
 APP_URL | ask:APP_URL

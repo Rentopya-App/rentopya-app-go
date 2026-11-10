@@ -196,13 +196,14 @@ jobs:
       - name: Generate env from schema and validate prod compose
         run: |
           scripts/prod-env.sh init -o "$RUNNER_TEMP/prod.env" --app-url https://ci.example.com
-          # IMAGE_TAG has no schema default: the deploy sets the release (v0.N).
-          IMAGE_TAG=v0.0 docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q
-          IMAGE_TAG=v0.0 docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml -f compose.build.yml config -q
-          # Without IMAGE_TAG compose must refuse to start.
-          if docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q 2>/dev/null; then
-            echo "::error::compose.prod.yml resolved without IMAGE_TAG"; exit 1
-          fi
+          # The schema sets IMAGE_TAG=latest (moved by promote-latest); a pin
+          # (v0.N) must still win over it.
+          docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q
+          docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml -f compose.build.yml config -q
+          images="$(docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config --images)"
+          grep -q -- '-backend:latest$' <<<"$images" || { echo "::error::schema env does not resolve to :latest"; exit 1; }
+          images="$(IMAGE_TAG=v0.0 docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config --images)"
+          grep -q -- '-backend:v0.0$' <<<"$images" || { echo "::error::IMAGE_TAG pin is not honoured"; exit 1; }
           scripts/prod-env.sh check "$RUNNER_TEMP/prod.env"
 
   # deploy/env/schema stays the source of truth (docs/design/env-core.md):
@@ -675,9 +676,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Main push, every test job green: build + push every image to GHCR as
-  # :sha-<short> and :v0.N (never latest). Any test job that failed, was
-  # cancelled OR was skipped blocks the publish (main always runs the full
-  # suite, so a skip means something went wrong). mobile has its own release
+  # :sha-<short> and :v0.N (promote-latest then moves :latest). Any test job
+  # that failed, was cancelled OR was skipped blocks the publish (main always
+  # runs the full suite, so a skip means something went wrong). mobile has its own release
   # track and does not gate the server images.
   publish-images:
     needs: [changes, commit-policy, prod-env, env, backend, frontend, site, acceptance, release-meta]
@@ -742,12 +743,72 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.service }}
 
-  # Every image is on GHCR -> cut the version release-meta chose (the one baked
-  # into the images): git tag v0.N plus a GitHub release with the notes.
+  # Every image of this commit is on GHCR -> point :latest at them, so the
+  # server can run IMAGE_TAG=latest and every release deploys without editing
+  # the tag. No rebuild: :latest becomes the exact digest that was tested and
+  # pushed as :sha-<short>. Runs only after the whole publish matrix passed
+  # (main push, every test gate green), so :latest never mixes commits.
+  # Never moves :latest backwards: when main has moved on since this run
+  # started, the newer run promotes its own images instead.
+  # Same GITHUB_TOKEN scope as publish-images (packages: write); PR and fork
+  # builds never reach this job.
+  promote-latest:
+    needs: [changes, release-meta, publish-images]
+    if: always() && needs.release-meta.result == 'success' && needs.publish-images.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Skip when main has moved on
+        id: head
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          head="$(gh api "repos/${GH_REPO}/commits/main" --jq .sha)"
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "promote=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "promote=false" >> "$GITHUB_OUTPUT"
+            echo "main is at ${head::7}, not ${GITHUB_SHA::7}: leaving :latest to the newer run." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: steps.head.outputs.promote == 'true'
+        uses: docker/setup-buildx-action@v4
+      - if: steps.head.outputs.promote == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Point :latest at sha-${{ github.sha }}
+        if: steps.head.outputs.promote == 'true'
+        env:
+          IMAGES: ${{ needs.changes.outputs.images }}
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY,,}"            # ghcr.io requires lowercase
+          sha="${GITHUB_SHA::7}"
+          for service in $(jq -r '.[].service' <<<"$IMAGES"); do
+            image="ghcr.io/${repo}-${service}"
+            docker buildx imagetools create --tag "${image}:latest" "${image}:sha-${sha}"
+            echo "${image}:latest -> sha-${sha}" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+  # Every image is on GHCR and :latest moved -> cut the version release-meta
+  # chose (the one baked into the images): git tag v0.N plus a GitHub release
+  # with the notes. The tag is what triggers the Dokploy deploy, so it comes
+  # last: by then IMAGE_TAG=latest already resolves to this commit.
   # Re-runs are idempotent (tag at this commit / release already there).
   release-tag:
-    needs: [release-meta, publish-images]
-    if: always() && needs.release-meta.result == 'success' && needs.publish-images.result == 'success'
+    needs: [release-meta, publish-images, promote-latest]
+    if: >-
+      always() &&
+      needs.release-meta.result == 'success' &&
+      needs.publish-images.result == 'success' &&
+      needs.promote-latest.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -854,7 +915,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, mobile, acceptance, mobile-release, image-build, image-test-push, release-meta, publish-images, release-tag]
+    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, mobile, acceptance, mobile-release, image-build, image-test-push, release-meta, publish-images, promote-latest, release-tag]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate
