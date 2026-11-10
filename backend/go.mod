@@ -83,6 +83,7 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/furkanmeclis/go-ubltr/render => github.com/furkanmeclis/go-ubltr/render v0.0.0-20260816110918-5b412e96178d
