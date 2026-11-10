@@ -7,6 +7,7 @@ import { isApiError } from '@/core/api/errors';
 import { Permission, useCan } from '@/core/auth/permissions';
 import { formatCalendarDate, formatMoney, formatNumber, formatRelative, formatShort } from '@/core/format';
 import { apiErrorMessage } from '@/core/i18n';
+import { PlanMaintenanceButton } from '@/features/fleet-ops/maintenance-screens';
 import { Button } from '@/ui/button';
 import { Card } from '@/ui/card';
 import { EmptyState } from '@/ui/empty-state';
@@ -337,6 +338,7 @@ function Maintenance({ uuid }: { uuid: string }) {
   return (
     <View>
       <SectionHeader title={t('vehicle_records:maintenance.title')} />
+      <PlanMaintenanceButton vehicle={uuid} />
       <QueryState query={items} rows={2}>
         {(data) => {
           // Open plans first (the API's order), then the three latest done.
