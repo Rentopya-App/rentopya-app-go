@@ -106,15 +106,15 @@ Ayrıntılı dosya listeleri ve riskler ilgili Linear issue'larında.
 |---|---|---|---|---|
 | İP-1 | Güvenlik: güvenilir proxy arkasında istemci IP'si | `529ed47` | TEC-1163 | birleşti (#7) |
 | İP-2 | Güvenlik: depolama yükleme gövdesi sınırı | `2c0ed87`, `43a0cb4` | TEC-1164 | birleşti (#9) |
-| İP-3 | Güvenlik: SMTP zaman aşımı ve TLS modları | `ac23b89` | TEC-1165 | PR açık (#10) |
-| İP-4 | Güvenlik: bildirim gelen kutusu ve güvenlik e-postası sırları | `4141d63` (gelen kutusu), `8686dc6` | TEC-1166 | açık |
-| İP-5 | Güvenlik: davet ve üyelik sertleştirmesi | `4141d63` (davet, üye) | TEC-1167 | açık |
+| İP-3 | Güvenlik: SMTP zaman aşımı ve TLS modları | `ac23b89` | TEC-1165 | birleşti (#10) |
+| İP-4 | Güvenlik: bildirim gelen kutusu ve güvenlik e-postası sırları | `4141d63` (gelen kutusu), `8686dc6` | TEC-1166 | birleşti (#24) |
+| İP-5 | Güvenlik: davet ve üyelik sertleştirmesi | `4141d63` (davet, üye) | TEC-1167 | birleşti |
 | İP-6 | Frontend düzeltmeleri ve araç zinciri | `a3b4961`, `917a4f2`, `7a76aec`, `57244d8` | TEC-1168 | birleşti (#5) |
 | İP-7 | Güvenlik: prod gizli anahtar koruması ve süper admin aracı | `8cd2080`, `b82338c`, `f077b5f` | TEC-1169 (süper admin varsayılanları), TEC-1130 (secret guard) | birleşti (#8, #3) |
 | İP-8 | CI/CD: şema tabanlı prod env çekirdeği | `5478a7d`, `c33cb26`, `46ab039`, `85ddaec`, `8c5c2c2`, `48c1a22`, `b046965`, `ece3989` | TEC-1130 | birleşti (#3) |
-| İP-9 | CI/CD: GHCR imaj yayını, v0.N etiketleri, sürüm kaydı | `0796eb4`, `26fac85`, `bd2e26c`, `84840de`, `2b9982b`, `2e0a092`, `647be7a` (mobil hariç), `b012eb3` (expo hariç), `24d1b20`, `1c94dfd` | TEC-1131, TEC-1132, TEC-1133 | CI iskeleti birleşti (TEC-1131, #15); GHCR, etiket ve sürüm kaydı açık. Deploy dokümanı TEC-1134 |
-| İP-10 | Modül self-registration altyapısı (adım 1), tüm mux için route ↔ OpenAPI testi | `6dd4c13` | TEC-1171 | PR |
-| İP-11 | Skill ve doküman senkronu (`.agents/skills`, `llms.txt`, `CONTRIBUTING.md`, `docs/`) | `59bab48` (skill), `b046965`, `9339e09`, `f077b5f` (doküman kısımları) | TEC-1172 | PR |
+| İP-9 | CI/CD: GHCR imaj yayını, v0.N etiketleri, sürüm kaydı | `0796eb4`, `26fac85`, `bd2e26c`, `84840de`, `2b9982b`, `2e0a092`, `647be7a` (mobil hariç), `b012eb3` (expo hariç), `24d1b20`, `1c94dfd` | TEC-1131, TEC-1132, TEC-1133, TEC-1134 | birleşti (#15, #22, #32, #44) |
+| İP-10 | Modül self-registration altyapısı (adım 1), tüm mux için route ↔ OpenAPI testi | `6dd4c13` | TEC-1171 | birleşti (#31) |
+| İP-11 | Skill ve doküman senkronu (`.agents/skills`, `llms.txt`, `CONTRIBUTING.md`, `docs/`) | `59bab48` (skill), `b046965`, `9339e09`, `f077b5f` (doküman kısımları) | TEC-1172 | birleşti |
 
 Gelmeyecekler (ATLA): `8fdc26f`. `647be7a` ve `b012eb3`'ün mobil kısımları boilerplate'ten gelmez; Rentopya'nın mobil CI'ı TEC-1139'da otopoly modeliyle yazılır.
 
@@ -159,3 +159,9 @@ Kısa yollar Rentopya'da `backend/internal/` veya `frontend/src/` altındadır. 
 9. iOS build Xcode Cloud, Android EAS Build.
 10. Mobil testler `node --test`. `mobile-release.sh` testleri sıfırdan yazılır (otopoly'de yok).
 11. ATLA: `8fdc26f` (Rentopya'da tenancy her zaman açık). `59bab48`'den yalnızca `mobile-ci` skill fikri alındı (TEC-1172); mobil CI ve release TEC-1139'da otopoly modeliyle yazılır.
+12. Migration numaraları: `000139` TEC-1137, `000140` TEC-1166, `000141` TEC-1132, `000142` TEC-1199. Bir sonraki boş numara `000143`.
+13. Bir `openapi.yaml` değişikliği hem frontend (`pnpm api:generate`) hem mobil (`npm run api:generate`) tiplerini yeniden üretir; `npm run api:check` geçmelidir.
+14. GitHub Actions faturalandırma yüzünden durduğunda (repo public yapılınca çözüldü) birkaç PR yerel kontrollerle birleştirildi; ardından `cc-collective-branch`'in tam CI koşusu yeşil geçti. Mobil PR'lar rebase sonrası yerel kontrollerle (tsc, lint, test, i18n, api:check) birleştirildi; son doğrulama `cc-collective-branch → main` PR'ının tam CI koşusudur.
+15. Makine yenilenince global git kimliği bir AI kimliğine dönmüştü. Kimlik düzeltildi; açık dallar yeniden yazıldı ve `cc-collective-branch` geçmişi yalnızca yazar/committer alanları değişecek şekilde (ağaç aynı) bir kez yeniden yazıldı.
+16. Mobil modüllerin ilk turu: rezervasyon, kiralama, teslim/iade, saha, araç, müşteri, tahsilat ve hesap tam işlemli; raporlar/muhasebe, yapılandırma ve ayarların bir kısmı salt okunur, karmaşık düzenleyiciler "panelde aç" ile panele gider. Ayrıntı her issue'nun PR açıklamasında.
+17. Apple Watch uygulaması (TEC-1162, opsiyonel) bu turda yapılmadı.
