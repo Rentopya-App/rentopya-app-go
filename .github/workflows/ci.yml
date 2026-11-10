@@ -196,7 +196,13 @@ jobs:
       - name: Generate env from schema and validate prod compose
         run: |
           scripts/prod-env.sh init -o "$RUNNER_TEMP/prod.env" --app-url https://ci.example.com
-          docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q
+          # IMAGE_TAG has no schema default: the deploy sets the release (v0.N).
+          IMAGE_TAG=v0.0 docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q
+          IMAGE_TAG=v0.0 docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml -f compose.build.yml config -q
+          # Without IMAGE_TAG compose must refuse to start.
+          if docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q 2>/dev/null; then
+            echo "::error::compose.prod.yml resolved without IMAGE_TAG"; exit 1
+          fi
           scripts/prod-env.sh check "$RUNNER_TEMP/prod.env"
 
   # deploy/env/schema stays the source of truth (docs/design/env-core.md):

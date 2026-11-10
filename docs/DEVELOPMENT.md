@@ -103,20 +103,27 @@ Production never starts from a copy of `.env.example`. The env comes from `deplo
 
 1. `make prod-env`: asks only for the public app URL (e.g. `https://panel.example.com`), derives every URL from it and generates all secrets and the VAPID pair into `.env.server` (mode 600). Centrifugo gets `realtime.<app host>`; edit `REALTIME_HOST` and the two Centrifugo URLs if you want another host. Company sites answer on `{subdomain}.<host of SITE_BASE_URL>` (default: the app host).
    Fill `SMTP_*` yourself. TEC-1165 adds `SMTP_TLS` (`auto`: implicit TLS on port 465, STARTTLS required on any other port; `starttls` / `implicit` force one; `none` is refused in production) and `SMTP_TIMEOUT` (default `10s`). Leave `TRUSTED_PROXIES` empty behind Traefik on the docker networks (loopback + private ranges are trusted); list your proxies' CIDRs if another proxy sits in front, or `none` to ignore `X-Forwarded-For`.
-2. `make prod-env-check`, then `make prod-config` and `make prod-up`. On Dokploy, paste `.env.server` into the compose app's environment and point the frontend domain at port 3000, the Centrifugo domain at port 8000 and the wildcard site domain (`*.<app host>`) at the `site` service, port 3000.
+2. Set `IMAGE_TAG` to the release to run (`v0.N`, see [Images](#images-ghcr)), then `make prod-env-check`, `make prod-config` and `make prod-up`. On Dokploy, paste `.env.server` into the compose app's environment and point the frontend domain at port 3000, the Centrifugo domain at port 8000 and the wildcard site domain (`*.<app host>`) at the `site` service, port 3000.
 3. Plain Docker host only (Dokploy creates it for you): `docker network create dokploy-network` once
 
-Images are built on the server today (`*_IMAGE` = `{NAME_PREFIX}-*:latest`). Prebuilt GHCR images with `v0.N` tag deploys come with the CI/CD port (İP-9 in [BOILERPLATE_SYNC.md](./BOILERPLATE_SYNC.md)); this section changes then.
+### Images (GHCR)
 
-### Plain Docker host with automatic updates
+The server does not build the app images. CI builds every service in `deploy/images.json` and, on a green `main` push, publishes `ghcr.io/rentopya-app/rentopya-app-go-<service>` as `:sha-<short>` and `:v0.N` (never `latest`). `compose.prod.yml` runs `${IMAGE_REPO}-<service>:${IMAGE_TAG}` for `backend` (also `migrate` and `worker`), `frontend`, `site` and `backup`, with `pull_policy: ${IMAGE_PULL_POLICY:-always}`.
 
-`scripts/server-sync.sh` (or `make prod-sync`) follows `main` (only CI-green commits reach it): when `origin/main` moved it fast-forwards, upgrades `.env.server` if the env schema changed, runs `docker compose up -d --build`, waits for the backend to be healthy and prunes old images. One run at a time (flock). Cron example:
+- `IMAGE_REPO` comes from the schema (`ghcr.io/rentopya-app/rentopya-app-go`).
+- `IMAGE_TAG` has no default: compose refuses to start without it. On Dokploy set it in the compose app's environment to the release being deployed (`v0.N`); to roll back, set the previous `v0.N` and redeploy (migrations are not reverted).
+- Private packages: add a `ghcr.io` registry with a `read:packages` token in Dokploy (plain host: `docker login ghcr.io`).
+- Build on the host instead (smoke test of an unreleased commit): `make prod-build` / `make prod-up-build` use the `compose.build.yml` override, which adds the `build:` sections back (contexts as in `deploy/images.json`) under the same image names. Use a non-release tag such as `IMAGE_TAG=local`.
+
+### Plain Docker host with automatic updates (deprecated)
+
+`scripts/server-sync.sh` (or `make prod-sync`) is kept for the current plain-host cron until production is switched to Dokploy pulling GHCR images. It follows `main` (only CI-green commits reach it): when `origin/main` moved it fast-forwards, upgrades `.env.server` if the env schema changed, starts the stack, waits for the backend to be healthy and prunes old images. One run at a time (flock). `SYNC_MODE=build` (default, the previous behaviour) builds the images on the host with `compose.build.yml` under `IMAGE_TAG=local`; `SYNC_MODE=pull` pulls the `:sha-<short>` images CI published for the target commit instead (needs `docker login ghcr.io`) and only moves the checkout once the pull succeeded. Cron example:
 
 ```
 */5 * * * * /opt/rentopia/scripts/server-sync.sh >> /var/log/rentopia-sync.log 2>&1
 ```
 
-Rollback: `touch .sync-paused`, `git checkout <previous sha>`, `scripts/server-sync.sh --force` (rebuilds the checked-out commit without pulling; migrations are not reverted). Remove `.sync-paused` to resume. First admin: `make prod-super-admin SA_EMAIL=…` (runs `/app/create-super-admin` inside the backend container; without `SA_PASSWORD` it prints a generated password once, see [Super admin](#super-admin)). TSB list import from the host: `docker compose --env-file .env.server -f compose.prod.yml exec backend /app/catalog-import -file /path/in/container.xlsx -apply` (or use Platform → Araç kataloğu → Aktarımlar).
+Rollback: `touch .sync-paused`, `git checkout <previous sha>`, `scripts/server-sync.sh --force` (redeploys the checked-out commit without pulling git; migrations are not reverted). Remove `.sync-paused` to resume. First admin: `make prod-super-admin SA_EMAIL=…` (runs `/app/create-super-admin` inside the backend container; without `SA_PASSWORD` it prints a generated password once, see [Super admin](#super-admin)). TSB list import from the host: `docker compose --env-file .env.server -f compose.prod.yml exec backend /app/catalog-import -file /path/in/container.xlsx -apply` (or use Platform → Araç kataloğu → Aktarımlar).
 
 ### Upgrading the env for a new release
 
