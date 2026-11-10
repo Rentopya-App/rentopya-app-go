@@ -17,24 +17,25 @@ name: ${COMPOSE_PROJECT_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-prod}
 # deploy/images.json; the server does NOT build them. Each one is
 # ${IMAGE_REPO}-<service>:${IMAGE_TAG}, the <service> suffix matching
 # images.json exactly (backend: also migrate and worker; frontend; site;
-# backup). IMAGE_TAG has no default: Dokploy sets it to the release tag v0.N
-# (or a :sha-<short> of main). IMAGE_PULL_POLICY defaults to "always" so a
-# redeploy fetches the tag. Build on the host instead (smoke tests, the legacy
+# backup). IMAGE_TAG defaults to latest, which CI moves to every green main
+# commit before it tags v0.N (the tag triggers the Dokploy deploy). Pin a
+# release (or roll back) with IMAGE_TAG=v0.N. IMAGE_PULL_POLICY defaults to
+# "always" so a redeploy fetches the tag. Build on the host instead (smoke tests, the legacy
 # server-sync cron): add -f compose.build.yml (make prod-build).
 x-backend-image: &backend-image
-  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-backend:${IMAGE_TAG:?IMAGE_TAG is required (v0.N)}
+  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-backend:${IMAGE_TAG:-latest}
   pull_policy: ${IMAGE_PULL_POLICY:-always}
 
 x-frontend-image: &frontend-image
-  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-frontend:${IMAGE_TAG:?IMAGE_TAG is required (v0.N)}
+  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-frontend:${IMAGE_TAG:-latest}
   pull_policy: ${IMAGE_PULL_POLICY:-always}
 
 x-site-image: &site-image
-  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-site:${IMAGE_TAG:?IMAGE_TAG is required (v0.N)}
+  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-site:${IMAGE_TAG:-latest}
   pull_policy: ${IMAGE_PULL_POLICY:-always}
 
 x-backup-image: &backup-image
-  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-backup:${IMAGE_TAG:?IMAGE_TAG is required (v0.N)}
+  image: ${IMAGE_REPO:?IMAGE_REPO is required (ghcr.io/<owner>/<repo>)}-backup:${IMAGE_TAG:-latest}
   pull_policy: ${IMAGE_PULL_POLICY:-always}
 
 x-backend-environment: &backend-environment

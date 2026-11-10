@@ -7,8 +7,9 @@ Sunucu uygulama imajlarını derlemez. CI her `main` push'unda imajları GHCR'a 
 1. İş, bir özellik dalından PR ile `main`'e birleşir (şimdilik `cc-collective-branch` üzerinden, bkz. [Sahibin kontrol listesi](#sahibin-kontrol-listesi)).
 2. `main` push'unda `.github/workflows/ci.yml` tüm paketi koşar (alan filtresi yok).
 3. `release-meta` sürüm numarasını seçer: mevcut en yüksek `v0.*` etiketi + 1 (hiç yoksa `v0.1`). Sürüm notları önceki `v0.*` etiketinden bu yana `git log --no-merges` (en fazla 200 satır).
-4. `publish-images`, yalnız test işlerinin hepsi (`commit-policy`, `prod-env`, `env`, `backend`, `frontend`, `site`, `acceptance`) başarılıysa çalışır; biri başarısız, iptal ya da atlanmışsa yayın olmaz. [`deploy/images.json`](../../deploy/images.json) içindeki her servis için (`backend`, `frontend`, `site`, `backup`) `ghcr.io/rentopya-app/rentopya-app-go-<servis>` imajını iki etiketle iter: `:sha-<kısa sha>` ve `:v0.N`. `latest` hiç kullanılmaz.
-5. `release-tag`, bütün imajlar GHCR'dayken git etiketi `v0.N`'i ve notlarıyla bir GitHub release oluşturur.
+4. `publish-images`, yalnız test işlerinin hepsi (`commit-policy`, `prod-env`, `env`, `backend`, `frontend`, `site`, `acceptance`) başarılıysa çalışır; biri başarısız, iptal ya da atlanmışsa yayın olmaz. [`deploy/images.json`](../../deploy/images.json) içindeki her servis için (`backend`, `frontend`, `site`, `backup`) `ghcr.io/rentopya-app/rentopya-app-go-<servis>` imajını iki etiketle iter: `:sha-<kısa sha>` ve `:v0.N`.
+5. `promote-latest`, matrisin tamamı başarılıysa her servisin `:latest` etiketini bu commit'in `:sha-<kısa sha>` imajına taşır (yeniden derleme yok, aynı digest). `main` bu arada ilerlediyse `:latest`'e dokunmaz; onu yeni koşu taşır, böylece `:latest` geriye gitmez.
+6. `release-tag`, `:latest` taşındıktan sonra git etiketi `v0.N`'i ve notlarıyla bir GitHub release oluşturur. Dokploy'u tetikleyen bu etikettir; o anda `latest` zaten yeni sürümü gösterir.
 
 İmaja gömülenler: sürüm, git SHA, derleme zamanı ve notlar (`backend/internal/buildinfo`, OCI etiketleri). Backend bunları `/healthz` yanıtında verir:
 
@@ -20,10 +21,16 @@ Dal derlemelerinde `version` `sha-<kısa>`, yerelde `dev` olur. Mobil uygulama b
 
 ## Dokploy bir sürümü nasıl dağıtır
 
-Compose uygulaması `compose.prod.yml`'ı kullanır; `backend` (ayrıca `migrate` ve `worker`), `frontend`, `site` ve `backup` servisleri `${IMAGE_REPO}-<servis>:${IMAGE_TAG}` imajını `pull_policy: always` ile çeker. `IMAGE_REPO` şemadan gelir (`ghcr.io/rentopya-app/rentopya-app-go`); `IMAGE_TAG`'in varsayılanı yoktur, boşsa compose başlamaz.
+Compose uygulaması `compose.prod.yml`'ı kullanır; `backend` (ayrıca `migrate` ve `worker`), `frontend`, `site` ve `backup` servisleri `${IMAGE_REPO}-<servis>:${IMAGE_TAG}` imajını `pull_policy: always` ile çeker. `IMAGE_REPO` ve `IMAGE_TAG=latest` şemadan gelir.
 
-1. GitHub → Releases'tan dağıtılacak sürümü seçin (`v0.N`), notlarını okuyun. Notlarda env değişikliği varsa önce [Env yükseltme](#env-yükseltme) adımını yapın.
-2. Dokploy → compose uygulaması → Environment: `IMAGE_TAG=v0.N`, kaydedin.
+Normal akış elle iş istemez: compose uygulamasının tetikleyicisi **On Tag** ve `IMAGE_TAG=latest` iken her yeni `v0.N` etiketi dağıtımı başlatır, `pull_policy: always` yeni `latest`'i çeker. Şema `@version`'ını artıran bir PR'ı `main`'e birleştirmeden **önce** [Env yükseltme](#env-yükseltme) adımını yapın; birleşince dağıtım kendiliğinden başlar ve eksik anahtarla açılır.
+
+Güvenlik: `:latest`'i yalnız `main` push'undaki `promote-latest` işi taşır, o da bütün test işleri ve imaj yayını başarılıysa. PR ve fork derlemeleri bu işe ulaşmaz (dal derlemeleri imaj itmez, elle test yayını yalnız `:test-<sha>` iter). Yazma yetkisi yalnız o işin `GITHUB_TOKEN`'ında (`packages: write`); ayrı bir PAT yoktur. Paketler özel kalır, sunucu `read:packages` token'ıyla çeker. `latest` test edilen `:sha-<kısa sha>` ile aynı digest'tir; geri alma için `v0.N` ve `sha-` etiketleri durur.
+
+Belirli bir sürümü sabitlemek için:
+
+1. GitHub → Releases'tan sürümü seçin (`v0.N`).
+2. Dokploy → compose uygulaması → Environment: `IMAGE_TAG=v0.N`, kaydedin. Sabitken yeni etiketler aynı sürümü yeniden dağıtır; otomatik akışa dönmek için `IMAGE_TAG=latest`.
 3. Deploy. Sıra compose'da sabittir:
    - `postgres` sağlıklı olunca `migrate` servisi `migrate up` çalıştırır, ardından `release-record` `app_releases` tablosuna bir satır yazar (sürüm, SHA, derleme zamanı, notlar). Kayıt başarısız olursa dağıtım durmaz.
    - `migrate` başarıyla bitmeden `backend` ve `worker` başlamaz. Bir migration hata verirse eski container'lar ayakta kalır; `migrate` loguna bakın.
@@ -33,11 +40,11 @@ Compose uygulaması `compose.prod.yml`'ı kullanır; `backend` (ayrıca `migrate
    - İsteğe bağlı: `SELECT version, git_sha, deployed_at FROM app_releases ORDER BY deployed_at DESC LIMIT 5;`
    - Panelde giriş ve bir organizasyon sayfası; site alan adı açılıyor mu.
 
-Düz Docker sunucusunda aynı akış: `.env.server` içinde `IMAGE_TAG=v0.N`, `docker login ghcr.io` (paketler özelse), `make prod-up`. Yayınlanmamış bir commit'i sunucuda denemek için `make prod-up-build` (`compose.build.yml`, `IMAGE_TAG=local` gibi sürüm dışı bir etiketle). `scripts/server-sync.sh` (cron ile `main`'i izleyen eski yol) kullanımdan kalkıyor; Dokploy'a geçince kapatın.
+Düz Docker sunucusunda aynı akış: `.env.server` içinde `IMAGE_TAG=latest` (ya da sabit `v0.N`), `docker login ghcr.io` (paketler özelse), `make prod-up`. Yayınlanmamış bir commit'i sunucuda denemek için `make prod-up-build` (`compose.build.yml`, `IMAGE_TAG=local` gibi sürüm dışı bir etiketle). `scripts/server-sync.sh` (cron ile `main`'i izleyen eski yol) kullanımdan kalkıyor; Dokploy'a geçince kapatın.
 
 ## Geri alma
 
-1. Dokploy'da `IMAGE_TAG`'i önceki sürüme (`v0.N-1`) çekin ve yeniden dağıtın.
+1. Dokploy'da `IMAGE_TAG`'i önceki sürüme (`v0.N-1`) sabitleyin ve yeniden dağıtın. Düzeltme sürümü çıkınca `IMAGE_TAG=latest`'e dönün.
 2. `/healthz` → `version` eski sürümü göstermeli. `app_releases` yeni bir satır alır (olay kaydıdır; geri dönüş de bir dağıtımdır).
 
 **Migration'lar yalnız ileri gider.** Geri almak şemayı geri almaz: `migrate` servisi sadece `up` çalıştırır ve eski imaj veritabanında zaten uygulanmış migration'ları görür, hiçbirini geri sarmaz. Bu yüzden:
@@ -55,14 +62,14 @@ Compose dosyası Dokploy'un çektiği git ref'inden gelir. Geri alınan sürüml
 1. Dokploy'daki env'i bir dosyaya kopyalayın (ör. `.env.server`, mod 600).
 2. `scripts/prod-env.sh upgrade .env.server` (ya da `make prod-env-upgrade`): mevcut her değer korunur (gizli anahtarlar değişmez), yeniden adlandırılan anahtarlar değeriyle taşınır, yeni anahtarlar üretilir ya da varsayılanını alır, kaldırılanlar yorum satırına döner. Önceki dosya `.env.server.bak.<zaman>` olarak kalır.
 3. `scripts/prod-env.sh check .env.server` (`make prod-env-check`) temiz çıkmalı.
-4. Dosyayı Dokploy'a geri yapıştırın, `IMAGE_TAG`'i ayarlayın, dağıtın.
+4. Dosyayı Dokploy'a geri yapıştırın, dağıtın. `upgrade` mevcut `IMAGE_TAG` değerini korur; v15 öncesinden gelen bir env'de `v0.N` duruyorsa bir kez `latest` yapın.
 
 Bu geçişte (GHCR ve güvenlik işleri) eklenen önemli anahtarlar:
 
 | Anahtar | Varsayılan | Not |
 |---------|-----------|-----|
 | `IMAGE_REPO` | `ghcr.io/rentopya-app/rentopya-app-go` | Şemadan gelir, değiştirmeyin. `BACKEND_IMAGE`, `FRONTEND_IMAGE`, `SITE_IMAGE` kaldırıldı |
-| `IMAGE_TAG` | boş | Her dağıtımda `v0.N`. Boşken compose başlamaz |
+| `IMAGE_TAG` | `latest` | CI her yeşil `main` push'unda taşır. Sabitlemek / geri almak için `v0.N` |
 | `TRUSTED_PROXIES` | boş (loopback + özel ağlar) | X-Forwarded-For'una güvenilen proxy'ler (CIDR/IP, virgüllü). Cloudflare gibi dış bir proxy varsa aralıklarını ekleyin; `none` = hiç güvenme |
 | `SMTP_TLS` | `auto` | 465'te örtük TLS, diğer portlarda STARTTLS zorunlu; `starttls` / `implicit` biri zorlar; `none` üretimde reddedilir |
 | `SMTP_TIMEOUT` | `10s` | Bir gönderimin tamamı (bağlantı, TLS, teslim) |
@@ -85,7 +92,7 @@ Ajanlar etiket oluşturmaz, `eas` komutu çalıştırmaz, Dokploy'a, repo ayarla
 **Dokploy**
 
 - [ ] Registry: `ghcr.io`, kullanıcı adı GitHub hesabı, parola `read:packages` yetkili bir token (paketler herkese açıksa gerekmez). Düz sunucuda: `docker login ghcr.io`.
-- [ ] Compose uygulamasının env'i şemadan üretilmiş olsun (`make prod-env`, eskiyse `scripts/prod-env.sh upgrade`); `IMAGE_TAG=v0.N`.
+- [ ] Compose uygulamasının env'i şemadan üretilmiş olsun (`make prod-env`, eskiyse `scripts/prod-env.sh upgrade`); `IMAGE_TAG=latest`.
 - [ ] Alan adları: panel → `frontend:3000`, Centrifugo → `centrifugo:8000`, joker site alanı (`*.<uygulama alanı>`) → `site:3000`.
 - [ ] Eski `scripts/server-sync.sh` cron'unu Dokploy'a geçince kapatın.
 

@@ -58,9 +58,8 @@ done <"$ALLOW"
 # --- delivered set -------------------------------------------------------------
 "$ROOT/scripts/prod-env.sh" init -o "$T/env" --app-url https://app.example.com </dev/null >/dev/null 2>"$T/init.err" ||
   { cat "$T/init.err" >&2; die "could not generate an env from deploy/env/schema"; }
-# IMAGE_TAG has no schema default (the deploy sets the release, v0.N): give
-# config a placeholder, it only names the images.
-if ! IMAGE_TAG=v0.0 docker compose --env-file "$T/env" -f "$COMPOSE" config >"$T/resolved.yml" 2>"$T/config.err"; then
+# IMAGE_TAG comes from the schema (latest); config only names the images.
+if ! docker compose --env-file "$T/env" -f "$COMPOSE" config >"$T/resolved.yml" 2>"$T/config.err"; then
   cat "$T/config.err" >&2
   die "docker compose config failed with the schema-generated env: compose probably requires a variable deploy/env/schema does not manage"
 fi
