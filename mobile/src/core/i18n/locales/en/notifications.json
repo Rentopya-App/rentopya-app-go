@@ -1,0 +1,19 @@
+{
+  "title": "Notifications",
+  "filter_all": "All",
+  "filter_unread": "Unread",
+  "filter_unread_count": "Unread ({{count}})",
+  "read_all": "Mark all as read",
+  "read_all_done": "All notifications read",
+  "open_in_panel": "Open in panel",
+  "group.today": "Today",
+  "group.yesterday": "Yesterday",
+  "group.week": "This week",
+  "group.older": "Older",
+  "empty_title": "No notifications",
+  "empty_unread_title": "No unread notifications",
+  "empty_body": "New notifications show up here.",
+  "bell_unread": "Notifications, {{count}} unread",
+  "menu_unread": "Unread: {{count}}",
+  "menu_none": "No unread notifications"
+}

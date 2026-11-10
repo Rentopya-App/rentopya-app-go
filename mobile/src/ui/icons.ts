@@ -25,6 +25,7 @@ import HouseIcon from 'lucide-react-native/icons/house';
 import ImagesIcon from 'lucide-react-native/icons/images';
 import InboxIcon from 'lucide-react-native/icons/inbox';
 import InfoIcon from 'lucide-react-native/icons/info';
+import KeyRoundIcon from 'lucide-react-native/icons/key-round';
 import LinkIcon from 'lucide-react-native/icons/link';
 import LockIcon from 'lucide-react-native/icons/lock';
 import LogInIcon from 'lucide-react-native/icons/log-in';
@@ -33,6 +34,7 @@ import MailIcon from 'lucide-react-native/icons/mail';
 import MapPinIcon from 'lucide-react-native/icons/map-pin';
 import MenuIcon from 'lucide-react-native/icons/menu';
 import MinusIcon from 'lucide-react-native/icons/minus';
+import MonitorSmartphoneIcon from 'lucide-react-native/icons/monitor-smartphone';
 import MoonIcon from 'lucide-react-native/icons/moon';
 import PencilIcon from 'lucide-react-native/icons/pencil';
 import PhoneIcon from 'lucide-react-native/icons/phone';
@@ -106,7 +108,9 @@ export type IconName =
   | 'history'
   | 'flashlight'
   | 'camera'
-  | 'photos';
+  | 'photos'
+  | 'key'
+  | 'devices';
 
 /** `sf` on iOS, `md` (Material Symbols, the font expo-symbols bundles) on Android, Lucide where neither draws. */
 type Entry = { sf: SFSymbol; md: AndroidSymbol; lucide: LucideIcon; minIOS?: number };
@@ -161,6 +165,8 @@ export const ICONS: Record<IconName, Entry> = {
   flashlight: { sf: 'flashlight.on.fill', md: 'flashlight_on', lucide: FlashlightIcon },
   camera: { sf: 'camera', md: 'photo_camera', lucide: CameraIcon },
   photos: { sf: 'photo.on.rectangle', md: 'photo_library', lucide: ImagesIcon },
+  key: { sf: 'key', md: 'key', lucide: KeyRoundIcon },
+  devices: { sf: 'laptopcomputer.and.iphone', md: 'devices', lucide: MonitorSmartphoneIcon },
 };
 /** Lucide glyph for a concept; `back`/`forward` mirror in RTL. */
 export function lucideFor(name: IconName): LucideIcon {
