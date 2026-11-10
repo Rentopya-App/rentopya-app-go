@@ -9,6 +9,7 @@ import { type ThemePreference, usePreferences } from '@/core/preferences';
 import { useSelectedBranch } from '@/core/tenant';
 import { signOutGoogle } from '@/features/auth/social';
 import { FleetOpsMenuEntry } from '@/features/fleet-ops/menu-entry';
+import { OrgSettingsMenuEntry } from '@/features/org-settings/menu-entry';
 import { ReservationsMenuEntry } from '@/features/reservations/menu-entry';
 import { NotificationCenterRow } from '@/features/notifications/bell';
 import { FinanceMenuEntry } from '@/features/finance/menu-entry';
@@ -105,6 +106,7 @@ export function MenuScreen() {
         <TransfersMenuEntry />
         <FleetOpsMenuEntry />
         <ReportsMenuEntry />
+        <OrgSettingsMenuEntry />
         <View>
           <SectionHeader title={t('section_account')} />
           <List>
