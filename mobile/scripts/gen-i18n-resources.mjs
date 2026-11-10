@@ -28,6 +28,8 @@ const WEB = {
   reservations: 'reservations',
   payments: 'payments',
   customer_portal: 'customer_portal',
+  finance: 'finance',
+  deposits: 'deposits',
 };
 const WEB_NS = Object.values(WEB);
 
