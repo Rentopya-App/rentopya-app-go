@@ -41,6 +41,33 @@ var catalog = map[string]pair{
 	},
 }
 
+// Staff events of the company panel (field tasks, notification engine);
+// fixed texts only: references and names stay inside the app.
+func init() {
+	assigned := pair{
+		tr: Text{"Yeni saha görevi", "Size yeni bir saha görevi atandı."},
+		en: Text{"New field task", "A new field task was assigned to you."},
+	}
+	catalog["field_tasks.assigned"] = assigned
+	catalog["field_task.assigned"] = assigned
+	catalog["field_task.overdue"] = pair{
+		tr: Text{"Geciken saha görevi", "Bir saha göreviniz gecikti."},
+		en: Text{"Overdue field task", "One of your field tasks is overdue."},
+	}
+	catalog["field_task.handover_upcoming"] = pair{
+		tr: Text{"Teslim yaklaşıyor", "Size atanan bir araç teslimi yaklaşıyor."},
+		en: Text{"Handover coming up", "A vehicle handover assigned to you is coming up."},
+	}
+	catalog["reservation.approval_waiting"] = pair{
+		tr: Text{"Onay bekleyen rezervasyon", "Bir rezervasyon onayınızı bekliyor."},
+		en: Text{"Reservation awaiting approval", "A reservation is waiting for your approval."},
+	}
+	catalog["site_lead.created"] = pair{
+		tr: Text{"Yeni site başvurusu", "Sitenizden yeni bir başvuru alındı."},
+		en: Text{"New site enquiry", "A new enquiry came in from your site."},
+	}
+}
+
 var fallback = pair{
 	tr: Text{"Bildirim", "Yeni bir bildiriminiz var."},
 	en: Text{"Notification", "You have a new notification."},

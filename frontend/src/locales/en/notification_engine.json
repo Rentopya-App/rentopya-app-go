@@ -35,6 +35,8 @@
   "events.account_payment_due": "Account payment due",
   "events.field_task_assigned": "New field task",
   "events.field_task_overdue": "Overdue field task",
+  "events.field_task_handover_upcoming": "Handover task coming up (staff)",
+  "events.reservation_approval_waiting": "Reservation awaiting approval",
   "delivery_statuses.sending": "Sending",
   "delivery_statuses.sent": "Sent",
   "delivery_statuses.delivered": "Delivered",

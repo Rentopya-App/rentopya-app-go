@@ -9,6 +9,7 @@ import { type ThemePreference, usePreferences } from '@/core/preferences';
 import { useSelectedBranch } from '@/core/tenant';
 import { signOutGoogle } from '@/features/auth/social';
 import { UploadQueueRow } from '@/features/uploads/queue-row';
+import { PushSettingsRow } from '@/features/push/push-settings-row';
 import { Chips } from '@/ui/chips';
 import { List, ListRow, SectionHeader } from '@/ui/list';
 import { Screen } from '@/ui/screen';
@@ -108,6 +109,7 @@ export function MenuScreen() {
         <View>
           <SectionHeader title={t('section_app')} />
           <List>
+            <PushSettingsRow />
             <View className="gap-2 border-b border-border px-4 py-3">
               <Text variant="footnote" tone="muted">
                 {t('language')}
