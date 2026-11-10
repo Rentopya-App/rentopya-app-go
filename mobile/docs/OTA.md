@@ -83,9 +83,9 @@ Agents never run `eas` commands and never create tags. The owner does these step
    - if used: `EXPO_PUBLIC_APPLE_SIGN_IN=1` and `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`. Write them into `release.env` too, with the same value.
    - if used: `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`.
 4. **iOS / App Store Connect.**
-   - Create the identifier `com.rentopya.app` (team `N5T7KH96U3`) and the App Store Connect app.
-   - Put its `ascAppId` under `submit.production.ios` in `eas.json`.
-   - Widget and Siri (TEC-1161): create the identifier `com.rentopya.app.widgets` and the App Group `group.com.rentopya.app`, and enable the App Group on both `com.rentopya.app` and `com.rentopya.app.widgets`. Xcode Cloud signs the extension target `ExpoWidgetsTarget` with these; EAS reads them from `extra.eas.build.experimental.ios.appExtensions`, which `expo-widgets` writes into the resolved config.
+   - ✓ Create the identifier `com.rentopya.app` (team `N5T7KH96U3`) and the App Store Connect app. Done 2026-11-10: App ID with App Groups, Push Notifications and Sign in with Apple; App Store Connect app "Rentopya" (primary language Turkish, SKU `rentopya-ios`).
+   - ✓ Put its `ascAppId` under `submit.production.ios` in `eas.json`: `6832920047`.
+   - ✓ Widget and Siri (TEC-1161): create the identifier `com.rentopya.app.widgets` and the App Group `group.com.rentopya.app`, and enable the App Group on both `com.rentopya.app` and `com.rentopya.app.widgets`. Done 2026-11-10. App Intents need no Siri capability. Xcode Cloud signs the extension target `ExpoWidgetsTarget` with these; EAS reads them from `extra.eas.build.experimental.ios.appExtensions`, which `expo-widgets` writes into the resolved config.
 5. **Xcode Cloud.**
    - In App Store Connect → Xcode Cloud, connect the GitHub repo.
    - Create a workflow for the `mobile/ios` project. Point it at the `Rentopya.xcworkspace` that prebuild generates.
@@ -93,7 +93,7 @@ Agents never run `eas` commands and never create tags. The owner does these step
    - Environment variables: `EXPO_PUBLIC_API_URL` (the same https URL as EAS), `EXPO_PUBLIC_WEB_URL` and, if used, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`. Do not set the `release.env` keys there. `ci_post_clone.sh` exports them, and it stops if the workflow sets them to a different value.
    - The custom build scripts are `mobile/ios/ci_scripts/ci_post_clone.sh` (Node 22, `npm ci`, fingerprint log and check, `expo prebuild`, `pod install`) and `ci_pre_xcodebuild.sh` (`CFBundleVersion` = `CI_BUILD_NUMBER`). Their source is `mobile/scripts/xcode-cloud/`. `plugins/with-xcode-cloud.js` copies them on every prebuild. Edit the source, then copy it, or the test fails.
 6. **Android / Play Console.**
-   - Create the app `com.rentopya.app`.
+   - ✓ Create the app `com.rentopya.app`. Done 2026-11-10: "Rentopya" in the TechnoWide Software developer account, default language Turkish (tr-TR), app, free.
    - Create a Google Cloud service account with release access in Play Console. Upload its JSON key with `eas credentials -p android` (Google Service Account for submissions).
    - Upload the very first build to the internal track by hand. After that, `eas submit` (`--auto-submit`) works.
 7. **Turn it on.** Set the repo variable `MOBILE_RELEASE_ENABLED=true` (Settings → Variables). Do this only once Xcode Cloud is listening for `ios-build-*` tags; otherwise a tag pushed earlier is recorded as built. Before that, run **Mobile release** by hand with `dry_run` to see the decision.

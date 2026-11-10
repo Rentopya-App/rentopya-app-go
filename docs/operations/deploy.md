@@ -103,12 +103,13 @@ Ajanlar etiket oluşturmaz, `eas` komutu çalıştırmaz, Dokploy'a, repo ayarla
 
 **Apple**
 
-- [ ] App Store Connect: `com.rentopya.app` kimliği (takım `N5T7KH96U3`) ve uygulama kaydı; `ascAppId`'yi `eas.json` → `submit.production.ios`'a yazın.
+- [x] App Store Connect: `com.rentopya.app` kimliği (takım `N5T7KH96U3`) ve uygulama kaydı; `ascAppId`'yi `eas.json` → `submit.production.ios`'a yazın. (2026-11-10: `ascAppId` `6832920047`; App ID'ler `com.rentopya.app` ve `com.rentopya.app.widgets`, ikisi de App Group `group.com.rentopya.app`'e bağlı.)
 - [ ] Xcode Cloud: repoyu bağlayın, `mobile/ios` için iş akışı; başlangıç koşulu **Tag Changes**, `ios-build-` ile başlayan etiketler; Archive → TestFlight (internal). Env: `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_WEB_URL` (EAS ile aynı), varsa `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`.
 
 **Google Play**
 
-- [ ] Play Console'da `com.rentopya.app` uygulaması; yayın yetkili bir Google Cloud servis hesabı, JSON anahtarı `eas credentials -p android` ile yüklenir. İlk derleme internal kanala elle yüklenir.
+- [x] Play Console'da `com.rentopya.app` uygulaması (2026-11-10, TechnoWide Software hesabı, varsayılan dil tr-TR).
+- [ ] Yayın yetkili bir Google Cloud servis hesabı, JSON anahtarı `eas credentials -p android` ile yüklenir. İlk derleme internal kanala elle yüklenir.
 
 **Apple / Google ile giriş (mobil)**
 
