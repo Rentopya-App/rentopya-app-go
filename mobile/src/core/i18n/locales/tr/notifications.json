@@ -1,0 +1,19 @@
+{
+  "title": "Bildirimler",
+  "filter_all": "Tümü",
+  "filter_unread": "Okunmamış",
+  "filter_unread_count": "Okunmamış ({{count}})",
+  "read_all": "Tümünü okundu yap",
+  "read_all_done": "Tüm bildirimler okundu",
+  "open_in_panel": "Panelde aç",
+  "group.today": "Bugün",
+  "group.yesterday": "Dün",
+  "group.week": "Bu hafta",
+  "group.older": "Daha eski",
+  "empty_title": "Bildirim yok",
+  "empty_unread_title": "Okunmamış bildirim yok",
+  "empty_body": "Yeni bildirimler burada görünür.",
+  "bell_unread": "Bildirimler, {{count}} okunmamış",
+  "menu_unread": "Okunmamış: {{count}}",
+  "menu_none": "Okunmamış bildirim yok"
+}

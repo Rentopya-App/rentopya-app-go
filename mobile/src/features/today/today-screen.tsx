@@ -6,6 +6,7 @@ import { RefreshControl, View } from 'react-native';
 import { useSession } from '@/core/auth/session';
 import { DEFAULT_TIME_ZONE, formatDay, formatMoney, formatShort, formatTime, localDate } from '@/core/format';
 import { useSelectedBranch } from '@/core/tenant';
+import { TodayHeaderActions } from '@/features/search/header-actions';
 import { EmptyState } from '@/ui/empty-state';
 import { QueryState } from '@/ui/query-state';
 import { Screen } from '@/ui/screen';
@@ -217,7 +218,7 @@ export function TodayScreen() {
   const data = overview.data;
   return (
     <>
-      <Stack.Screen options={{ title: t('title') }} />
+      <Stack.Screen options={{ title: t('title'), headerRight: () => <TodayHeaderActions /> }} />
       <Screen refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void refresh()} />}>
         <View className="gap-0.5 px-1">
           <Text variant="headline" numberOfLines={1}>

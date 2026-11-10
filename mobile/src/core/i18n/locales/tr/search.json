@@ -1,0 +1,14 @@
+{
+  "title": "Ara",
+  "placeholder": "Araç, müşteri, şube, tedarikçi…",
+  "hint_title": "Aramak için yazın",
+  "hint_body": "En az 2 karakter. Yalnızca görme yetkiniz olan kayıtlar listelenir.",
+  "disabled_title": "Arama kapalı",
+  "disabled_body": "Bu ortamda arama servisi yapılandırılmamış.",
+  "open_in_panel": "Panelde aç",
+  "specs_vehicles": "Araçlar",
+  "specs_customers": "Müşteriler",
+  "specs_branches": "Şubeler",
+  "specs_suppliers": "Tedarikçiler",
+  "specs_rental_products": "Kiralık ürünler"
+}

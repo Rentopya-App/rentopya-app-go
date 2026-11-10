@@ -9,8 +9,12 @@ taken from.
 
 So far: sign-in (e-mail + password, 2FA code, Sign in with Apple and Google
 when configured), the organization picker, the branch filter, permission
-checks, the "Bugün" home tab (today's handovers, returns, overdue returns and KPIs from `/v1/tenant/overview`), the "Kiralamalar" tab (rentals list and detail with extend, vehicle swap, cancel and charge approval; operation tasks; handover / return form records), the reservations module (list, detail and its actions, approval queue, customer requests, quotes, resolution tasks; from the menu) and the menu (company, branch, account,
-language, appearance, version). Module screens come next.
+checks, the "Bugün" home tab (today's handovers, returns, overdue returns and KPIs from `/v1/tenant/overview`), the "Kiralamalar" tab (rentals list and detail with extend, vehicle swap, cancel and charge approval; operation tasks; handover / return form records), the reservations module (list, detail and its actions, approval queue, customer requests, quotes, resolution tasks; from the menu), the menu (company, branch, account,
+language, appearance, version), "Hesap ve güvenlik" (profile, sessions, authenticator
+2FA, passkey list, notification preferences, account deletion with the e-mailed code
+or a password step-up), the notification center (bell with the unread count on
+"Bugün"), search (`/v1/tenant/search`) and approving a web sign-in by QR
+(`rentopya://login/qr/{id}` or the scanner). Module screens come next.
 
 The app calls the Go API directly: `<EXPO_PUBLIC_API_URL>/v1/*` with its own
 Bearer token pair (`backend/docs/openapi.yaml`), the organization in
