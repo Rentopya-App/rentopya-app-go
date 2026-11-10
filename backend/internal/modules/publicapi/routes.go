@@ -15,6 +15,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/publicapi/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/publicapi/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/features"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -23,7 +24,7 @@ import (
 
 // RegisterRoutes mounts the public and the staff routes. A nil resolver
 // (tenancy off) mounts nothing: every key belongs to an organization.
-func RegisterRoutes(mux *http.ServeMux, public *handler.Public, panel *handler.Panel, tokens *jwt.Manager,
+func RegisterRoutes(mux httpkit.Mux, public *handler.Public, panel *handler.Panel, tokens *jwt.Manager,
 	loader middleware.IdentityLoader, resolver orgctx.Resolver) {
 	if resolver == nil {
 		return

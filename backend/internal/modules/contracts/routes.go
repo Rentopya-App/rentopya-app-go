@@ -18,6 +18,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/contracts/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/contracts/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ratelimit"
@@ -26,7 +27,7 @@ import (
 )
 
 // RegisterRoutes mounts the routes. A nil resolver mounts nothing.
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
+func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
 	// Public remote approval page (TEC-711): the token names the link and
 	// its organization; per-IP / per-token limits in the handler.
 	mux.HandleFunc("GET /v1/public/documents/{token}", h.PublicDocument)

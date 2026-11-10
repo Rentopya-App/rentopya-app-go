@@ -5,12 +5,13 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	storagehandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/storage/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 )
 
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *storagehandler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,

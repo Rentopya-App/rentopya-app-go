@@ -4,12 +4,13 @@ import (
 	"net/http"
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 )
 
 // RegisterRoutes mounts the QR sign-in endpoints.
-func RegisterRoutes(mux *http.ServeMux, h *Handler, tokens *jwt.Manager, loader middleware.IdentityLoader) {
+func RegisterRoutes(mux httpkit.Mux, h *Handler, tokens *jwt.Manager, loader middleware.IdentityLoader) {
 	authn := middleware.Authenticate(tokens, loader)
 	requireSession := middleware.RequirePermission(rbac.PermAuthSession)
 

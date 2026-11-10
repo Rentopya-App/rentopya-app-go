@@ -5,13 +5,14 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/siteleads/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/features"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 	"net/http"
 )
 
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
+func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
 	if resolver == nil {
 		return
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	exporthandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/exports/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -13,7 +14,7 @@ import (
 
 // RegisterRoutes mounts export routes.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *exporthandler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,
@@ -58,7 +59,7 @@ func RegisterRoutes(
 // Resource export routes (POST /v1/tenant/<resource>/export) are mounted by
 // the resource module with its tenant permission. A nil resolver mounts nothing.
 func RegisterTenantRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *exporthandler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,

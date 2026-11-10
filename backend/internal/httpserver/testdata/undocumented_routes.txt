@@ -1,0 +1,46 @@
+# /v1 routes mounted on the server but not yet in backend/docs/openapi.yaml.
+# Read by internal/httpserver/routes_test.go (TestRoutesDocumented).
+#
+# TODO(TEC-1171): document these 34 routes and delete their lines. The list
+# only shrinks: a new undocumented route fails the test, and so does a line
+# whose route is documented or no longer mounted. Never add a line.
+
+# Auth.js adapter, server to server (BFF -> API, internal secret): 13
+DELETE /v1/internal/auth/accounts
+DELETE /v1/internal/auth/authenticators/{credential_id}
+GET /v1/internal/auth/accounts
+GET /v1/internal/auth/authenticators/{credential_id}
+GET /v1/internal/auth/oauth/{provider}
+GET /v1/internal/auth/users/by-email
+GET /v1/internal/auth/users/{uuid}
+GET /v1/internal/auth/users/{uuid}/authenticators
+PATCH /v1/internal/auth/authenticators/{credential_id}/counter
+POST /v1/internal/auth/accounts
+POST /v1/internal/auth/authenticators
+POST /v1/internal/auth/session
+POST /v1/internal/auth/users
+
+# Platform logs and log-retention rules: 14
+DELETE /v1/platform/log-rules/{uuid}
+DELETE /v1/platform/logs/{uuid}
+GET /v1/platform/log-rules
+GET /v1/platform/log-rules/meta
+GET /v1/platform/log-rules/{uuid}
+GET /v1/platform/logs
+GET /v1/platform/logs/meta
+GET /v1/platform/logs/sources
+GET /v1/platform/logs/stats
+GET /v1/platform/logs/{uuid}
+PATCH /v1/platform/log-rules/{uuid}
+POST /v1/platform/log-rules
+POST /v1/platform/log-rules/{uuid}/run
+POST /v1/platform/logs/purge
+
+# Platform roles and permissions: 7
+DELETE /v1/platform/roles/{uuid}
+GET /v1/platform/permissions
+GET /v1/platform/roles
+GET /v1/platform/roles/meta
+GET /v1/platform/roles/{uuid}
+PATCH /v1/platform/roles/{uuid}
+POST /v1/platform/roles

@@ -11,6 +11,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	fleethandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/fleet/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/fleet/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -43,7 +44,7 @@ type EngineHandlers struct {
 // RegisterRoutes mounts the fleet routes. The public image stream is always
 // mounted; the tenant routes only when tenancy is on (resolver != nil).
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *fleethandler.Handler,
 	engines EngineHandlers,
 	tokens *jwt.Manager,
