@@ -49,6 +49,8 @@ const WEB = {
   whatsapp: 'whatsapp',
   public_api: 'public_api',
   site_leads: 'site_leads',
+  kabis: 'kabis',
+  tolls: 'tolls',
 };
 const WEB_NS = Object.values(WEB);
 
