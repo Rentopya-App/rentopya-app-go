@@ -1,3 +1,9 @@
+import {
+  BodyTooLargeError,
+  PUBLIC_BODY_BYTES,
+  bodyTooLargeResponse,
+  readBodyCapped,
+} from "@/lib/server/request-body";
 import { fetchUpstream, forwardedForFromHeaders } from "@/lib/server/upstream";
 
 /**
@@ -73,10 +79,15 @@ export async function proxyPublicBooking(
   const forwardedFor = forwardedForFromHeaders(request.headers);
   if (forwardedFor) headers.set("X-Forwarded-For", forwardedFor);
 
-  const body =
-    method === "GET" || method === "HEAD" || method === "OPTIONS"
-      ? null
-      : await request.arrayBuffer();
+  let body: ArrayBuffer | null = null;
+  if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+    try {
+      body = await readBodyCapped(request, PUBLIC_BODY_BYTES);
+    } catch (err) {
+      if (err instanceof BodyTooLargeError) return bodyTooLargeResponse();
+      throw err;
+    }
+  }
   const result = await fetchUpstream(`${pathSegments.join("/")}${url.search}`, {
     method,
     headers,
