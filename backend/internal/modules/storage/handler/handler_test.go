@@ -191,3 +191,34 @@ func TestWriteFileForcesDownloadForActiveContent(t *testing.T) {
 		}
 	}
 }
+
+// presignDriver records the content type the upload session presigns with.
+type presignDriver struct {
+	*recordingDriver
+	contentType string
+}
+
+func (d *presignDriver) PresignPut(_ context.Context, path, contentType string, _ time.Duration) (string, error) {
+	d.contentType = contentType
+	return "https://storage.example.test/" + path, nil
+}
+
+// The explorer sends snake_case fields (content_type); they must reach the
+// presigned PUT instead of being dropped by the JSON decoder.
+func TestCreateUploadSessionReadsSnakeCaseBody(t *testing.T) {
+	t.Parallel()
+	drv := &presignDriver{recordingDriver: newRecordingDriver()}
+	h := New(storageusecase.New(drv, nil, nil), 0)
+	body := `{"prefix":"docs/","filename":"a.pdf","content_type":"application/pdf","size":3}`
+	rec := httptest.NewRecorder()
+	h.CreateUploadSession(rec, httptest.NewRequest(http.MethodPost, "/v1/platform/storage/uploads/session", strings.NewReader(body)))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if drv.contentType != "application/pdf" {
+		t.Fatalf("presigned content type = %q, want application/pdf", drv.contentType)
+	}
+	if !strings.Contains(rec.Body.String(), `"key":"docs/a.pdf"`) {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+}

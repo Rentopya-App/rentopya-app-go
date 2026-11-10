@@ -14,6 +14,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/profitability/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/profitability/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/profitability/usecase"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -28,7 +29,7 @@ var ExportQueryKeys = usecase.QueryKeys
 // RegisterRoutes mounts the report. A nil resolver (tenancy off) mounts
 // nothing; a nil export handler skips the export route.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *handler.Handler,
 	export http.HandlerFunc,
 	tokens *jwt.Manager,

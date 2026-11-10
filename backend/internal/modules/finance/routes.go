@@ -9,6 +9,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	financehandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/finance/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/finance/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -50,7 +51,7 @@ type EngineHandlers struct {
 // RegisterRoutes mounts /v1/tenant/finance. A nil resolver (tenancy off)
 // mounts nothing.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *financehandler.Handler,
 	engines EngineHandlers,
 	tokens *jwt.Manager,

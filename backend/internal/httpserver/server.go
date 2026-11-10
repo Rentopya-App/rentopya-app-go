@@ -15,9 +15,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
-	accessmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/access"
 	accesshandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/access/handler"
-	activitymodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/activity"
 	activityhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/activity/handler"
 	activityusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/activity/usecase"
 	agreementsmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/agreements"
@@ -116,7 +114,6 @@ import (
 	kabismodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis"
 	kabishandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis/handler"
 	kabisusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis/usecase"
-	logsmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs"
 	logshandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs/handler"
 	logsusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs/usecase"
 	notifmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifications"
@@ -170,7 +167,6 @@ import (
 	reservationadapters "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/adapters"
 	reservationhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/handler"
 	reservationusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/usecase"
-	searchmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/search"
 	searchhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/search/handler"
 	searchusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/search/usecase"
 	settingsmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/settings"
@@ -222,11 +218,13 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/crypto"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/events"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/features"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/integrations"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ioengine"
 	ioadapters "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ioengine/adapters"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/mail"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/module"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/oidc"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx/orgcache"
@@ -281,6 +279,7 @@ type Server struct {
 	oauthProvSvc  *oauthproviderusecase.Service
 	authSettings  *authsettingsusecase.Service
 	mux           *http.ServeMux
+	routes        *httpkit.RouteRecorder
 	http          *http.Server
 }
 
@@ -290,7 +289,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("httpserver: TRUSTED_PROXIES: %w", err)
 	}
-	mux := http.NewServeMux()
+	serveMux := http.NewServeMux()
+	// Every route goes through the recorder, so tests can check the complete
+	// route table against backend/docs/openapi.yaml (routes_test.go).
+	mux := httpkit.NewRouteRecorder(serveMux)
 	eventBus := deps.Events
 	if eventBus == nil {
 		eventBus = events.NewBus(log)
@@ -307,7 +309,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		realtime:    deps.Realtime,
 		worker:      deps.Worker,
 		events:      eventBus,
-		mux:         mux,
+		mux:         serveMux,
+		routes:      mux,
 	}
 
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
@@ -1191,16 +1194,21 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		deps.Storage,
 		settingsusecase.NewSystemService(cfg, deps.DB, deps.Redis, deps.Storage, searchClient),
 	), tokens, loader)
-	accessmodule.RegisterRoutes(mux, accesshandler.New(stepUpSvc, activityRec), tokens, loader)
 	authsettingsmodule.RegisterRoutes(mux, authsettingshandler.New(authSettingsSvc, activityRec), tokens, loader)
 	githubmodule.RegisterRoutes(mux, githubhandler.New(githubSvc, activityRec), tokens, loader)
 	oauthprovidermodule.RegisterRoutes(mux, oauthproviderhandler.New(oauthProvSvc, activityRec), tokens, loader)
-	activitymodule.RegisterRoutes(mux, activityhandler.New(activityusecase.New(deps.Queries)), tokens, loader)
-	logsmodule.RegisterRoutes(mux, logshandler.New(logsSvc), tokens, loader)
+	// Self-registering modules (docs/design/module-registry.md). Modules move
+	// here one at a time from the explicit RegisterRoutes calls above.
+	modRouter := module.NewRouter(module.Deps{Mux: mux, Tokens: tokens, Loader: loader, Resolver: tenantResolver})
 	searchSvc := searchusecase.New(searchClient, searchReg, log)
-	searchH := searchhandler.New(searchSvc)
-	searchmodule.RegisterRoutes(mux, searchH, tokens, loader)
-	searchmodule.RegisterTenantRoutes(mux, searchH, tokens, loader, tenantResolver)
+	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
+		access:   accesshandler.New(stepUpSvc, activityRec),
+		search:   searchhandler.New(searchSvc),
+		activity: activityhandler.New(activityusecase.New(deps.Queries)),
+		logs:     logshandler.New(logsSvc),
+	})...); err != nil {
+		return nil, fmt.Errorf("httpserver: %w", err)
+	}
 	storagemodule.RegisterRoutes(
 		mux,
 		storagehandler.New(storageusecase.New(deps.Storage, deps.Queries, log), cfg.Storage.MaxBytes),
@@ -1214,7 +1222,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 
 	s.http = &http.Server{
 		Addr:         cfg.HTTP.Addr,
-		Handler:      middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(mux))),
+		Handler:      middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(serveMux))),
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,

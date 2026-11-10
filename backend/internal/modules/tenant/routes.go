@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 )
@@ -13,7 +14,7 @@ import (
 // RegisterRoutes mounts the tenant routes. A nil resolver (tenancy off)
 // registers nothing.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,
 	resolver orgctx.Resolver,

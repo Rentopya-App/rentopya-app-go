@@ -72,12 +72,14 @@ type KeysInput struct {
 	Keys []string `json:"keys"`
 }
 
+// UploadMeta is the upload-session request body (and the multipart upload's
+// form fields). The snake_case tags match what the explorer sends.
 type UploadMeta struct {
-	Prefix      string
-	Key         string
-	Filename    string
-	ContentType string
-	Size        int64
+	Prefix      string `json:"prefix"`
+	Key         string `json:"key"`
+	Filename    string `json:"filename"`
+	ContentType string `json:"content_type"`
+	Size        int64  `json:"size"`
 }
 
 type UploadSession struct {

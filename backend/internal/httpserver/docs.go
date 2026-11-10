@@ -5,9 +5,10 @@ import (
 	"strings"
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/docs"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 )
 
-func (s *Server) mountDocs(mux *http.ServeMux) {
+func (s *Server) mountDocs(mux httpkit.Mux) {
 	openapi, err := docs.FS.ReadFile("openapi.yaml")
 	if err != nil {
 		s.log.Error("docs_openapi_missing", "error", err)

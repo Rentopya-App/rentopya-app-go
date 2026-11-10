@@ -11,6 +11,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/suppliers/adapters"
 	supplierhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/suppliers/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/suppliers/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -35,7 +36,7 @@ type EngineHandlers struct {
 // RegisterRoutes mounts /v1/tenant/suppliers. A nil resolver (tenancy off)
 // mounts nothing.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *supplierhandler.Handler,
 	engines EngineHandlers,
 	tokens *jwt.Manager,

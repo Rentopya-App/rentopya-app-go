@@ -5,6 +5,7 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifications/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -12,7 +13,7 @@ import (
 
 // RegisterRoutes mounts notification routes.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *handler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,
@@ -88,7 +89,7 @@ func RegisterRoutes(
 // one notification by uuid stays on /v1/notifications/{uuid}: it is owned by
 // the caller whatever its organization. A nil resolver mounts nothing.
 func RegisterTenantRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *handler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,

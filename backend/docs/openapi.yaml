@@ -24643,6 +24643,1158 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /v1/platform/storage/meta:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageMeta
+      summary: Storage explorer list metadata
+      description: "`platform.storage.read`."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "Resource meta"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeResourceMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/storage/objects:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageObjects
+      summary: List storage objects
+      description: "`platform.storage.read`. Folders and files under `prefix`, or a virtual `view`. Sort: `name`, `size`, `updated_at`, `type`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: prefix, in: query, schema: { type: string } }
+        - { name: view, in: query, schema: { type: string, enum: [all, starred, shared, public, trash, recent], default: all } }
+        - $ref: "#/components/parameters/Q"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - { name: kind, in: query, description: File kind filter, schema: { $ref: "#/components/schemas/StorageFileKind" } }
+        - { name: access, in: query, schema: { type: string, enum: [private, public, shared] } }
+        - { name: modified_from, in: query, schema: { type: string, format: date } }
+        - { name: modified_to, in: query, schema: { type: string, format: date } }
+        - { name: recursive, in: query, schema: { type: boolean } }
+      responses:
+        "200":
+          description: "Objects"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObjectList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/storage/objects/item:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageObject
+      summary: Get one storage object
+      description: "`platform.storage.read`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: query, required: true, description: Object key, schema: { type: string } }
+      responses:
+        "200":
+          description: "Object"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObject" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/usage:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageUsage
+      summary: Storage usage summary
+      description: "`platform.storage.read`."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "Usage"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageUsage" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/storage/objects/download:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageObjectDownload
+      summary: Download an object
+      description: "`platform.storage.read`. Always `Content-Disposition: attachment`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: query, required: true, description: Object key, schema: { type: string } }
+        - { name: version_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: File bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/objects/preview:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageObjectPreview
+      summary: Preview an object inline
+      description: "`platform.storage.read`. Inline only for safe types (images, PDF, plain text, audio, video); others download."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: query, required: true, description: Object key, schema: { type: string } }
+        - { name: version_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: File bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/versions:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageVersions
+      summary: List versions of an object
+      description: "`platform.storage.read`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: query, required: true, description: Object key, schema: { type: string } }
+      responses:
+        "200":
+          description: "Versions"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageVersionList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/activity:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageActivity
+      summary: Storage activity
+      description: "`platform.storage.read`. Optionally for one `key`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: query, schema: { type: string } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: "Page"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageActivityPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/storage/shares:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageShares
+      summary: List user shares of an object
+      description: "`platform.storage.read`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: query, required: true, description: Object key, schema: { type: string } }
+      responses:
+        "200":
+          description: "Shares"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageShareList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageShare
+      summary: Share an object with a user
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageShareRequest" }
+      responses:
+        "201":
+          description: "Share"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageShare" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/platform/storage/shares/{uuid}:
+    delete:
+      tags: [Platform]
+      operationId: deletePlatformStorageShare
+      summary: Remove a share
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      responses:
+        "200":
+          description: "Removed"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/links:
+    get:
+      tags: [Platform]
+      operationId: getPlatformStorageLinks
+      summary: List public / signed links of an object
+      description: "`platform.storage.read`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: query, required: true, description: Object key, schema: { type: string } }
+      responses:
+        "200":
+          description: "Links"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageLinkList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageLink
+      summary: Create a public or signed link
+      description: "`platform.storage.write`. `public` links use a slug (`/v1/public/storage/{slug}`); `signed` links return a one-time `token` (`/v1/public/storage/s/{token}`)."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageLinkRequest" }
+      responses:
+        "201":
+          description: "Link"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageLink" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/platform/storage/links/{uuid}:
+    delete:
+      tags: [Platform]
+      operationId: deletePlatformStorageLink
+      summary: Revoke a link
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      responses:
+        "200":
+          description: "Revoked"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/folders:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageFolder
+      summary: Create a folder
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageFolderRequest" }
+      responses:
+        "201":
+          description: "Folder"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObject" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/platform/storage/uploads:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageUpload
+      summary: Upload a file (multipart)
+      description: "`platform.storage.write`. Capped by `STORAGE_MAX_BYTES` (413 above it)."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/StorageUploadForm" }
+      responses:
+        "201":
+          description: "Uploaded object"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObject" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413":
+          description: Upload exceeds the maximum size (PAYLOAD_TOO_LARGE)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /v1/platform/storage/uploads/session:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageUploadSession
+      summary: Start a direct upload
+      description: "`platform.storage.write`. Returns a presigned URL when the driver supports it; finish with `/uploads/complete`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageUploadSessionRequest" }
+      responses:
+        "201":
+          description: "Upload session"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageUploadSession" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/platform/storage/uploads/complete:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageUploadComplete
+      summary: Finish a direct upload
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageKeyRequest" }
+      responses:
+        "200":
+          description: "Object"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObject" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/objects/copy:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageCopy
+      summary: Copy an object
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageCopyMoveRequest" }
+      responses:
+        "200":
+          description: "Object at the destination"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObject" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/platform/storage/objects/move:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageMove
+      summary: Move an object
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageCopyMoveRequest" }
+      responses:
+        "200":
+          description: "Object at the destination"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObject" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/platform/storage/objects/rename:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageRename
+      summary: Rename an object
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageRenameRequest" }
+      responses:
+        "200":
+          description: "Renamed object"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObject" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /v1/platform/storage/objects/delete:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageDelete
+      summary: Move objects to the trash
+      description: "`platform.storage.write`. Answers `status: trashed`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageKeysRequest" }
+      responses:
+        "200":
+          description: "Done"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/objects/restore:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageRestore
+      summary: Restore objects from the trash
+      description: "`platform.storage.write`. Answers `status: restored`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageKeysRequest" }
+      responses:
+        "200":
+          description: "Done"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/objects/purge:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStoragePurge
+      summary: Delete objects permanently
+      description: "`platform.storage.write`. Answers `status: deleted`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageKeysRequest" }
+      responses:
+        "200":
+          description: "Done"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/versions/restore:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageVersionRestore
+      summary: Restore an object version
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageVersionRequest" }
+      responses:
+        "200":
+          description: "Object"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStorageObject" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/versions/delete:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageVersionDelete
+      summary: Delete an object version
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageVersionRequest" }
+      responses:
+        "200":
+          description: "Deleted"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/storage/star:
+    post:
+      tags: [Platform]
+      operationId: postPlatformStorageStar
+      summary: Star an object
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorageKeyRequest" }
+      responses:
+        "200":
+          description: "Starred"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Platform]
+      operationId: deletePlatformStorageStar
+      summary: Unstar an object
+      description: "`platform.storage.write`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: query, required: true, description: Object key, schema: { type: string } }
+      responses:
+        "200":
+          description: "Unstarred"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/public/storage/{slug}:
+    get:
+      tags: [Platform]
+      operationId: getPublicStorageObject
+      summary: Open a public storage link
+      description: "No auth. Forbidden when the link expired or was revoked."
+      security: []
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+        - { name: download, in: query, description: "`1` forces attachment", schema: { type: string, enum: ["1"] } }
+      responses:
+        "200":
+          description: File bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/public/storage/s/{token}:
+    get:
+      tags: [Platform]
+      operationId: getPublicSignedStorageObject
+      summary: Open a signed storage link
+      description: "No auth; the token is the credential. Forbidden when the link expired or was revoked."
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+        - { name: download, in: query, description: "`1` forces attachment", schema: { type: string, enum: ["1"] } }
+      responses:
+        "200":
+          description: File bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/notifications/vapid-public-key:
+    get:
+      tags: [Notifications]
+      operationId: getNotificationsVapidPublicKey
+      summary: Web push public key
+      description: "Any signed-in user. Empty when web push is not configured."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "Public key"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVapidPublicKey" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /v1/notifications/push-subscriptions:
+    post:
+      tags: [Notifications]
+      operationId: postNotificationsPushSubscription
+      summary: Subscribe this browser to web push
+      description: "Upserts by endpoint for the caller."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PushSubscriptionInput" }
+      responses:
+        "200":
+          description: "Subscription"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopePushSubscription" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    delete:
+      tags: [Notifications]
+      operationId: deleteNotificationsPushSubscription
+      summary: Unsubscribe this browser from web push
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PushSubscriptionEndpoint" }
+      responses:
+        "200":
+          description: "Removed"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeStatus" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /v1/platform/activity:
+    get:
+      tags: [Platform]
+      operationId: getPlatformActivity
+      summary: List platform activity (audit log)
+      description: "`platform.activity.read`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Q"
+        - $ref: "#/components/parameters/Sort"
+        - { name: resource, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: "Page"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeActivityPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/activity/meta:
+    get:
+      tags: [Platform]
+      operationId: getPlatformActivityMeta
+      summary: Activity list metadata
+      description: "`platform.activity.read`."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "Resource meta"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeResourceMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/users/export:
+    post:
+      tags: [Platform]
+      operationId: postPlatformUsersExport
+      summary: Export users
+      description: "Queues an export (`platform.users.export`, step-up). Poll `GET /v1/platform/exports/{uuid}`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExportRequest" }
+      responses:
+        "202":
+          description: "Export job queued"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/roles/export:
+    post:
+      tags: [Platform]
+      operationId: postPlatformRolesExport
+      summary: Export roles
+      description: "Queues an export (`platform.roles.export`, step-up). Poll `GET /v1/platform/exports/{uuid}`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExportRequest" }
+      responses:
+        "202":
+          description: "Export job queued"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/notifications/export:
+    post:
+      tags: [Platform]
+      operationId: postPlatformNotificationsExport
+      summary: Export notifications
+      description: "Queues an export (`platform.notifications.export`, step-up). Poll `GET /v1/platform/exports/{uuid}`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExportRequest" }
+      responses:
+        "202":
+          description: "Export job queued"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/activity/export:
+    post:
+      tags: [Platform]
+      operationId: postPlatformActivityExport
+      summary: Export activity
+      description: "Queues an export (`platform.activity.read`, step-up). Poll `GET /v1/platform/exports/{uuid}`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExportRequest" }
+      responses:
+        "202":
+          description: "Export job queued"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/exports:
+    get:
+      tags: [Platform]
+      operationId: getPlatformExportJobs
+      summary: List export jobs
+      description: "`platform.exports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: "Page"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExportJobPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/exports/{uuid}:
+    get:
+      tags: [Platform]
+      operationId: getPlatformExportJob
+      summary: Get an export job
+      description: "`platform.exports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      responses:
+        "200":
+          description: "Export job"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/exports/{uuid}/download:
+    get:
+      tags: [Platform]
+      operationId: getPlatformExportDownload
+      summary: Download a completed export
+      description: "`platform.exports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      responses:
+        "200":
+          description: Export file
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/imports:
+    get:
+      tags: [Platform]
+      operationId: getPlatformImportJobs
+      summary: List import jobs
+      description: "`platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: "Page"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportJobPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/imports/{uuid}:
+    get:
+      tags: [Platform]
+      operationId: getPlatformImportJob
+      summary: Get an import job
+      description: "`platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      responses:
+        "200":
+          description: "Import job"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/imports/{uuid}/mapping:
+    patch:
+      tags: [Platform]
+      operationId: patchPlatformImportMapping
+      summary: Save the column mapping of an import
+      description: "`platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportMappingRequest" }
+      responses:
+        "200":
+          description: "Import job"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/imports/{uuid}/preview:
+    post:
+      tags: [Platform]
+      operationId: postPlatformImportPreview
+      summary: Dry-run an import
+      description: "`platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      responses:
+        "200":
+          description: "Import job with preview summary"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/imports/{uuid}/confirm:
+    post:
+      tags: [Platform]
+      operationId: postPlatformImportConfirm
+      summary: Apply a previewed import
+      description: "`platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      responses:
+        "202":
+          description: "Import queued"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/imports/{uuid}/rollback:
+    post:
+      tags: [Platform]
+      operationId: postPlatformImportRollback
+      summary: Roll back an applied import
+      description: "`platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ResourceUUID"
+      responses:
+        "200":
+          description: "Rolled back job"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/users/import:
+    post:
+      tags: [Platform]
+      operationId: postPlatformUsersImport
+      summary: Upload a users import file
+      description: "Creates an import job (`platform.users.import`). Continue with `/v1/platform/imports/{uuid}/mapping`, `/preview` and `/confirm`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/ImportUploadForm" }
+      responses:
+        "201":
+          description: "Import job"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/users/import/sample:
+    get:
+      tags: [Platform]
+      operationId: getPlatformUsersImportSample
+      summary: Download a users import sample
+      description: "`platform.users.import`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [json, xlsx, csv, tsv], default: xlsx } }
+        - { name: locale, in: query, schema: { type: string, enum: [tr, en], default: tr } }
+      responses:
+        "200":
+          description: Sample file
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/roles/import:
+    post:
+      tags: [Platform]
+      operationId: postPlatformRolesImport
+      summary: Upload a roles import file
+      description: "Creates an import job (`platform.roles.import`). Continue with `/v1/platform/imports/{uuid}/mapping`, `/preview` and `/confirm`."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/ImportUploadForm" }
+      responses:
+        "201":
+          description: "Import job"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/roles/import/sample:
+    get:
+      tags: [Platform]
+      operationId: getPlatformRolesImportSample
+      summary: Download a roles import sample
+      description: "`platform.roles.import`."
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [json, xlsx, csv, tsv], default: xlsx } }
+        - { name: locale, in: query, schema: { type: string, enum: [tr, en], default: tr } }
+      responses:
+        "200":
+          description: Sample file
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
 components:
   securitySchemes:
     siteDomainSecret:
@@ -43160,3 +44312,438 @@ components:
         full_url: { type: [string, "null"] }
         synced_at: { type: [string, "null"], format: date-time }
 
+    # --- Platform storage explorer (TEC-1171) ---
+    StorageFileKind:
+      type: string
+      enum: [folder, image, video, audio, pdf, archive, spreadsheet, document, code, unknown]
+
+    StorageObject:
+      type: object
+      required: [id, name, key, prefix, bucket, kind, file_kind, size, mime_type, is_public, is_starred, is_shared, access, metadata, created_at, updated_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        key: { type: string }
+        prefix: { type: string }
+        bucket: { type: string }
+        kind: { type: string, enum: [file, folder] }
+        file_kind: { $ref: "#/components/schemas/StorageFileKind" }
+        size: { type: integer, format: int64 }
+        mime_type: { type: string }
+        etag: { type: string }
+        version_id: { type: string }
+        version: { type: string }
+        is_public: { type: boolean }
+        is_starred: { type: boolean }
+        is_shared: { type: boolean }
+        access: { type: string, enum: [private, public, shared] }
+        owner: { type: string }
+        storage_class: { type: string }
+        content_disposition: { type: string }
+        cache_control: { type: string }
+        metadata:
+          type: object
+          additionalProperties: { type: string }
+        created_at: { type: string }
+        updated_at: { type: string }
+        trash_uuid: { type: string, description: Set for objects in the trash }
+        trash_expires_at: { type: string }
+
+    StorageObjectList:
+      type: object
+      required: [items, total, limit, offset, prefix, view]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StorageObject" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+        prefix: { type: string }
+        view: { type: string }
+
+    StorageUsage:
+      type: object
+      required: [total_bytes, used_bytes, available_bytes, quota_bytes, total_files, total_folders, by_kind, largest, recent]
+      properties:
+        total_bytes: { type: integer, format: int64 }
+        used_bytes: { type: integer, format: int64 }
+        available_bytes: { type: integer, format: int64 }
+        quota_bytes: { type: integer, format: int64 }
+        total_files: { type: integer, format: int64 }
+        total_folders: { type: integer, format: int64 }
+        by_kind:
+          type: array
+          items:
+            type: object
+            required: [kind, bytes, count]
+            properties:
+              kind: { type: string }
+              bytes: { type: integer, format: int64 }
+              count: { type: integer, format: int64 }
+        largest:
+          type: array
+          items: { $ref: "#/components/schemas/StorageObject" }
+        recent:
+          type: array
+          items: { $ref: "#/components/schemas/StorageObject" }
+
+    StorageVersion:
+      type: object
+      required: [version_id, label, size, is_latest, status, created_at]
+      properties:
+        version_id: { type: string }
+        label: { type: string }
+        size: { type: integer, format: int64 }
+        etag: { type: string }
+        is_latest: { type: boolean }
+        status: { type: string, enum: [current, archived] }
+        created_at: { type: string }
+        created_by: { type: string }
+
+    StorageActivity:
+      type: object
+      required: [uuid, object_key, action, actor, payload, created_at]
+      properties:
+        uuid: { type: string }
+        object_key: { type: string }
+        action: { type: string }
+        actor: { type: string }
+        payload:
+          type: object
+          additionalProperties: true
+        created_at: { type: string }
+
+    StorageActivityPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StorageActivity" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    StorageShare:
+      type: object
+      required: [uuid, object_key, user_uuid, name, email, role, created_at]
+      properties:
+        uuid: { type: string }
+        object_key: { type: string }
+        user_uuid: { type: string }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [viewer, editor, owner] }
+        created_at: { type: string }
+
+    StorageLink:
+      type: object
+      required: [uuid, object_key, kind, url, can_view, can_download, can_upload, status, created_at]
+      properties:
+        uuid: { type: string }
+        object_key: { type: string }
+        kind: { type: string, enum: [public, signed] }
+        slug: { type: string }
+        url: { type: string }
+        token: { type: string, description: Only in the create response of a signed link }
+        expires_at: { type: string }
+        can_view: { type: boolean }
+        can_download: { type: boolean }
+        can_upload: { type: boolean }
+        status: { type: string, enum: [active, expired, revoked] }
+        created_at: { type: string }
+
+    StorageUploadSession:
+      type: object
+      required: [session_id, key, method, upload_url, expires_in]
+      properties:
+        session_id: { type: string }
+        key: { type: string }
+        method: { type: string }
+        upload_url: { type: string }
+        presigned_url: { type: string }
+        expires_in: { type: integer, description: Seconds }
+
+    StorageKeyRequest:
+      type: object
+      required: [key]
+      properties:
+        key: { type: string }
+
+    StorageKeysRequest:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items: { type: string }
+
+    StorageFolderRequest:
+      type: object
+      required: [name]
+      properties:
+        prefix: { type: string }
+        name: { type: string }
+
+    StorageCopyMoveRequest:
+      type: object
+      required: [source_key, dest_key]
+      properties:
+        source_key: { type: string }
+        dest_key: { type: string }
+
+    StorageRenameRequest:
+      type: object
+      required: [key, name]
+      properties:
+        key: { type: string }
+        name: { type: string }
+
+    StorageVersionRequest:
+      type: object
+      required: [key, version_id]
+      properties:
+        key: { type: string }
+        version_id: { type: string }
+
+    StorageShareRequest:
+      type: object
+      required: [key, user_uuid, role]
+      properties:
+        key: { type: string }
+        user_uuid: { type: string, format: uuid }
+        role: { type: string, enum: [viewer, editor, owner] }
+
+    StorageLinkRequest:
+      type: object
+      required: [key, kind]
+      properties:
+        key: { type: string }
+        kind: { type: string, enum: [public, signed] }
+        slug: { type: string, description: Public links only; generated when empty }
+        expires_in: { type: integer, description: Seconds; 0 never expires }
+        can_view: { type: boolean, default: true }
+        can_download: { type: boolean, default: true }
+        can_upload: { type: boolean, default: false }
+
+    StorageUploadForm:
+      type: object
+      required: [file]
+      properties:
+        file: { type: string, format: binary }
+        prefix: { type: string }
+        key: { type: string, description: Full object key; overrides prefix + file name }
+
+    StorageUploadSessionRequest:
+      type: object
+      properties:
+        prefix: { type: string }
+        key: { type: string }
+        filename: { type: string }
+        content_type: { type: string }
+        size: { type: integer, format: int64 }
+
+    EnvelopeStorageObject:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/StorageObject" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageObjectList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/StorageObjectList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageUsage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/StorageUsage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageVersionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/StorageVersion" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageActivityPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/StorageActivityPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageShare:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/StorageShare" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageShareList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/StorageShare" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageLink:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/StorageLink" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageLinkList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/StorageLink" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeStorageUploadSession:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/StorageUploadSession" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    # --- Member web push (TEC-1171) ---
+    PushSubscriptionInput:
+      type: object
+      required: [endpoint]
+      properties:
+        endpoint: { type: string }
+        key_p256dh: { type: string }
+        key_auth: { type: string }
+
+    PushSubscriptionEndpoint:
+      type: object
+      required: [endpoint]
+      properties:
+        endpoint: { type: string }
+
+    EnvelopeVapidPublicKey:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [vapid_public_key]
+          properties:
+            vapid_public_key: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopePushSubscription:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [uuid, endpoint]
+          properties:
+            uuid: { type: string, format: uuid }
+            endpoint: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    # --- Platform activity and io job lists (TEC-1171) ---
+    ActivityEvent:
+      type: object
+      required: [uuid, action, resource, payload, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        actor_user_id: { type: integer, format: int64 }
+        action: { type: string }
+        resource: { type: string }
+        resource_uuid: { type: string, format: uuid }
+        payload:
+          type: object
+          additionalProperties: true
+        created_at: { type: string, format: date-time }
+
+    EnvelopeActivityPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ActivityEvent" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeExportJobPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ExportJob" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeImportJobPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ImportJob" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }

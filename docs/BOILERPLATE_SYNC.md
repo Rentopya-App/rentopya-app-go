@@ -113,7 +113,7 @@ Ayrıntılı dosya listeleri ve riskler ilgili Linear issue'larında.
 | İP-7 | Güvenlik: prod gizli anahtar koruması ve süper admin aracı | `8cd2080`, `b82338c`, `f077b5f` | TEC-1169 (süper admin varsayılanları), TEC-1130 (secret guard) | birleşti (#8, #3) |
 | İP-8 | CI/CD: şema tabanlı prod env çekirdeği | `5478a7d`, `c33cb26`, `46ab039`, `85ddaec`, `8c5c2c2`, `48c1a22`, `b046965`, `ece3989` | TEC-1130 | birleşti (#3) |
 | İP-9 | CI/CD: GHCR imaj yayını, v0.N etiketleri, sürüm kaydı | `0796eb4`, `26fac85`, `bd2e26c`, `84840de`, `2b9982b`, `2e0a092`, `647be7a` (mobil hariç), `b012eb3` (expo hariç), `24d1b20`, `1c94dfd` | TEC-1131, TEC-1132, TEC-1133 | CI iskeleti birleşti (TEC-1131, #15); GHCR, etiket ve sürüm kaydı açık. Deploy dokümanı TEC-1134 |
-| İP-10 | Modül self-registration altyapısı (adım 1) | `6dd4c13` | TEC-1171 | açık |
+| İP-10 | Modül self-registration altyapısı (adım 1), tüm mux için route ↔ OpenAPI testi | `6dd4c13` | TEC-1171 | PR |
 | İP-11 | Skill ve doküman senkronu (`.agents/skills`, `llms.txt`, `CONTRIBUTING.md`, `docs/`) | `59bab48` (skill), `b046965`, `9339e09`, `f077b5f` (doküman kısımları) | TEC-1172 | PR |
 
 Gelmeyecekler (ATLA): `8fdc26f`. `647be7a` ve `b012eb3`'ün mobil kısımları boilerplate'ten gelmez; Rentopya'nın mobil CI'ı TEC-1139'da otopoly modeliyle yazılır.

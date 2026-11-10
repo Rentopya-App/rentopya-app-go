@@ -15,6 +15,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reports/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reports/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reports/usecase"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -44,7 +45,7 @@ type ExportFactory func(resource string, queryKeys ...string) http.HandlerFunc
 // RegisterRoutes mounts the reports. A nil resolver (tenancy off) mounts
 // nothing.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *handler.Handler,
 	export ExportFactory,
 	tokens *jwt.Manager,
