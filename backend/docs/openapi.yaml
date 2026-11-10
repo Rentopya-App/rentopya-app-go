@@ -42656,7 +42656,7 @@ components:
           additionalProperties: { type: string }
           description: Library UUID to API-owned URL; previews carry their signed token.
         site_uuid: { type: string, format: uuid }
-        version: { type: integer, description: The published revision (the draft version in a preview); the `?v=` of image paths. }
+        version: { type: integer, description: "The published revision (the draft version in a preview); the `?v=` of image paths." }
         host: { type: string }
         host_kind: { type: string, enum: [subdomain, custom] }
         origin: { type: string, description: Origin to open booking sessions for. }
