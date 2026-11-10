@@ -795,6 +795,7 @@ type Querier interface {
 	// transaction): the rental, its current vehicle, the actual handover /
 	// return places, the reservation's customer and planned pick-up branch.
 	GetKabisRentalFacts(ctx context.Context, arg GetKabisRentalFactsParams) (GetKabisRentalFactsRow, error)
+	GetLatestAppRelease(ctx context.Context) (AppRelease, error)
 	// The latest deposit of a rental (the handover wizard shows its state).
 	GetLatestDepositForRental(ctx context.Context, arg GetLatestDepositForRentalParams) (GetLatestDepositForRentalRow, error)
 	// The newest start-side notification of a rental (the start or its last
@@ -1127,6 +1128,7 @@ type Querier interface {
 	InsertAgreementDriver(ctx context.Context, arg InsertAgreementDriverParams) (InsertAgreementDriverRow, error)
 	InsertAllocation(ctx context.Context, arg InsertAllocationParams) (InsertAllocationRow, error)
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
+	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
 	InsertBulkChange(ctx context.Context, arg InsertBulkChangeParams) (BulkChange, error)
 	InsertCampaignRedemption(ctx context.Context, arg InsertCampaignRedemptionParams) (InsertCampaignRedemptionRow, error)
 	InsertCampaignTarget(ctx context.Context, arg InsertCampaignTargetParams) error
