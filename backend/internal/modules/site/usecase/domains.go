@@ -27,6 +27,14 @@ var (
 	ErrDomainMode  = errors.New("operation requires a verified domain using the manual provisioner")
 )
 
+// DomainClaimTTL is how long a pending claim waits for DNS proof before it expires as failed.
+// Only a verified domain reserves its host: pending, failed (including expired) and disabled
+// claims never block another organization, so registering a host first cannot squat it.
+const DomainClaimTTL = 72 * time.Hour
+
+// DomainClaimLost is the error recorded on pending claims that lost the host to another organization.
+const DomainClaimLost = "host verified by another organization; remove this domain"
+
 // DomainQueries is the persisted verification and reconciliation state.
 type DomainQueries interface {
 	ReleaseSiteDomainLease(context.Context, db.ReleaseSiteDomainLeaseParams) error
@@ -34,6 +42,8 @@ type DomainQueries interface {
 	ListSiteDomainHealthIssues(context.Context, int32) ([]db.SiteDomain, error)
 	SiteDomainHealthCounts(context.Context) (db.SiteDomainHealthCountsRow, error)
 	CreateSiteDomain(context.Context, db.CreateSiteDomainParams) (db.SiteDomain, error)
+	SiteDomainVerifiedElsewhere(context.Context, db.SiteDomainVerifiedElsewhereParams) (bool, error)
+	FailRivalSiteDomainClaims(context.Context, db.FailRivalSiteDomainClaimsParams) (int64, error)
 	ListSiteDomains(context.Context, int64) ([]db.SiteDomain, error)
 	ListPlatformSiteDomains(context.Context, db.ListPlatformSiteDomainsParams) ([]db.SiteDomain, error)
 	GetSiteDomain(context.Context, db.GetSiteDomainParams) (db.SiteDomain, error)
@@ -164,7 +174,12 @@ func (d *Domains) Create(ctx context.Context, orgID, userID int64, raw string) (
 	r, err := d.q.CreateSiteDomain(ctx, db.CreateSiteDomainParams{OrganizationID: orgID, Host: host,
 		Now: domainTS(d.opts.Now()), VerificationToken: hex.EncodeToString(token), Provisioner: d.opts.Provisioner, CreatedBy: pgtype.Int8{Int64: userID, Valid: userID > 0}})
 	var pe *pgconn.PgError
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Another organization already verified this host.
+		return model.Domain{}, ErrDomainTaken
+	}
 	if errors.As(err, &pe) {
+		// The organization already has a row for this host.
 		if pe.Code == "23505" {
 			return model.Domain{}, ErrDomainTaken
 		}
@@ -343,8 +358,18 @@ func (d *Domains) check(ctx context.Context, r db.SiteDomain) (db.SiteDomain, er
 	now := d.opts.Now()
 	status, lastError := "verified", ""
 	verified := r.VerifiedAt
-	if !r.VerifiedAt.Valid && !now.Before(r.CreatedAt.Time.Add(72*time.Hour)) {
+	taken := false
+	if r.Status == "pending" {
+		// A claim that was mid-check when another organization verified the host loses here.
+		var err error
+		if taken, err = d.q.SiteDomainVerifiedElsewhere(ctx, db.SiteDomainVerifiedElsewhereParams{Host: r.Host, OrganizationID: r.OrganizationID}); err != nil {
+			return r, err
+		}
+	}
+	if !r.VerifiedAt.Valid && !now.Before(r.CreatedAt.Time.Add(DomainClaimTTL)) {
 		status, lastError = "failed", "verification expired after 72 hours; remove and register again"
+	} else if taken {
+		status, lastError = "failed", DomainClaimLost
 	} else if err := d.CheckDNS(ctx, r); err != nil {
 		lastError = err.Error()
 		status = "pending"
@@ -357,10 +382,29 @@ func (d *Domains) check(ctx context.Context, r db.SiteDomain) (db.SiteDomain, er
 
 	delay := 24 * time.Hour
 	if status == "pending" {
-		delay = min(time.Minute*time.Duration(1<<min(r.Attempts, 10)), 6*time.Hour, r.CreatedAt.Time.Add(72*time.Hour).Sub(now))
+		delay = min(time.Minute*time.Duration(1<<min(r.Attempts, 10)), 6*time.Hour, r.CreatedAt.Time.Add(DomainClaimTTL).Sub(now))
 	}
-	return d.q.UpdateSiteDomainCheck(ctx, db.UpdateSiteDomainCheckParams{ID: r.ID, OrganizationID: r.OrganizationID, Status: r.Status, Status_2: status,
-		LastCheckedAt: domainTS(now), VerifiedAt: verified, LastError: lastError, NextCheckAt: domainTS(now.Add(delay))})
+	params := db.UpdateSiteDomainCheckParams{ID: r.ID, OrganizationID: r.OrganizationID, Status: r.Status, Status_2: status,
+		LastCheckedAt: domainTS(now), VerifiedAt: verified, LastError: lastError, NextCheckAt: domainTS(now.Add(delay))}
+	updated, err := d.q.UpdateSiteDomainCheck(ctx, params)
+	if status != "verified" {
+		return updated, err
+	}
+	var pe *pgconn.PgError
+	if errors.As(err, &pe) && pe.Code == "23505" {
+		// Another organization verified the host first (uq_site_domains_verified_host).
+		params.Status_2, params.VerifiedAt, params.LastError = "failed", r.VerifiedAt, DomainClaimLost
+		return d.q.UpdateSiteDomainCheck(ctx, params)
+	}
+	if err != nil {
+		return updated, err
+	}
+	// First to verify wins: other organizations' pending claims for the host fail.
+	if _, err = d.q.FailRivalSiteDomainClaims(ctx, db.FailRivalSiteDomainClaimsParams{Host: r.Host, OrganizationID: r.OrganizationID,
+		LastError: DomainClaimLost, Now: domainTS(now)}); err != nil {
+		return updated, fmt.Errorf("fail rival claims: %w", err)
+	}
+	return updated, nil
 }
 
 // Sweep processes leased rows, syncing origins before making routing changes.
@@ -403,7 +447,12 @@ func (d *Domains) Sweep(ctx context.Context) (int, error) {
 			state, providerID, err = p.Ensure(ctx, r)
 		} else {
 			state = "pending"
-			err = p.Remove(ctx, r)
+			// Routes are keyed by host: never remove the route of another organization's verified domain.
+			var taken bool
+			taken, err = d.q.SiteDomainVerifiedElsewhere(ctx, db.SiteDomainVerifiedElsewhereParams{Host: r.Host, OrganizationID: r.OrganizationID})
+			if err == nil && !taken {
+				err = p.Remove(ctx, r)
+			}
 		}
 		if err != nil {
 			persistErr := d.q.UpdateSiteDomainTLS(ctx, db.UpdateSiteDomainTLSParams{ID: r.ID, OrganizationID: r.OrganizationID, TlsStatus: "failed", ProvisionerID: r.ProvisionerID, LastError: "routing provisioning failed; check worker logs"})

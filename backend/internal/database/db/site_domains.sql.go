@@ -65,7 +65,11 @@ func (q *Queries) ClaimDueSiteDomains(ctx context.Context, dollar_1 pgtype.Times
 
 const createSiteDomain = `-- name: CreateSiteDomain :one
 INSERT INTO site_domains(organization_id,host,verification_token,provisioner,created_by,created_at,next_check_at)
-VALUES ($1,$2,$3,$4,$5,$6::timestamptz,$6::timestamptz) RETURNING id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at
+SELECT $1::bigint, $2::text, $3::text, $4::text,
+ $5::bigint, $6::timestamptz, $6::timestamptz
+WHERE NOT EXISTS (SELECT 1 FROM site_domains v WHERE v.host = $2::text AND v.status = 'verified'
+ AND v.organization_id <> $1::bigint)
+RETURNING id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at
 `
 
 type CreateSiteDomainParams struct {
@@ -77,6 +81,7 @@ type CreateSiteDomainParams struct {
 	Now               pgtype.Timestamptz `json:"now"`
 }
 
+// A pending claim never blocks other organizations; a host verified by another organization does (no row).
 func (q *Queries) CreateSiteDomain(ctx context.Context, arg CreateSiteDomainParams) (SiteDomain, error) {
 	row := q.db.QueryRow(ctx, createSiteDomain,
 		arg.OrganizationID,
@@ -139,6 +144,35 @@ type DisableSiteDomainParams struct {
 
 func (q *Queries) DisableSiteDomain(ctx context.Context, arg DisableSiteDomainParams) (int64, error) {
 	result, err := q.db.Exec(ctx, disableSiteDomain, arg.OrganizationID, arg.Uuid, arg.NextCheckAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const failRivalSiteDomainClaims = `-- name: FailRivalSiteDomainClaims :execrows
+UPDATE site_domains SET status = 'failed', last_error = $3, last_checked_at = $4::timestamptz,
+ attention_since = coalesce(attention_since, $4::timestamptz), next_check_at = $4::timestamptz + interval '24 hours'
+WHERE host = $1 AND organization_id <> $2 AND status = 'pending'
+ AND (lease_until IS NULL OR lease_until <= $4::timestamptz)
+`
+
+type FailRivalSiteDomainClaimsParams struct {
+	Host           string             `json:"host"`
+	OrganizationID int64              `json:"organization_id"`
+	LastError      string             `json:"last_error"`
+	Now            pgtype.Timestamptz `json:"now"`
+}
+
+// The first organization to verify a host wins; the other organizations' pending claims fail.
+// A leased claim is mid-check; its own verification attempt hits uq_site_domains_verified_host instead.
+func (q *Queries) FailRivalSiteDomainClaims(ctx context.Context, arg FailRivalSiteDomainClaimsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failRivalSiteDomainClaims,
+		arg.Host,
+		arg.OrganizationID,
+		arg.LastError,
+		arg.Now,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -502,6 +536,23 @@ func (q *Queries) SiteDomainHealthCounts(ctx context.Context) (SiteDomainHealthC
 	var i SiteDomainHealthCountsRow
 	err := row.Scan(&i.Verified, &i.Pending, &i.Failed)
 	return i, err
+}
+
+const siteDomainVerifiedElsewhere = `-- name: SiteDomainVerifiedElsewhere :one
+SELECT EXISTS (SELECT 1 FROM site_domains WHERE host = $1 AND organization_id <> $2 AND status = 'verified')::boolean
+`
+
+type SiteDomainVerifiedElsewhereParams struct {
+	Host           string `json:"host"`
+	OrganizationID int64  `json:"organization_id"`
+}
+
+// The route of a host verified by another organization must survive this organization's cleanup.
+func (q *Queries) SiteDomainVerifiedElsewhere(ctx context.Context, arg SiteDomainVerifiedElsewhereParams) (bool, error) {
+	row := q.db.QueryRow(ctx, siteDomainVerifiedElsewhere, arg.Host, arg.OrganizationID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const updateSiteDomainCheck = `-- name: UpdateSiteDomainCheck :one

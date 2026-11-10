@@ -1,6 +1,23 @@
 -- name: CreateSiteDomain :one
+-- A pending claim never blocks other organizations; a host verified by another organization does (no row).
 INSERT INTO site_domains(organization_id,host,verification_token,provisioner,created_by,created_at,next_check_at)
-VALUES ($1,$2,$3,$4,$5,sqlc.arg(now)::timestamptz,sqlc.arg(now)::timestamptz) RETURNING *;
+SELECT sqlc.arg(organization_id)::bigint, sqlc.arg(host)::text, sqlc.arg(verification_token)::text, sqlc.arg(provisioner)::text,
+ sqlc.narg(created_by)::bigint, sqlc.arg(now)::timestamptz, sqlc.arg(now)::timestamptz
+WHERE NOT EXISTS (SELECT 1 FROM site_domains v WHERE v.host = sqlc.arg(host)::text AND v.status = 'verified'
+ AND v.organization_id <> sqlc.arg(organization_id)::bigint)
+RETURNING *;
+
+-- name: SiteDomainVerifiedElsewhere :one
+-- The route of a host verified by another organization must survive this organization's cleanup.
+SELECT EXISTS (SELECT 1 FROM site_domains WHERE host = $1 AND organization_id <> $2 AND status = 'verified')::boolean;
+
+-- name: FailRivalSiteDomainClaims :execrows
+-- The first organization to verify a host wins; the other organizations' pending claims fail.
+UPDATE site_domains SET status = 'failed', last_error = $3, last_checked_at = sqlc.arg(now)::timestamptz,
+ attention_since = coalesce(attention_since, sqlc.arg(now)::timestamptz), next_check_at = sqlc.arg(now)::timestamptz + interval '24 hours'
+-- A leased claim is mid-check; its own verification attempt hits uq_site_domains_verified_host instead.
+WHERE host = $1 AND organization_id <> $2 AND status = 'pending'
+ AND (lease_until IS NULL OR lease_until <= sqlc.arg(now)::timestamptz);
 
 -- name: ListSiteDomains :many
 SELECT * FROM site_domains WHERE organization_id = $1 ORDER BY created_at,id;
