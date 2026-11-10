@@ -9,6 +9,7 @@ Human and agent entry points for Rentopya.
 | [EXTENDING.md](./EXTENDING.md) | Adding a tenant / platform module, a provider, a mobile screen or an env var |
 | [BOILERPLATE_SYNC.md](./BOILERPLATE_SYNC.md) | Boilerplate base SHA, commit inventory, sync work packages (Turkish) |
 | [design/env-core.md](./design/env-core.md) | Production env schema, `prod-env.sh`, `make env-check`, boot guard |
+| [operations/deploy.md](./operations/deploy.md) | Release and deploy (Turkish): `v0.N` tags and GHCR images, Dokploy deploy by `IMAGE_TAG`, rollback (forward-only migrations), env upgrades, mobile release overview, owner checklist |
 | [operations/backup-restore.md](./operations/backup-restore.md) | Backups (Postgres, Redis, object storage), restore, staging rehearsal (RT-A32) |
 | [operations/observability.md](./operations/observability.md) | `APP_ENV` (development / staging / production), production endpoint guard, error tracking, log masking, failed-work alerts, availability search p95 |
 | [acceptance/beta.md](./acceptance/beta.md) | Beta acceptance RT-A01…A32: scenario → test → result → evidence, how to run (`make acceptance`), dependency-pending providers |
