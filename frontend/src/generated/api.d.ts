@@ -8543,7 +8543,7 @@ export interface paths {
         put?: never;
         /**
          * Register a custom site domain
-         * @description tenant.site.manage. At most three per organization; normalized host is globally unique. DOMAIN_LIMIT or DOMAIN_TAKEN is a conflict. Verification is asynchronous.
+         * @description tenant.site.manage. At most three per organization. Only a verified domain reserves its normalized host: several organizations may hold pending claims, the first to verify wins and the others fail. DOMAIN_TAKEN when the host is verified by another organization or already registered by this one; DOMAIN_LIMIT and DOMAIN_TAKEN are conflicts. Verification is asynchronous.
          */
         post: operations["postTenantSiteDomain"];
         delete?: never;
