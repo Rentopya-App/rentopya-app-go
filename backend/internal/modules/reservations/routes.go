@@ -20,6 +20,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/adapters"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -41,7 +42,7 @@ type EngineHandlers struct {
 
 // RegisterRoutes mounts the reservation routes. A nil resolver (tenancy
 // off) mounts nothing.
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, engines EngineHandlers, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
+func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, engines EngineHandlers, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
 	if resolver == nil {
 		return
 	}

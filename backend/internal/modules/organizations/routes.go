@@ -5,6 +5,7 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	orghandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/organizations/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -22,7 +23,7 @@ type PlatformEngineHandlers struct {
 // RegisterRoutes mounts platform organization management, the public
 // invitation accept flow and the organization logo stream.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *orghandler.Handler,
 	engines PlatformEngineHandlers,
 	tokens *jwt.Manager,
@@ -89,7 +90,7 @@ func RegisterRoutes(
 // mounts nothing. Permissions come from the membership only (no super_admin
 // bypass).
 func RegisterTenantRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *orghandler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,

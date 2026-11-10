@@ -5,13 +5,14 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	importhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/imports/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 )
 
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *importhandler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,
@@ -58,7 +59,7 @@ func RegisterRoutes(
 // use case only finds jobs of the caller in the X-Organization organization.
 // Resource upload / sample routes are mounted by the resource module.
 func RegisterTenantRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *importhandler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,

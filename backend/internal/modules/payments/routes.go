@@ -28,6 +28,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/payments/handler"
 	paymodel "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/payments/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ratelimit"
@@ -37,7 +38,7 @@ import (
 
 // RegisterRoutes mounts the tenant routes (a nil resolver mounts none)
 // and the public routes.
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
+func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
 	mux.HandleFunc("GET /v1/public/pay/{token}", h.PublicLink)
 	mux.HandleFunc("POST /v1/public/pay/{token}/checkout", h.StartCheckout)
 	mux.HandleFunc("POST /v1/public/payments/iyzico/webhook", h.Webhook("iyzico"))

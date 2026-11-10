@@ -13,6 +13,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/tolls/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/tolls/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/features"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/integrations"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
@@ -60,7 +61,7 @@ type EngineHandlers struct {
 // and /v1/tenant/vehicles/{uuid}/toll-tags. A nil resolver (tenancy off)
 // mounts nothing.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *handler.Handler,
 	engines EngineHandlers,
 	tokens *jwt.Manager,

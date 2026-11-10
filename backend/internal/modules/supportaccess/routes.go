@@ -11,6 +11,7 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/supportaccess/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -18,7 +19,7 @@ import (
 
 // RegisterRoutes mounts the tenant routes (nil resolver: tenancy off,
 // nothing mounted) and the platform overview of active grants.
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
+func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
 	authn := middleware.Authenticate(tokens, loader)
 	mux.Handle("GET /v1/platform/support-grants", middleware.Chain(http.HandlerFunc(h.PlatformActive),
 		authn, middleware.RequirePermission(rbac.PermPlatformUsersImpersonate)))

@@ -5,13 +5,14 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	bulkhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/bulk/handler"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 )
 
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *bulkhandler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,
@@ -43,7 +44,7 @@ func RegisterRoutes(
 // Resource bulk routes (POST /v1/tenant/<resource>/bulk) are mounted by the
 // resource module. A nil resolver mounts nothing.
 func RegisterTenantRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *bulkhandler.Handler,
 	tokens *jwt.Manager,
 	loader middleware.IdentityLoader,
