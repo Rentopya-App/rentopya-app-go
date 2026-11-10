@@ -2,6 +2,15 @@ export const routes = {
   public: {
     root: "/",
     health: "/health",
+    /** Public legal and info pages (Turkish at the root, English under /en). */
+    privacy: "/privacy",
+    privacyEn: "/en/privacy",
+    terms: "/terms",
+    termsEn: "/en/terms",
+    support: "/support",
+    supportEn: "/en/support",
+    accountDelete: "/account/delete",
+    accountDeleteEn: "/en/account/delete",
     share: {
       slug: (slug: string) => `/share/${slug}`,
       signed: (token: string) => `/share/s/${token}`,
@@ -346,6 +355,12 @@ export const routes = {
     health: "/platform/health",
     /** Organization custom domains (TEC-731). */
     siteDomains: "/platform/site-domains",
+    /** Public legal page editors (`legal_pages`, migration 000143). */
+    legal: {
+      privacy: "/platform/legal/privacy",
+      terms: "/platform/legal/terms",
+      accountDeletion: "/platform/legal/account-deletion",
+    },
     users: {
       root: "/platform/users",
       create: "/platform/users/create",

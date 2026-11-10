@@ -810,6 +810,7 @@ type Querier interface {
 	GetLatestPendingLinkPayment(ctx context.Context, arg GetLatestPendingLinkPaymentParams) (GetLatestPendingLinkPaymentRow, error)
 	GetLedgerEntryForDeposit(ctx context.Context, arg GetLedgerEntryForDepositParams) (GetLedgerEntryForDepositRow, error)
 	GetLedgerEntryRow(ctx context.Context, arg GetLedgerEntryRowParams) (GetLedgerEntryRowRow, error)
+	GetLegalPageBySlug(ctx context.Context, slug string) (GetLegalPageBySlugRow, error)
 	GetLiveDocument(ctx context.Context, arg GetLiveDocumentParams) (GetLiveDocumentRow, error)
 	GetLiveInspection(ctx context.Context, arg GetLiveInspectionParams) (GetLiveInspectionRow, error)
 	// The reserved / consumed redemption of a reservation, locked.
@@ -2814,6 +2815,7 @@ type Querier interface {
 	UpdateIntegrationAccount(ctx context.Context, arg UpdateIntegrationAccountParams) (int64, error)
 	UpdateInvoiceDraft(ctx context.Context, arg UpdateInvoiceDraftParams) (int64, error)
 	UpdateInvoiceLine(ctx context.Context, arg UpdateInvoiceLineParams) error
+	UpdateLegalPage(ctx context.Context, arg UpdateLegalPageParams) (int64, error)
 	UpdateLogPurgeRule(ctx context.Context, arg UpdateLogPurgeRuleParams) (LogPurgeRule, error)
 	// The send's result; a delivery report that arrived first is kept.
 	UpdateNotificationDelivery(ctx context.Context, arg UpdateNotificationDeliveryParams) (int64, error)

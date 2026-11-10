@@ -16,6 +16,7 @@ Human and agent entry points for Rentopya.
 | [handover/](./handover/README.md) | Handover set (Turkish, TEC-743): install, data model, public API, settings, record tracking, tests and open items |
 | [guides/firma-yoneticisi.md](./guides/firma-yoneticisi.md) | Company admin usage guide (Turkish): first setup order, daily operations |
 | [guides/teslim-iade-personeli.md](./guides/teslim-iade-personeli.md) | Handover / return staff guide (Turkish, mobile): tasks, handover and return steps, offline behaviour |
+| [design/legal-pages.md](./design/legal-pages.md) | Public privacy / terms / account deletion / support pages, platform editor, App Store and Google Play URLs |
 | [design/](./design) | One design doc per domain area (tenant-core, reservations, pricing, payments, integration-jobs, branded-site, …) |
 | [brand.md](./brand.md) | Rentopya logos, colours, kept `rentopia` identifiers |
 | [../AGENTS.md](../AGENTS.md) | Agent skill index |
