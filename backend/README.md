@@ -12,7 +12,7 @@ From the **repo root** (canonical `.env`):
 
 ```bash
 make local-dev
-make create-super-admin
+make create-super-admin SA_EMAIL=you@example.com
 ```
 
 Or from this directory, after infra is up:
@@ -20,7 +20,7 @@ Or from this directory, after infra is up:
 ```bash
 make migrate-up
 make sqlc
-make create-super-admin
+make create-super-admin SA_EMAIL=you@example.com
 make dev             # air on APP_HTTP_ADDR (default :8080)
 make worker          # optional: worker as its own process (QUEUE_WORKER_INPROCESS=false)
 make health          # GET /healthz and /readyz
@@ -31,7 +31,7 @@ Infra runs in Docker; the API runs on the host via `make dev` / `make run`. Othe
 | CLI (`cmd/`) | Purpose |
 |--------------|---------|
 | `server`, `worker` | API and Asynq worker |
-| `create-super-admin` | Upsert the platform admin (`make create-super-admin`) |
+| `create-super-admin` | Create the platform admin (`make create-super-admin SA_EMAIL=…`); no default credentials |
 | `search-reindex` | Rebuild Meilisearch indexes (`make search-reindex`) |
 | `catalog-import` | Import the monthly TSB kasko list into the platform catalog (`-file … -apply`) |
 | `enqueue-ping` | Smoke-test the queue (`make ping-job`) |
@@ -44,10 +44,11 @@ Doc index: [`docs/README.md`](docs/README.md).
 ### Bootstrap platform admin
 
 ```bash
-make create-super-admin SA_EMAIL=admin@localhost SA_PASSWORD='Password1' SA_NAME=Platform SA_SURNAME=Admin
+make create-super-admin SA_EMAIL=admin@localhost                      # generated password, printed once
+SA_PASSWORD='…' make create-super-admin SA_EMAIL=admin@localhost SA_NAME=Platform SA_SURNAME=Admin
 ```
 
-Requires migrations (`000005_seed_rbac`) so the `super_admin` role exists. The CLI upserts the user and assigns that role via `user_roles`.
+Requires migrations (`000005_seed_rbac`) so the `super_admin` role exists. The CLI creates the user and assigns that role via `user_roles`. There is no default email or password; a given password must pass the sign-up policy, and an existing user is only updated with `SA_RESET_PASSWORD=true` (`-reset-password`). Flags and env vars: `go run ./cmd/create-super-admin -h`.
 
 ### Register a user (self-serve, no roles)
 
@@ -56,7 +57,7 @@ curl -sS -X POST http://127.0.0.1:8080/v1/auth/register \
   -H 'Content-Type: application/json' \
   -d '{
     "email": "user@example.test",
-    "password": "Password1",
+    "password": "Ch4nge-me-now",
     "name": "Ada",
     "surname": "Lovelace"
   }'
@@ -71,7 +72,7 @@ Also enqueues welcome + email verification via the notification center (MailHog 
 ```bash
 curl -sS -X POST http://127.0.0.1:8080/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@localhost","password":"Password1"}'
+  -d '{"email":"admin@localhost","password":"<your password>"}'
 
 curl -sS http://127.0.0.1:8080/v1/auth/me \
   -H "Authorization: Bearer $ACCESS_TOKEN"

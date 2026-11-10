@@ -37,6 +37,7 @@ import (
 	vehiclerepository "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/vehicles/repository"
 	vehicleusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/vehicles/usecase"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/activity"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/clientip"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/crypto"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/integrations"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/mail"
@@ -214,7 +215,9 @@ func newEnv(t *testing.T) *env {
 
 	mux := http.NewServeMux()
 	customerportal.RegisterRoutes(mux, handler.New(e.svc, rec), nil, nil, stubResolver{})
-	e.server = httptest.NewServer(mux)
+	// As in production: requests reach the API from a trusted proxy (loopback)
+	// through clientip.Middleware, so X-Forwarded-For is honoured.
+	e.server = httptest.NewServer(withClientIP(mux))
 	t.Cleanup(e.server.Close)
 
 	e.a = e.newTenant("a", accounts, true)
@@ -991,4 +994,14 @@ func TestPortalSelfCancel(t *testing.T) {
 	if r := e.call(http.MethodPost, base+"/reservations/"+r1.UUID.String()+"/pay", token, nil); r.code != http.StatusConflict || r.code_() != "NOTHING_DUE" {
 		t.Fatalf("pay a cancelled reservation %d %s", r.code, r.raw)
 	}
+}
+
+// withClientIP wraps h in clientip.Middleware with the default trusted
+// proxies (loopback + private ranges), as httpserver does in production.
+func withClientIP(h http.Handler) http.Handler {
+	res, err := clientip.NewResolver(nil)
+	if err != nil {
+		panic(err)
+	}
+	return clientip.Middleware(res)(h)
 }

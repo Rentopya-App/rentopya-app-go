@@ -7,22 +7,175 @@ on:
   push:
     branches: ["**"]
   # Manual run of the acceptance job with the Playwright scenarios
-  # (docs/acceptance/beta.md); the other jobs run as on a push.
+  # (docs/acceptance/beta.md); every other job runs as on a full push.
   workflow_dispatch:
     inputs:
       e2e:
         description: "Run the Playwright acceptance scenarios (full stack)"
         type: boolean
         default: true
+      push_test_images:
+        description: "Also push every image to GHCR as :test-<short-sha> (never latest / v0.*)"
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Feature branches: newest push wins. main: never cancel mid-run.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Path filter. Plain `git diff` (no third-party action) decides which area
+  # jobs run; the outputs gate every job below except commit-policy.
+  #
+  # Diff base: a feature branch is diffed as a whole against its merge-base
+  # with main (not the previous push), so a docs-only push after a red one
+  # still re-tests the branch. Everything runs on: a main push, a
+  # workflow_dispatch, a head commit carrying [ci-full], a change under
+  # .github/workflows/, or when the merge-base cannot be found.
+  #
+  # Mapping (first match wins; case globs, `*` spans '/'):
+  #   backend/docs/openapi.yaml          -> backend, frontend, env, mobile
+  #                                         (mobile's api:check: committed types)
+  #   backend/**  (non-.md)              -> backend, env (env reads)
+  #   frontend/**, scripts/check-i18n.mjs-> frontend
+  #   site/**                            -> site
+  #   mobile/**                          -> mobile
+  #   scripts/ci/mobile-release*, .easignore -> mobile
+  #   deploy/**, compose.*.yml, .env*.example, scripts/{prod-env,check-*env*}
+  #                                      -> env
+  #   Makefile                           -> backend (acceptance targets)
+  #   docs/**, *.md, .agents/**, .claude/**, other .github/**, landing-video/**,
+  #   llms.txt, .gitignore, .mcp.json    -> nothing
+  #   anything else                      -> backend, frontend, site, env
+  #
+  # mobile_release (main pushes only, never another branch): the push itself
+  # (github.event.before..sha) changed a shipping file under mobile/ (not
+  # *.md / mobile/docs). Backend/OpenAPI changes never release the app; only a
+  # committed mobile/ diff (e.g. regenerated schema.d.ts) does (mobile-ci skill).
+  # ---------------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      backend: ${{ steps.f.outputs.backend }}
+      frontend: ${{ steps.f.outputs.frontend }}
+      site: ${{ steps.f.outputs.site }}
+      env: ${{ steps.f.outputs.env }}
+      mobile: ${{ steps.f.outputs.mobile }}
+      mobile_release: ${{ steps.f.outputs.mobile_release }}
+      workflows: ${{ steps.f.outputs.workflows }}
+      full: ${{ steps.f.outputs.full }}
+      images: ${{ steps.f.outputs.images }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: f
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          backend=false; frontend=false; site=false; env=false
+          mobile=false; workflows=false; full=false
+          files=""
+
+          if [ "$EVENT" != "push" ] || [ "$REF" = "refs/heads/main" ]; then
+            full=true
+          elif grep -qF '[ci-full]' <<<"$HEAD_MSG"; then
+            echo "[ci-full] in the head commit message: running everything."
+            full=true
+          else
+            base=""
+            if git fetch --no-tags --quiet origin main 2>/dev/null; then
+              base="$(git merge-base FETCH_HEAD "$SHA" 2>/dev/null || true)"
+            fi
+            if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              echo "No merge-base with main: running everything."
+              full=true
+            else
+              files="$(git diff --name-only "$base" "$SHA")"
+              echo "Changed files since ${base::7}:"
+              printf '%s\n' "$files"
+            fi
+          fi
+
+          if [ -n "$files" ]; then
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              case "$file" in
+                .github/workflows/*) workflows=true; full=true ;;
+              esac
+            done <<< "$files"
+          fi
+
+          if [ "$full" != "true" ] && [ -n "$files" ]; then
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              case "$file" in
+                backend/docs/openapi.yaml)           backend=true; frontend=true; env=true; mobile=true ;;
+                docs/*|*.md|.agents/*|.claude/*|.github/*|landing-video/*|llms.txt|.gitignore|.mcp.json)
+                                                     : ;;   # nothing (before app dirs: backend/*.md is docs)
+                backend/*)                           backend=true; env=true ;;
+                frontend/*|scripts/check-i18n.mjs)   frontend=true ;;
+                site/*)                              site=true ;;
+                mobile/*|scripts/ci/mobile-release*|.easignore)
+                                                     mobile=true ;;
+                deploy/*|compose.*.yml|.env*.example|scripts/prod-env*|scripts/check-env-sync.sh|scripts/check-compose-env*)
+                                                     env=true ;;
+                Makefile)                            backend=true ;;
+                *)                                   backend=true; frontend=true; site=true; env=true ;;
+              esac
+            done <<< "$files"
+          fi
+
+          if [ "$full" = "true" ]; then
+            backend=true; frontend=true; site=true; env=true; mobile=true
+          fi
+
+          mobile_release=false
+          if [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
+            if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              pushed="$(git diff --name-only "$BEFORE" "$SHA")"
+            else
+              # New branch or unknown base: let the fingerprint decide.
+              pushed="mobile/package.json"
+            fi
+            while IFS= read -r file; do
+              case "$file" in
+                mobile/*.md|mobile/docs/*) : ;;
+                mobile/*) mobile_release=true ;;
+              esac
+            done <<< "$pushed"
+          fi
+
+          # Build-context images (deploy/images.json) for the image matrices.
+          images="$(jq -c '.images' deploy/images.json)"
+
+          {
+            echo "images=$images"
+            echo "backend=$backend"
+            echo "frontend=$frontend"
+            echo "site=$site"
+            echo "env=$env"
+            echo "mobile=$mobile"
+            echo "mobile_release=$mobile_release"
+            echo "workflows=$workflows"
+            echo "full=$full"
+          } >> "$GITHUB_OUTPUT"
+          echo "backend=$backend frontend=$frontend site=$site env=$env mobile=$mobile mobile_release=$mobile_release workflows=$workflows full=$full" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
   # Project rule (AGENTS.md): no AI attribution in commit messages.
   commit-policy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Reject AI attribution in pushed commit messages
         env:
@@ -35,25 +188,52 @@ jobs:
 
   # deploy/env/schema must produce a complete env for compose.prod.yml.
   prod-env:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.env == 'true'
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Generate env from schema and validate prod compose
         run: |
           scripts/prod-env.sh init -o "$RUNNER_TEMP/prod.env" --app-url https://ci.example.com
-          docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q
+          # IMAGE_TAG has no schema default: the deploy sets the release (v0.N).
+          IMAGE_TAG=v0.0 docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q
+          IMAGE_TAG=v0.0 docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml -f compose.build.yml config -q
+          # Without IMAGE_TAG compose must refuse to start.
+          if docker compose --env-file "$RUNNER_TEMP/prod.env" -f compose.prod.yml config -q 2>/dev/null; then
+            echo "::error::compose.prod.yml resolved without IMAGE_TAG"; exit 1
+          fi
           scripts/prod-env.sh check "$RUNNER_TEMP/prod.env"
 
+  # deploy/env/schema stays the source of truth (docs/design/env-core.md):
+  # .env.server.example is generated from it, .env.example has every key, and
+  # every env var the backend reads reaches compose.prod.yml (or has a decision
+  # in deploy/env/compose-env.allow). Local: make env-check
+  env:
+    needs: changes
+    if: needs.changes.outputs.env == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Env schema sync
+        run: scripts/check-env-sync.sh
+      - name: Backend env reaches compose.prod.yml
+        run: |
+          scripts/check-compose-env.sh
+          scripts/check-compose-env.test.sh
+
   backend:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
-    # Database tests (tenant isolation, module integration tests) skip without
-    # TEST_DATABASE_URL. They expect an already migrated database; tests that
-    # need a private copy (dbtest.FreshDatabase) create one on the same server,
-    # so the role needs CREATEDB (the image's POSTGRES_USER is a superuser).
-    # Same Postgres major as compose.prod.yml.
+    # Database tests (tenant isolation RT-A01, module integration tests) skip
+    # without TEST_DATABASE_URL. They expect an already migrated database;
+    # tests that need a private copy (dbtest.FreshDatabase) create one on the
+    # same server, so the role needs CREATEDB (the image's POSTGRES_USER is a
+    # superuser). Same Postgres major as compose.prod.yml.
     services:
       postgres:
         image: postgres:18-alpine
@@ -83,12 +263,21 @@ jobs:
       - uses: sqlc-dev/setup-sqlc@v5
         with:
           sqlc-version: "1.31.1"
-      - name: sqlc generate
-        run: sqlc generate
+      - name: sqlc generate is up to date
+        run: |
+          sqlc generate
+          if ! git diff --exit-code -- . || [ -n "$(git status --porcelain -- .)" ]; then
+            echo "::error title=Stale sqlc output::Run 'sqlc generate' in backend/ and commit internal/database/db."
+            exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      # Pinned to the version `latest` resolved to before (keeps lint results
+      # stable); bump deliberately. The action caches its own results.
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.15.0
           working-directory: backend
       # Same golang-migrate image and version as backend/Dockerfile (prod's
       # migrate role); keep the two in step.
@@ -98,13 +287,17 @@ jobs:
           -v "$PWD/migrations:/migrations:ro"
           migrate/migrate:v4.19.1
           -path /migrations -database "$TEST_DATABASE_URL" up
+      # Includes the query isolation guard, the OpenAPI route check
+      # (internal/httpserver/docs_test.go) and RT-A01.
       - name: Test
         run: go test ./...
       - name: OpenAPI lint
         run: npx --yes @redocly/cli@1 lint docs/openapi.yaml
 
   frontend:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -124,6 +317,8 @@ jobs:
         run: pnpm typecheck
       - name: Lint
         run: pnpm lint
+      - name: Unit tests
+        run: pnpm test
       - name: i18n
         working-directory: .
         run: node scripts/check-i18n.mjs
@@ -131,7 +326,9 @@ jobs:
   # Branded site app (TEC-729): its own image (site/Dockerfile), built by
   # Dokploy from compose.prod.yml like backend and frontend.
   site:
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.site == 'true'
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: site
@@ -158,14 +355,59 @@ jobs:
       - name: Build
         run: pnpm build
 
+  # Expo app (mobile/). Verification only: no secrets, never a release
+  # (mobile-release below ships it). Also runs on every openapi.yaml change, so
+  # an API change that leaves mobile/src/core/api/schema.d.ts stale fails here.
+  mobile:
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      # openapi-typescript pinned to an exact version and the committed
+      # schema.d.ts equal to `npm run api:generate` (mobile-ci skill).
+      - name: API types up to date
+        run: npm run api:check
+      - name: Expo doctor
+        run: npx expo-doctor
+      - name: Release script
+        working-directory: .
+        run: |
+          bash -n scripts/ci/mobile-release.sh
+          scripts/ci/mobile-release.test.sh
+
   # Acceptance suite RT-A01…A32 (TEC-740, docs/acceptance/beta.md). The Go
-  # scenarios run on every push against the same Postgres as the backend
-  # job; the Playwright scenarios need the whole stack (containers, API,
-  # panel, site) and run on a manual dispatch only. Not a dependency of
-  # auto-pr: a red acceptance run is reported, it does not block merging.
+  # scenarios run against the same Postgres setup as the backend job whenever
+  # backend or frontend ran and neither failed; the Playwright scenarios need
+  # the whole stack (containers, API, panel, site) and run on a manual
+  # dispatch only. Part of the `ci` gate.
   acceptance:
-    needs: [backend, frontend]
-    runs-on: ubuntu-latest
+    needs: [changes, backend, frontend]
+    if: >-
+      always() &&
+      needs.changes.result == 'success' &&
+      ( needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' ) &&
+      needs.backend.result != 'failure' &&
+      needs.backend.result != 'cancelled' &&
+      needs.frontend.result != 'failure' &&
+      needs.frontend.result != 'cancelled'
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
       postgres:
@@ -209,6 +451,10 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.e2e
         with:
           node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: |
+            frontend/pnpm-lock.yaml
+            site/pnpm-lock.yaml
       - name: Install panel and site, Chromium
         if: github.event_name == 'workflow_dispatch' && inputs.e2e
         run: |
@@ -241,21 +487,322 @@ jobs:
             frontend/e2e/evidence/
             ${{ runner.temp }}/rentopya-e2e/playwright/report/
 
-  # Feature branch pushed and both test jobs green → open (or reuse) a PR into
-  # main and turn on auto-merge. GitHub merges once main's required checks pass.
-  # Opt out per push by putting [no-automerge] in the head commit message.
+  # Mobile store release (mobile/docs/OTA.md): OTA when the native fingerprint
+  # is unchanged, otherwise an Android EAS build and an ios-build-* tag for
+  # Xcode Cloud. Only on a main push whose own diff touched mobile/, after the
+  # app's checks passed, and only once the repo variable MOBILE_RELEASE_ENABLED
+  # is "true" (an ios-build-* tag pushed before Xcode Cloud listens would be
+  # recorded as built). Otherwise skipped, which the `ci` gate accepts. Never
+  # runs on cc-collective-branch, feature branches or PRs.
+  mobile-release:
+    needs: [changes, backend, frontend, mobile]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      vars.MOBILE_RELEASE_ENABLED == 'true' &&
+      needs.changes.outputs.mobile_release == 'true' &&
+      needs.backend.result == 'success' &&
+      needs.frontend.result == 'success' &&
+      needs.mobile.result == 'success'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/mobile-release.yml
+    secrets:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Images (TEC-1132). Every build-context service in deploy/images.json, as a
+  # matrix (nothing hardcoded). Image path is repo-derived and lower-cased:
+  # ghcr.io/<owner>/<repo>-<service>. Provenance goes in as build args
+  # (VERSION, GIT_SHA, BUILD_TIME, RELEASE_JSON_B64; only backend/Dockerfile
+  # consumes them) and OCI labels on every image.
+  # ---------------------------------------------------------------------------
+
+  # Every branch push (and dispatch): build every image, NO push. Part of the
+  # `ci` gate, so a broken Dockerfile or production build (the panel's
+  # `next build` runs only here) turns the branch red. Skipped on main pushes,
+  # where publish-images builds the same images.
+  image-build:
+    needs: changes
+    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - id: meta
+        run: |
+          echo "version=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Build ${{ matrix.image.service }} (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: false
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ steps.meta.outputs.built_at }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.built_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.service }}
+
+  # Optional test push, manual only: Actions → CI → Run workflow with
+  # "push_test_images" ticked. Pushes :test-<short-sha> and nothing else (never
+  # latest, :sha-*, or v0.*). Reuses image-build's gha cache.
+  image-test-push:
+    needs: [changes, image-build]
+    if: github.event_name == 'workflow_dispatch' && inputs.push_test_images && needs.image-build.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        env:
+          SERVICE: ${{ matrix.image.service }}
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY,,}"            # ghcr.io requires lowercase
+          {
+            echo "image=ghcr.io/${repo}-${SERVICE}"
+            echo "sha=${GITHUB_SHA::7}"
+            echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+      - name: Build and push ${{ matrix.image.service }}:test-${{ steps.meta.outputs.sha }}
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.image }}:test-${{ steps.meta.outputs.sha }}
+          build-args: |
+            VERSION=test-${{ steps.meta.outputs.sha }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ steps.meta.outputs.built_at }}
+          labels: |
+            org.opencontainers.image.version=test-${{ steps.meta.outputs.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.built_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image.service }}
+
+  # Main push: decide the release ONCE, before any image is built, so every
+  # image bakes the same provenance and release-tag cuts exactly this version.
+  #   version  next v0.N after the highest existing v0.* tag (none -> v0.1)
+  #   notes    `git log --no-merges` since the previous v0.* tag (whole history
+  #            for the first release), capped at 200 lines; no hand-kept CHANGELOG
+  #   release  base64 release.json {version, git_sha, built_at, notes}: the
+  #            backend embeds it (internal/buildinfo); cmd/release-record writes
+  #            it to app_releases when the migrate service runs on deploy.
+  #   label    the notes on one line, cut to 900 characters, for the
+  #            org.opencontainers.image.description label
+  release-meta:
+    needs: changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.m.outputs.version }}
+      built_at: ${{ steps.m.outputs.built_at }}
+      release_b64: ${{ steps.m.outputs.release_b64 }}
+      notes_b64: ${{ steps.m.outputs.notes_b64 }}
+      notes_label: ${{ steps.m.outputs.notes_label }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: m
+        env:
+          LC_ALL: C.UTF-8
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          last="$(git tag -l 'v0.*' | sed -n 's/^v0\.\([0-9]\+\)$/\1/p' | sort -n | tail -1)"
+          version="v0.$(( ${last:-0} + 1 ))"
+          if [ -n "$last" ]; then
+            range="v0.${last}..${GITHUB_SHA}"; since="since v0.${last}"
+          else
+            range="${GITHUB_SHA}"; since="(first release)"
+          fi
+          log="$(git log --no-merges --pretty='- %s (%h)' "$range")"
+          total="$(printf '%s\n' "$log" | grep -c '^- ' || true)"
+          notes="$(printf '%s\n' "$log" | head -n 200)"
+          if [ "${total:-0}" -gt 200 ]; then
+            notes="${notes}"$'\n'"- …and $(( total - 200 )) more commits ${since}."
+          fi
+          [ -n "$log" ] || notes="- No code changes ${since} (redeploy)."
+          built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          release_b64="$(jq -nc --arg v "$version" --arg s "$GITHUB_SHA" --arg b "$built_at" --arg n "$notes" \
+            '{version:$v, git_sha:$s, built_at:$b, notes:$n}' | base64 -w0)"
+          notes_b64="$(printf '%s\n' "$notes" | base64 -w0)"
+          # One line, no quotes or commas (the action parses the labels input as
+          # CSV), cut on a character boundary (C.UTF-8).
+          label="$(printf '%s' "$notes" | tr '\n' ' ' | tr -d '"' | tr ',' ';' | tr -s ' ')"
+          [ "${#label}" -le 900 ] || label="${label:0:897}..."
+          {
+            echo "version=$version"
+            echo "built_at=$built_at"
+            echo "release_b64=$release_b64"
+            echo "notes_b64=$notes_b64"
+            echo "notes_label=$label"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release $version ($since)"
+            echo
+            echo "$notes"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Main push, every test job green: build + push every image to GHCR as
+  # :sha-<short> and :v0.N (never latest). Any test job that failed, was
+  # cancelled OR was skipped blocks the publish (main always runs the full
+  # suite, so a skip means something went wrong). mobile has its own release
+  # track and does not gate the server images.
+  publish-images:
+    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, acceptance, release-meta]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      needs.commit-policy.result == 'success' &&
+      needs.prod-env.result == 'success' &&
+      needs.env.result == 'success' &&
+      needs.backend.result == 'success' &&
+      needs.frontend.result == 'success' &&
+      needs.site.result == 'success' &&
+      needs.acceptance.result == 'success' &&
+      needs.release-meta.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        env:
+          SERVICE: ${{ matrix.image.service }}
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY,,}"            # ghcr.io requires lowercase
+          echo "image=ghcr.io/${repo}-${SERVICE}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Build and push ${{ matrix.image.service }}
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.image }}:${{ needs.release-meta.outputs.version }}
+          build-args: |
+            VERSION=${{ needs.release-meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ needs.release-meta.outputs.built_at }}
+            RELEASE_JSON_B64=${{ needs.release-meta.outputs.release_b64 }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.release-meta.outputs.version }}
+            org.opencontainers.image.created=${{ needs.release-meta.outputs.built_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=${{ needs.release-meta.outputs.notes_label }}
+          cache-from: type=gha,scope=${{ matrix.image.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.service }}
+
+  # Every image is on GHCR -> cut the version release-meta chose (the one baked
+  # into the images): git tag v0.N plus a GitHub release with the notes.
+  # Re-runs are idempotent (tag at this commit / release already there).
+  release-tag:
+    needs: [release-meta, publish-images]
+    if: always() && needs.release-meta.result == 'success' && needs.publish-images.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Tag and release ${{ needs.release-meta.outputs.version }}
+        env:
+          TAG: ${{ needs.release-meta.outputs.version }}
+          NOTES_B64: ${{ needs.release-meta.outputs.notes_b64 }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          if existing="$(git rev-parse -q --verify "refs/tags/${TAG}^{commit}")"; then
+            if [ "$existing" != "$GITHUB_SHA" ]; then
+              echo "::error title=Tag taken::$TAG already exists at ${existing::7}, but the images were baked as $TAG for ${GITHUB_SHA::7}. Re-run the whole workflow so release-meta picks the next number."
+              exit 1
+            fi
+            echo "$TAG already points at ${GITHUB_SHA::7} (re-run)."
+          else
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$TAG"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+          else
+            printf '%s' "$NOTES_B64" | base64 -d > "$RUNNER_TEMP/notes.md"
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          echo "Released **$TAG** at \`${GITHUB_SHA::7}\`: images \`:$TAG\` and \`:sha-${GITHUB_SHA::7}\`." >> "$GITHUB_STEP_SUMMARY"
+
+  # Feature branch pushed and the `ci` gate green → open (or reuse) a PR into
+  # main and merge the tested commit. Opt out per push by putting
+  # [no-automerge] in the head commit message. Not part of the `ci` gate.
   # Token: repo secret AUTO_PR_TOKEN (fine-grained PAT: contents + pull
   # requests read/write) when set — merges made with it also trigger CI on
   # main. Otherwise GITHUB_TOKEN, which needs Settings → Actions → General →
   # "Allow GitHub Actions to create and approve pull requests".
+  #
+  # DISABLED: this job opens and merges a PR from every feature branch into
+  # main. During the org migration all work lands on cc-collective-branch via
+  # PRs and only the owner merges into main, so the job is turned off.
+  # To restore, replace `if: false` with the original condition:
+  #   if: >-
+  #     github.event_name == 'push' &&
+  #     github.ref_name != 'main' &&
+  #     github.ref_name != 'master' &&
+  #     !contains(github.event.head_commit.message, '[no-automerge]')
   auto-pr:
-    needs: [commit-policy, prod-env, backend, frontend, site]
-    if: >-
-      github.event_name == 'push' &&
-      github.ref_name != 'main' &&
-      github.ref_name != 'master' &&
-      !contains(github.event.head_commit.message, '[no-automerge]')
-    runs-on: ubuntu-latest
+    needs: [ci]
+    if: false
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -291,7 +838,7 @@ jobs:
       - name: Merge
         if: steps.pr.outputs.number != ''
         run: |
-          # This job only runs after backend + frontend passed, so merge right away
+          # This job only runs after the ci gate passed, so merge right away
           # (no --auto: that needs branch protection). Only merge the commit this
           # run tested: a later push (or a re-run of an older run) must never
           # merge an untested branch head.
@@ -301,3 +848,25 @@ jobs:
             exit 1
           fi
           echo "$out"
+
+  # Single required status check. Passes when every gated job is success or
+  # skipped; fails if any failed or was cancelled. Make THIS the required check
+  # in branch protection (not the individual jobs, which skip by design).
+  ci:
+    if: always()
+    needs: [changes, commit-policy, prod-env, env, backend, frontend, site, mobile, acceptance, mobile-release, image-build, image-test-push, release-meta, publish-images, release-tag]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Gate
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "Needed job results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error title=CI gate failed::A required job reported '$r'."; exit 1 ;;
+            esac
+          done
+          echo "All required jobs passed or were skipped."

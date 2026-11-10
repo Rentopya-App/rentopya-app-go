@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "Rentopya",
+  "NSCameraUsageDescription": "Rentopya uses the camera to scan vehicle QR labels and plates and to photograph the vehicle and its damage at handover and return.",
+  "NSPhotoLibraryUsageDescription": "Rentopya uses your photo library to attach vehicle photos taken earlier to a handover or return form."
+}

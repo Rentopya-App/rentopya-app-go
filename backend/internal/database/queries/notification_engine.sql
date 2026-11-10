@@ -482,3 +482,54 @@ WHERE t.organization_id = sqlc.arg(organization_id)
   AND t.due_at > sqlc.arg(since_at)::timestamptz
 ORDER BY t.due_at
 LIMIT 2000;
+
+-- name: ListNotifyHandoverTasks :many
+-- Open handover field tasks with an assignee whose due time is within the
+-- horizon (the staff member's "handover approaching" reminder).
+SELECT t.id, t.uuid, t.task_type, t.assignee_id::bigint AS assignee_id, t.due_at, b.name AS branch_name
+FROM operation_tasks t
+JOIN branches b ON b.organization_id = t.organization_id AND b.id = t.branch_id
+WHERE t.organization_id = sqlc.arg(organization_id)
+  AND b.organization_id = sqlc.arg(organization_id)
+  AND t.task_type = 'handover'
+  AND t.assignee_id IS NOT NULL
+  AND t.status IN ('planned', 'assigned', 'en_route')
+  AND t.due_at > sqlc.arg(now_at)::timestamptz
+  AND t.due_at <= sqlc.arg(until_at)::timestamptz
+ORDER BY t.due_at
+LIMIT 2000;
+
+-- name: ListNotifyApprovalWaiting :many
+-- Reservations waiting for a staff decision (request / awaiting_review)
+-- created recently, once per member who may approve them: a role with
+-- tenant.reservations.approve and a branch scope that covers the pickup
+-- branch.
+SELECT r.id, r.uuid, r.reference, r.status, r.starts_at, pb.name AS branch_name, om.user_id
+FROM reservations r
+JOIN branches pb ON pb.organization_id = r.organization_id AND pb.id = r.pickup_branch_id
+JOIN organization_members om ON om.organization_id = r.organization_id
+JOIN users u ON u.id = om.user_id
+WHERE r.organization_id = sqlc.arg(organization_id)
+  AND pb.organization_id = sqlc.arg(organization_id)
+  AND om.organization_id = sqlc.arg(organization_id)
+  AND r.status IN ('request', 'awaiting_review')
+  AND r.created_at > sqlc.arg(since_at)::timestamptz
+  AND u.deleted_at IS NULL
+  AND EXISTS (
+        SELECT 1
+        FROM organization_member_roles mr
+        JOIN role_permissions rp ON rp.role_id = mr.role_id
+        JOIN permissions p ON p.id = rp.permission_id
+        WHERE mr.organization_id = om.organization_id AND mr.member_id = om.id
+          AND p.slug = 'tenant.reservations.approve'
+  )
+  AND (
+        om.branch_scope = 'all'
+        OR EXISTS (
+            SELECT 1 FROM organization_member_branches mb
+            WHERE mb.organization_id = om.organization_id AND mb.member_id = om.id
+              AND mb.branch_id = r.pickup_branch_id
+        )
+  )
+ORDER BY r.created_at, om.user_id
+LIMIT 2000;

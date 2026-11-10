@@ -1,0 +1,22 @@
+{
+  "title": "Menü",
+  "section_account": "Hesap",
+  "section_app": "Uygulama",
+  "language": "Dil",
+  "theme": "Görünüm",
+  "theme_system": "Sistem",
+  "theme_light": "Açık",
+  "theme_dark": "Koyu",
+  "section_about": "Hakkında",
+  "version": "Sürüm",
+  "section_company": "Şirket",
+  "organization": "Şirket",
+  "switch_organization": "Şirket değiştir",
+  "branch": "Şube",
+  "branch_all": "Tüm şubeler",
+  "branch_hint": "Listeler bu şubeye göre süzülür. Yetkiniz olmayan şubeler zaten görünmez.",
+  "role": "Rolünüz",
+  "sign_out": "Çıkış yap",
+  "sign_out_confirm_title": "Çıkış yapılsın mı?",
+  "sign_out_confirm_body": "Bu cihazdaki oturumunuz kapanır."
+}

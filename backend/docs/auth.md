@@ -87,17 +87,21 @@ NextAuth keeps handling web OAuth; mobile apps send the SDK id_token to the API.
 - Apple tokens: when `authorization_code` is sent and `AUTH_APPLE_TEAM_ID` / `AUTH_APPLE_KEY_ID` / `AUTH_APPLE_PRIVATE_KEY` (the Sign in with Apple `.p8`, `\n` escapes allowed) are set, the refresh token is stored encrypted (`oauth_accounts.refresh_token_enc`, `client_id`) and revoked on account deletion.
 - Apple signing key resolution (`internal/platform/appleauth.Resolver`): the `.p8` uploaded in Platform → Integrations → Apple (`oauth_provider_settings.apple_team_id` / `apple_key_id` / `apple_private_key_enc`, encrypted with `APP_ENCRYPTION_KEY`) wins; the `AUTH_APPLE_*` env vars are the fallback. The parsed key is cached for 1 minute and dropped immediately when an admin saves the Apple settings. With a key, the web (NextAuth) Apple `client_secret` returned by `GET /v1/internal/auth/oauth/apple` is generated per request (ES256, `iss` = Team ID, `sub` = Services ID, `kid` = Key ID, valid 24h, `client_secret_expires_at` set); a pasted client secret JWT is only used when no key is configured.
 
-## Account deletion (deactivation)
+## Account deletion
+
+Real deletion with a 30-day restore window; full design in [docs/design/account-deletion.md](../../docs/design/account-deletion.md).
 
 | Method | Path | Auth |
 |--------|------|------|
 | POST | `/v1/auth/account/deactivate/request` | Bearer — emails `auth.account_deactivation_code` |
 | POST | `/v1/auth/account/deactivate` `{code?}` | Bearer + recent step-up **or** `code` |
+| POST | `/v1/auth/account/restore` `{token}` | Public — token from the deletion e-mail |
 
-- No data is deleted. `users.status = disabled`, `users.deactivated_at = now()`; all refresh tokens revoked; step-up grant revoked; stored Apple refresh tokens revoked via `https://appleid.apple.com/auth/revoke` (skipped when none stored or no key/secret configured); `auth.account_deactivated` email.
+- Request: `users.status = disabled`, `deactivated_at = now()`, `deletion_due_at = now() + 30 days`, `restore_token_hash` (SHA-256 only); all refresh tokens, push devices and browser push subscriptions removed; step-up grant revoked; stored Apple refresh tokens revoked via `https://appleid.apple.com/auth/revoke` (skipped when none stored or no key/secret configured); `auth.account_deactivated` e-mail with the purge date and restore link.
 - Every login path (password, refresh, email code, native OAuth, NextAuth OAuth / passkey session issue, org context) returns `403 ACCOUNT_DEACTIVATED`; existing access tokens stop working on the next request (identity loader rejects disabled users).
-- The last super admin cannot deactivate (`409`). Not allowed while impersonating.
-- Reactivation: a platform admin sets the user's status to `active` (clears `deactivated_at`).
+- Refused: the last super admin (`409 CONFLICT`); the only open owner of a live organization (`409 LAST_ORGANIZATION_OWNER`, details list the organizations; also on the code request); while impersonating.
+- Restore within the window: `POST /v1/auth/account/restore` (or a platform admin sets status `active`, which also clears the schedule).
+- Purge: the worker's hourly `app:auth:account-purge` erases sign-in methods, sessions, devices, inbox and memberships and anonymises the users row; business and audit rows keep their reference.
 
 ## QR sign-in (web QR approved in the mobile app)
 
@@ -150,9 +154,9 @@ Redis INCR, 15-minute window, fail-open if Redis is down. `429 RATE_LIMITED` + `
 
 | Endpoint | Key | Max |
 |----------|-----|-----|
-| Login | IP + email | 10 |
+| Login | IP + email 10, IP 100; refused while the email has 30 failed logins (wrong password or 2FA code, any IP) | |
 | Register | IP | 5 |
-| Forgot password | IP + email | 5 |
+| Forgot password | IP + email 5, email 10 | |
 | Reset password | IP | 10 |
 | Verify email (`/auth/email/verify`) | IP | 10 |
 | Verification email request | user | 5 |
@@ -161,8 +165,9 @@ Redis INCR, 15-minute window, fail-open if Redis is down. `429 RATE_LIMITED` + `
 | Native OAuth | IP | 30 |
 | OAuth link create | IP (register bucket) | 5 |
 | Account deletion code request / deactivate | user | 5 / 10 |
+| Account restore | IP | 10 |
 
-The BFF forwards the browser IP as `X-Forwarded-For`; the Go API must not be reachable directly from clients or the header could be spoofed.
+Per-IP limits, session rows and activity events use the client IP resolved by `internal/platform/clientip` (one middleware at the root of the HTTP stack; handlers call `clientip.From(r)` / `httpkit.ClientIP(r)` and never parse headers themselves). `X-Forwarded-For` is honoured only when the direct peer is a trusted proxy (`TRUSTED_PROXIES`, default loopback + private ranges; `none` disables it): the chain is walked right-to-left and the first untrusted hop wins, so client-prepended entries are ignored. The panel BFF and the site forward the chain they received from the edge proxy unchanged (`forwardedForFromHeaders`), using `X-Real-IP` only when no chain is present. Both must sit behind an edge proxy (Traefik) that appends the real client address; keep the Go API off public networks.
 
 ## `/v1/auth/me`
 
@@ -208,6 +213,8 @@ New permission slugs are added via migrations/seeds only (no permission CRUD API
 
 Behind `TENANCY_ENABLED` (config default `false`; on in `.env.example` and the production env schema, since Rentopya's company panel, customer portal, public API and branded site depend on it). Design: [`docs/design/tenant-core.md`](../../docs/design/tenant-core.md). Platform admins manage organizations under `/v1/platform/organizations` (`platform.organizations.*`); members join through invitations (`/v1/tenant/invitations`, `/v1/invitations/{token}`).
 
+**Security e-mails.** E-mail rows never appear in the inbox (`GET /v1/notifications`, `/v1/tenant/notifications`, the unread counts, `GET /v1/notifications/{uuid}` and its action route answer 404), so an unverified account cannot read its verification code there. E-mails enqueued with `SecurityEmail`, or with a template in `notifmodel.SecurityEmailTemplates` (`auth.password_reset`, `auth.email_verification`, `auth.login_code`, `auth.oauth_link_code`, `auth.account_deactivation_code`, `auth.account_deactivated`, `auth.account_restored`, `auth.account_deleted`, `organizations.invitation`), keep `title` = template code, `body` = `[redacted]` and no `action_url` from the first write, so platform notification views, search, the export and database backups never see the code or link. The real subject, body and link live AES-256-GCM sealed in `notifications.sealed_content` (FieldCipher purpose `notification_content`, keys derived from `APP_ENCRYPTION_KEY`, bound to channel and template); delivery opens them in memory, so retries and stuck-row reclaims send the real content, and a successful send sets the column to NULL. A row that keeps failing keeps only the ciphertext. Enqueue fails rather than store plaintext when no sealer is wired. Migration `000140` redacted older rows of these templates and cancelled the unsent ones (their secrets cannot be sealed from SQL).
+
 **Organization per request.** Nothing about the organization lives in the access token. Tenant routes (`/v1/tenant/*`) read the `X-Organization` header (slug, or uuid) on every request; the BFF forwards that header on `/api/v1/tenant/*` only. Two tabs on two organizations are independent and switching never rotates tokens.
 
 **Chain.** `Authenticate` → `RequireOrganization(resolver)` → `RequireTenantPermission("tenant.x.y")` → handler. `RequireOrganization` resolves the organization and the caller's membership (`orgctx.Resolver`) and stores an `orgctx.Scope` (`orgctx.From` / `orgctx.Must`); handlers pass `scope.ID` to repositories.
@@ -239,4 +246,4 @@ Probe: `GET /v1/tenant/context` returns `{organization, role, roles, permissions
 
 ## CLI
 
-`make create-super-admin` upserts the user and assigns the `super_admin` role.
+`make create-super-admin SA_EMAIL=…` creates the user and assigns the `super_admin` role. No default credentials: the password comes from `SA_PASSWORD` (checked against the sign-up policy) or is generated and printed once; an existing user's password is only overwritten with `SA_RESET_PASSWORD=true`.

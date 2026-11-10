@@ -13,6 +13,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/rentals/model"
 	vehiclemodel "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/vehicles/model"
 	vehicleusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/vehicles/usecase"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -39,13 +40,15 @@ func (s *Service) core(ctx context.Context, orgID int64, id uuid.UUID) (db.GetRe
 }
 
 // place resolves a branch (and an optional point of it) of the
-// organization; nil branch = def.
+// organization; nil branch = def. A branch other than def must be in the
+// caller's branch scope (outside it reads like an unknown branch); def is
+// the rental's planned branch, which the caller may already act on.
 func (s *Service) place(ctx context.Context, orgID int64, field string, branch, point *uuid.UUID, def int64) (db.GetRentalBranchRow, pgtype.Int8, error) {
 	var b db.GetRentalBranchRow
 	var err error
 	if branch != nil {
 		b, err = s.q.GetRentalBranch(ctx, db.GetRentalBranchParams{OrganizationID: orgID, Uuid: *branch})
-		if notFound(err) {
+		if notFound(err) || (err == nil && b.ID != def && orgctx.CheckBranch(ctx, b.ID) != nil) {
 			return b, pgtype.Int8{}, validation(field+"_uuid", "not_found", "branch was not found")
 		}
 	} else {

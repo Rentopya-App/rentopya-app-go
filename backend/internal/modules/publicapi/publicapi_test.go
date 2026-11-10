@@ -37,6 +37,7 @@ import (
 	resusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/usecase"
 	vehiclerepository "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/vehicles/repository"
 	vehicleusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/vehicles/usecase"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/clientip"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/crypto"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/integrations"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
@@ -171,7 +172,9 @@ func newEnv(t *testing.T) *env {
 	t.Cleanup(func() { _ = rdb.Close() })
 	mux := http.NewServeMux()
 	publicapi.RegisterRoutes(mux, handler.NewPublic(e.svc, ratelimit.New(rdb, "test")), handler.NewPanel(e.svc, nil), nil, nil, stubResolver{})
-	e.server = httptest.NewServer(mux)
+	// As in production: requests reach the API from a trusted proxy (loopback)
+	// through clientip.Middleware, so X-Forwarded-For is honoured.
+	e.server = httptest.NewServer(withClientIP(mux))
 	t.Cleanup(e.server.Close)
 
 	e.a = e.newTenant("a", accounts, true)
@@ -1054,4 +1057,14 @@ func mustRes(e *env, reference string) string {
 	var id uuid.UUID
 	e.must(e.pool.QueryRow(context.Background(), `SELECT uuid FROM reservations WHERE organization_id = $1 AND reference = $2`, e.a.id, reference).Scan(&id))
 	return id.String()
+}
+
+// withClientIP wraps h in clientip.Middleware with the default trusted
+// proxies (loopback + private ranges), as httpserver does in production.
+func withClientIP(h http.Handler) http.Handler {
+	res, err := clientip.NewResolver(nil)
+	if err != nil {
+		panic(err)
+	}
+	return clientip.Middleware(res)(h)
 }

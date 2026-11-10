@@ -13,7 +13,6 @@ import {
   oauthProviderService,
   type OAuthProviderSlug,
 } from "@/features/integrations/oauth/services/oauth-provider.service";
-import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 import { appToast } from "@/providers/toast-provider";
@@ -72,11 +71,7 @@ export function OAuthProviderSettingsPage({
       appToast.success(t(`${ns}.toast.saved`));
     },
     onError: (error) => {
-      if (isApiError(error)) {
-        appToast.error(error.message);
-        return;
-      }
-      appToast.error(t(`${ns}.toast.failed`));
+      appToast.apiError(error, t(`${ns}.toast.failed`));
     },
   });
 

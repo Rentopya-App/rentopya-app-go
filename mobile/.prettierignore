@@ -1,0 +1,5 @@
+src/core/i18n/resources.ts
+src/ui/material-symbols.ts
+src/uniwind-types.d.ts
+src/core/api/schema.d.ts
+src/core/auth/permission-slugs.ts

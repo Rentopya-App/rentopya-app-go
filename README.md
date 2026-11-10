@@ -2,13 +2,14 @@
 
 Rentopya is a multi-company, multi-branch car rental SaaS. One installation serves many rental companies (organizations); each company works in its own panel with its own branches, roles, fleet, prices, customers and provider accounts, and gets its own branded booking site.
 
-Monorepo: Go HTTP API + Asynq worker, Next.js BFF panel, Next.js branded site, Docker infra. It grew out of a Next.js + Go boilerplate; the platform layer (auth, RBAC, engines) is still shared with it.
+Monorepo: Go HTTP API + Asynq worker, Next.js BFF panel, Next.js branded site, Expo mobile app, Docker infra. It grew out of a Next.js + Go boilerplate; the platform layer (auth, RBAC, engines) is still shared with it.
 
 | Path | Role |
 |------|------|
 | [`backend/`](./backend) | Go HTTP API + Asynq worker (`:8080`, `/v1/...`) |
 | [`frontend/`](./frontend) | Next.js BFF: landing (`/`), platform panel (`/platform`), company panel (`/t/{slug}`), customer portal (`/r/{orgSlug}`) |
 | [`site/`](./site) | Branded site: one image serves every company's site by host (`{subdomain}.<base host>` or a verified custom domain) |
+| [`mobile/`](./mobile) | Expo app (SDK 58) for the company panel; calls the Go API directly, organization in `X-Organization` |
 | [`compose.local.yml`](./compose.local.yml) | Local infra only |
 | [`compose.prod.yml`](./compose.prod.yml) | Full stack + Dokploy network |
 | [`deploy/`](./deploy) | Production env schema, Centrifugo config |
@@ -70,8 +71,8 @@ make local-dev
 In another terminal (after Postgres is up):
 
 ```sh
-make create-super-admin
-# or: make create-super-admin SA_EMAIL=you@example.com SA_PASSWORD='Secret1'
+make create-super-admin SA_EMAIL=you@example.com   # prints a generated password once
+# or: SA_PASSWORD='…' make create-super-admin SA_EMAIL=you@example.com
 ```
 
 Then open http://localhost:3000/platform/login and sign in as `super_admin`. Create an organization under Platform → Organizations; its panel is at `/t/{slug}`.

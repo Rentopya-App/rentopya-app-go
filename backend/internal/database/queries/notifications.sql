@@ -4,11 +4,11 @@
 INSERT INTO notifications (
     user_id, channel, status, priority,
     title, body, payload, action_url, recipient, template_code, source_event,
-    scheduled_at, max_attempts, organization_id, idempotency_key
+    scheduled_at, max_attempts, organization_id, idempotency_key, sealed_content
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6, $7, $8, $9, $10, $11,
-    $12, $13, sqlc.narg(organization_id), sqlc.narg(idempotency_key)
+    $12, $13, sqlc.narg(organization_id), sqlc.narg(idempotency_key), sqlc.narg(sealed_content)
 )
 ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
 RETURNING *;
@@ -23,8 +23,11 @@ SELECT * FROM notifications WHERE uuid = $1;
 SELECT * FROM notifications WHERE id = $1;
 
 -- name: ListNotificationsForUser :many
+-- E-mail rows stay out of the inbox: their bodies carry one-time codes and
+-- links that must only reach the mailbox, not the account holder.
 SELECT * FROM notifications
 WHERE user_id = sqlc.arg(user_id)
+  AND channel <> 'email'
   -- Inbox scope: un-stamped rows always; organization rows only inside
   -- that organization (NULL organization_id param = platform shell).
   AND (organization_id IS NULL OR organization_id = sqlc.narg(organization_id)::bigint)
@@ -48,6 +51,7 @@ LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);
 -- name: CountNotificationsForUser :one
 SELECT COUNT(*)::bigint FROM notifications
 WHERE user_id = sqlc.arg(user_id)
+  AND channel <> 'email'
   -- Inbox scope: un-stamped rows always; organization rows only inside
   -- that organization (NULL organization_id param = platform shell).
   AND (organization_id IS NULL OR organization_id = sqlc.narg(organization_id)::bigint)
@@ -165,7 +169,9 @@ SET status = sqlc.arg(status)::varchar,
     END,
     provider = sqlc.arg(provider),
     provider_reference = sqlc.arg(provider_reference),
-    last_error = NULL
+    last_error = NULL,
+    -- A delivered security e-mail drops its encrypted content.
+    sealed_content = NULL
 WHERE id = sqlc.arg(id)
 RETURNING *;
 
@@ -251,3 +257,15 @@ WHERE user_id = $1 AND endpoint = $2;
 
 -- name: ListPushSubscriptionsByUser :many
 SELECT * FROM push_subscriptions WHERE user_id = $1;
+
+-- name: RedactNotification :exec
+-- Security e-mails (EnqueueInput.SecretVars): once the row is final the
+-- stored title / body are replaced with the copies rendered without the
+-- secrets (payload.redact), and the recipient is dropped when asked, so no
+-- restore link or erased address outlives the delivery.
+UPDATE notifications
+SET title = COALESCE(payload->'redact'->>'title', title),
+    body = COALESCE(payload->'redact'->>'body', body),
+    recipient = CASE WHEN COALESCE((payload->'redact'->>'forget_recipient')::boolean, FALSE) THEN NULL ELSE recipient END,
+    payload = payload - 'redact'
+WHERE id = sqlc.arg(id) AND payload ? 'redact';

@@ -1,4 +1,10 @@
-import { clientIpFromHeaders, fetchUpstream } from "@/lib/server/upstream";
+import {
+  BodyTooLargeError,
+  PUBLIC_BODY_BYTES,
+  bodyTooLargeResponse,
+  readBodyCapped,
+} from "@/lib/server/request-body";
+import { fetchUpstream, forwardedForFromHeaders } from "@/lib/server/upstream";
 
 /**
  * Public booking API (TEC-728, `/api/v1/public/{sessions,locations,…}`):
@@ -69,13 +75,19 @@ export async function proxyPublicBooking(
   // The upstream helper strips Origin; the API reads it from here.
   const origin = request.headers.get("origin");
   if (origin) headers.set("X-Forwarded-Origin", origin);
-  const clientIp = clientIpFromHeaders(request.headers);
-  if (clientIp) headers.set("X-Forwarded-For", clientIp);
+  // The API resolves the visitor from the chain (trusted proxies only).
+  const forwardedFor = forwardedForFromHeaders(request.headers);
+  if (forwardedFor) headers.set("X-Forwarded-For", forwardedFor);
 
-  const body =
-    method === "GET" || method === "HEAD" || method === "OPTIONS"
-      ? null
-      : await request.arrayBuffer();
+  let body: ArrayBuffer | null = null;
+  if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+    try {
+      body = await readBodyCapped(request, PUBLIC_BODY_BYTES);
+    } catch (err) {
+      if (err instanceof BodyTooLargeError) return bodyTooLargeResponse();
+      throw err;
+    }
+  }
   const result = await fetchUpstream(`${pathSegments.join("/")}${url.search}`, {
     method,
     headers,

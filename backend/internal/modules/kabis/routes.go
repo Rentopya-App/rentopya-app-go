@@ -19,6 +19,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/envguard"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/features"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/integrations"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/kabis"
@@ -57,7 +58,7 @@ func Adapters(providers []kabis.Provider) []integrations.Adapter {
 
 // RegisterRoutes mounts /v1/tenant/kabis-notifications. A nil resolver
 // (tenancy off) mounts nothing.
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
+func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
 	if resolver == nil {
 		return
 	}

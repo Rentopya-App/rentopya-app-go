@@ -8,6 +8,7 @@ Most product work is **organization-scoped**: data a rental company owns, shown 
 | Platform list resource | `.agents/skills/add-platform-resource` | `users`, `roles` |
 | External provider / integration job kind | `.agents/skills/integration-adapter` | Netgsm SMS, KABİS |
 | Table, column, seed, permission slug, query | `.agents/skills/db-migration` | |
+| Mobile API types, mobile CI / release | `.agents/skills/mobile-ci` | |
 
 Before a domain feature, read its design doc in `docs/design/` (one per area: reservations, pricing, rentals, payments, …) and the module's package comment.
 
@@ -18,7 +19,7 @@ Before a domain feature, read its design doc in `docs/design/` (one per area: re
    - Tenant routes: `Authenticate` → `RequireOrganization(resolver)` → `RequireTenantPermission("tenant.<plural>.<action>")`; the handler reads `orgctx.Must(ctx).ID` and every query filters `organization_id` (and the branch scope for branch-bound data). A nil resolver (tenancy off) mounts nothing.
    - Platform routes: `Authenticate` → `RequirePermission("platform.<plural>.<action>")`.
 3. SQL: `make -C backend migrate-create NAME=…` → write up + down → `make -C backend migrate-up` → `make -C backend sqlc`.
-4. Update `backend/docs/openapi.yaml` in the **same** change (RT-A01 cross-checks every `/v1/tenant` route against it).
+4. Update `backend/docs/openapi.yaml` in the **same** change (RT-A01 cross-checks every `/v1/tenant` route against it), then regenerate both clients: `cd frontend && pnpm api:generate`, `cd mobile && npm run api:generate`.
 5. Lists use `pkg/apiquery` (`limit`, `offset`, `q`, `sort`). Envelope via `pkg/response`. See [backend/API_CONVENTIONS.md](../backend/API_CONVENTIONS.md).
 6. If the resource is listed, add `GET /v1/{platform|tenant}/<plural>/meta` via `internal/platform/resourcemeta` and register `/meta` **before** `/{uuid}`.
 7. Side effects: publish on `internal/platform/events`, `notifications.Service.Enqueue`, the notification engine (customer messages) or the integration job runner (provider work). Never SMTP, SMS or a provider call from a handler.
@@ -33,6 +34,16 @@ Before a domain feature, read its design doc in `docs/design/` (one per area: re
 4. Call the BFF (`/api/v1/...`), not the Go host, from the browser.
 5. Dates: shared `DatePicker` / `AppDatePicker` — see `.agents/skills/admin-date-picker`.
 6. After OpenAPI changes: `cd frontend && pnpm api:generate`.
+
+## Mobile screen
+
+The Expo app (`mobile/`) uses the same `/v1` API as the panel; it has no BFF. Read `mobile/AGENTS.md` first.
+
+1. Route file under `mobile/src/app/` (one line), screen and hooks under `mobile/src/features/<name>/`.
+2. Company data goes through `/v1/tenant/*` with `X-Organization` from the picked membership. Business rules stay in the API.
+3. Permission checks use the slugs copied by `npm run permissions:gen` from `frontend/src/config/permissions.ts`.
+4. Text in both `src/core/i18n/locales/tr` and `en` (`npm run i18n:check`).
+5. After OpenAPI changes: `npm run api:generate` and commit `src/core/api/schema.d.ts`.
 
 ## Sidebar (nav-engine)
 
@@ -155,6 +166,19 @@ On an event (debounced 400 ms) the table refetches silently when a visible row c
 Tenant resources (`tenant.<plural>`) are published on `org:{org_uuid}:resource:tenant.<plural>` by `tenantmodule.ChannelResolver`; the page uses `tenantLiveList(organization, "tenant.<plural>")` (`add-tenant-resource` §4a).
 
 Other scoped channels: `Broadcaster.AddResolver` returns another channel for chosen resources, `AuthUseCase.AddChannelRules` authorizes it, and the page passes `realtime: { resource, channel }`.
+
+## Environment variables
+
+`deploy/env/schema` is the source of truth for the production env; CI keeps the other files in line with it ([design](./design/env-core.md)). Adding a variable:
+
+1. **Read it** in `backend/internal/config/config.go` with a string-literal key (`getEnv("MY_KEY", "default")`); the checks below find reads by literal name.
+2. **Local default** in `.env.example` (local dev never needs a generator).
+3. **Production**, when prod needs a value: add a line to `deploy/env/schema` at the end of its section (`derive:`, `const:`, `secret:…`, `empty`; `#` notes above it are copied for operators), bump `@version`, then `scripts/prod-env.sh example > .env.server.example`. Renaming or dropping a key: `@rename OLD NEW <ver>` / `@remove KEY <ver>`, so `make prod-env-upgrade` migrates deployed files without losing values. Optional tuning knobs with a safe Go default can stay out of the schema (document them in `.env.example`).
+4. **Deliver it** to the containers: add it to `x-backend-environment` in `compose.prod.yml` (`MY_KEY: ${MY_KEY:-}` keeps the Go default when unset), or record why not in `deploy/env/compose-env.allow`. Frontend / site keys go into their service's `environment` by hand.
+5. **Secrets**: a backend secret gets a row in `managedSecrets` (`backend/internal/config/guard.go`) with its development value, so staging/production refuse it; a secret only another container reads goes into `unguardedSchemaSecrets` with a reason. A test fails until you do.
+6. `make env-check && (cd backend && go test ./internal/config/)`.
+
+Never add env keys for provider credentials (iyzico, Netgsm, e-invoice, KABİS, HGS, Yolcu360, Obilet, WhatsApp sessions): they are per organization in the integration vault (`integration-adapter` skill). Do not edit `.env.server.example` by hand, and never put real values in either example file.
 
 ## Do not
 

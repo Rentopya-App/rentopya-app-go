@@ -14,11 +14,17 @@ import {
   proxyPublicBooking,
 } from "@/lib/server/public-booking";
 import {
+  BodyTooLargeError,
+  bodyTooLargeResponse,
+  maxProxyBodyBytes,
+  readBodyCapped,
+} from "@/lib/server/request-body";
+import {
   sharedRefresh,
   type RefreshResult,
 } from "@/lib/server/refresh-single-flight";
 import {
-  clientIpFromHeaders,
+  forwardedForFromHeaders,
   fetchUpstream,
   fetchUpstreamStream,
 } from "@/lib/server/upstream";
@@ -498,10 +504,16 @@ export async function proxyToUpstream(
   const url = new URL(request.url);
   const pathWithQuery = `${path}${url.search}`;
 
-  const incomingBody =
-    request.method === "GET" || request.method === "HEAD"
-      ? new ArrayBuffer(0)
-      : await request.arrayBuffer();
+  let incomingBody: ArrayBuffer;
+  try {
+    incomingBody =
+      request.method === "GET" || request.method === "HEAD"
+        ? new ArrayBuffer(0)
+        : await readBodyCapped(request, maxProxyBodyBytes());
+  } catch (err) {
+    if (err instanceof BodyTooLargeError) return bodyTooLargeResponse();
+    throw err;
+  }
 
   const { accessToken, refreshToken } = await getApiTokens();
 
@@ -512,9 +524,10 @@ export async function proxyToUpstream(
   else headers.set("Accept", "application/json");
   if (contentType) headers.set("Content-Type", contentType);
   // Go rate limits and audit rows key on the client IP; without this every
-  // request would share the BFF's address (one global bucket).
-  const clientIp = clientIpFromHeaders(request.headers);
-  if (clientIp) headers.set("X-Forwarded-For", clientIp);
+  // request would share the BFF's address (one global bucket). The API picks
+  // the client out of the chain (trusted-proxy walk), not the BFF.
+  const forwardedFor = forwardedForFromHeaders(request.headers);
+  if (forwardedFor) headers.set("X-Forwarded-For", forwardedFor);
   if (isQRSessionCreatePath(path, request.method)) {
     // The phone shows which browser / where the sign-in request comes from.
     const userAgent = request.headers.get("user-agent");

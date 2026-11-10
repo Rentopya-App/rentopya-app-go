@@ -1,0 +1,5 @@
+{
+  "CFBundleDisplayName": "Rentopya",
+  "NSCameraUsageDescription": "Rentopya, araç QR etiketlerini ve plakaları okumak, teslim ve iadede aracı ve hasarlarını fotoğraflamak için kamerayı kullanır.",
+  "NSPhotoLibraryUsageDescription": "Rentopya, daha önce çekilmiş araç fotoğraflarını teslim veya iade formuna eklemek için fotoğraf arşivinizi kullanır."
+}

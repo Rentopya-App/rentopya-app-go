@@ -16,6 +16,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	pricinghandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/pricing/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/pricing/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -46,7 +47,7 @@ type EngineHandlers struct {
 // RegisterRoutes mounts the pricing routes. A nil resolver (tenancy off)
 // mounts nothing.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *pricinghandler.Handler,
 	engines EngineHandlers,
 	tokens *jwt.Manager,

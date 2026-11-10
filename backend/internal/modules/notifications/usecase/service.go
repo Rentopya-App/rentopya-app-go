@@ -45,6 +45,7 @@ type Querier interface {
 	ListStaleQueuedNotifications(ctx context.Context, staleMinutes int32) ([]db.ListStaleQueuedNotificationsRow, error)
 	GetNotificationByIdempotencyKey(ctx context.Context, idempotencyKey pgtype.Text) (db.Notification, error)
 	MarkNotificationSent(ctx context.Context, arg db.MarkNotificationSentParams) (db.Notification, error)
+	RedactNotification(ctx context.Context, id int64) error
 	MarkNotificationFailed(ctx context.Context, arg db.MarkNotificationFailedParams) (db.Notification, error)
 	MarkNotificationRead(ctx context.Context, arg db.MarkNotificationReadParams) (db.Notification, error)
 	MarkAllNotificationsReadForUser(ctx context.Context, arg db.MarkAllNotificationsReadForUserParams) (int64, error)
@@ -77,6 +78,8 @@ type Service struct {
 	// redeliver re-enqueues stale queued rows (ReclaimStuck); nil delivers
 	// them inline.
 	redeliver Enqueuer
+	// sealer encrypts security e-mail content (seal.go); nil refuses them.
+	sealer ContentSealer
 }
 
 // New creates a notification service.
@@ -158,6 +161,7 @@ func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 			continue
 		}
 		title, body := in.Title, in.Body
+		tplSubject, tplBody := "", ""
 		if in.TemplateCode != "" {
 			tpl, err := s.q.GetTemplateByCodeChannelLang(ctx, db.GetTemplateByCodeChannelLangParams{
 				Code: in.TemplateCode, Channel: ch, Language: lang,
@@ -168,6 +172,7 @@ func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 				})
 			}
 			if err == nil {
+				tplSubject, tplBody = tpl.Subject, tpl.Body
 				title = templates.Render(tpl.Subject, in.TemplateVars)
 				body = templates.Render(tpl.Body, in.TemplateVars)
 			} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -176,7 +181,29 @@ func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 				title = in.TemplateCode
 			}
 		}
-		payload, err := json.Marshal(withPushVars(ch, payloadIn, in.TemplateVars))
+		rowPayload := withPushVars(ch, payloadIn, in.TemplateVars)
+		actionURL := textPtr(in.ActionURL)
+		var sealed pgtype.Text
+		if ch == model.ChannelEmail && in.IsSecurityEmail() {
+			// The real subject, body and link live only in sealed_content
+			// until delivery; the row shows a redacted stand-in from the
+			// first write, so the SecretVars copy is redundant (the
+			// recipient may still have to be forgotten).
+			code := pgtype.Text{String: in.TemplateCode, Valid: in.TemplateCode != ""}
+			if sealed, err = s.sealContent(ch, code, sealedContent{
+				Title: title, Body: body, ActionURL: actionURL.String,
+			}); err != nil {
+				return nil, err
+			}
+			title, body, actionURL = redactedTitle(in.TemplateCode), RedactedBody, pgtype.Text{}
+			tplSubject, tplBody = "", ""
+			if in.ForgetRecipient {
+				rowPayload = withRedaction(rowPayload, in, title, body, "", "")
+			}
+		} else if len(in.SecretVars) > 0 || in.ForgetRecipient {
+			rowPayload = withRedaction(rowPayload, in, title, body, tplSubject, tplBody)
+		}
+		payload, err := json.Marshal(rowPayload)
 		if err != nil {
 			payload = []byte("{}")
 		}
@@ -195,7 +222,7 @@ func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 			Title:          title,
 			Body:           body,
 			Payload:        payload,
-			ActionUrl:      textPtr(in.ActionURL),
+			ActionUrl:      actionURL,
 			Recipient:      recipient,
 			TemplateCode:   pgtype.Text{String: in.TemplateCode, Valid: in.TemplateCode != ""},
 			SourceEvent:    pgtype.Text{String: in.SourceEvent, Valid: in.SourceEvent != ""},
@@ -203,6 +230,7 @@ func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 			MaxAttempts:    5,
 			OrganizationID: int8Ptr(in.OrganizationID),
 			IdempotencyKey: pgtype.Text{String: key, Valid: key != ""},
+			SealedContent:  sealed,
 		})
 		if errors.Is(err, pgx.ErrNoRows) && key != "" {
 			// Already created for this cause, channel and recipient (a
@@ -298,11 +326,14 @@ func (s *Service) deliverRow(ctx context.Context, row db.Notification) error {
 			userUUID = &uid
 		}
 	}
-	res, err := p.Deliver(ctx, row, userUUID)
+	res, err := s.deliverVia(ctx, p, row, userUUID)
 	if err != nil {
 		_, _ = s.q.MarkNotificationFailed(ctx, db.MarkNotificationFailedParams{
 			ID: id, LastError: pgtype.Text{String: err.Error(), Valid: true},
 		})
+		if row.AttemptCount >= row.MaxAttempts {
+			s.redact(ctx, id)
+		}
 		_, _ = s.q.InsertNotificationHistory(ctx, db.InsertNotificationHistoryParams{
 			NotificationID: id, Event: "failed",
 			Metadata: mustJSON(map[string]string{"error": err.Error()}),
@@ -324,6 +355,7 @@ func (s *Service) deliverRow(ctx context.Context, row db.Notification) error {
 	_, _ = s.q.InsertNotificationHistory(ctx, db.InsertNotificationHistoryParams{
 		NotificationID: id, Event: status, Metadata: []byte("{}"),
 	})
+	s.redact(ctx, id)
 
 	// Fan-out realtime mirror for inapp deliveries.
 	if row.Channel == model.ChannelInapp {
@@ -465,6 +497,11 @@ func (s *Service) GetOwned(ctx context.Context, userID int64, id uuid.UUID) (mod
 	if !row.UserID.Valid || row.UserID.Int64 != userID {
 		return model.Notification{}, ErrForbidden
 	}
+	// Same rule as the inbox list: e-mail bodies carry one-time codes and
+	// links that must only reach the mailbox.
+	if row.Channel == model.ChannelEmail {
+		return model.Notification{}, ErrNotFound
+	}
 	return s.project(row), nil
 }
 
@@ -494,6 +531,9 @@ func (s *Service) RedeemAction(ctx context.Context, userID int64, id uuid.UUID, 
 	}
 	if !row.UserID.Valid || row.UserID.Int64 != userID {
 		return model.Notification{}, "", ErrForbidden
+	}
+	if row.Channel == model.ChannelEmail {
+		return model.Notification{}, "", ErrNotFound
 	}
 	if !row.ActionUrl.Valid || strings.TrimSpace(row.ActionUrl.String) == "" {
 		return model.Notification{}, "", fmt.Errorf("%w: action url missing", ErrInvalidRequest)

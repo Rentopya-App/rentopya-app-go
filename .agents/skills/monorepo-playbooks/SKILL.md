@@ -1,9 +1,9 @@
 ---
 name: monorepo-playbooks
 description: >-
-  Repository playbook for Rentopya (Go API + Next.js panel + branded site
-  monorepo). Use when working across frontend, backend, site, compose, or
-  setup conventions. Maps shells, engines, skills, and hard rules.
+  Repository playbook for Rentopya (Go API + Next.js panel + branded site +
+  Expo mobile monorepo). Use when working across frontend, backend, site,
+  mobile, compose, or setup conventions. Maps shells, engines, skills, and hard rules.
 ---
 
 **Persona:** Keep the repo mental model sharp and prefer the nearest app boundary.
@@ -15,6 +15,8 @@ description: >-
 | `frontend/` | Next.js BFF — `/platform`, company panel `/t/{slug}`, customer portal `/r/{orgSlug}`, landing `/` |
 | `site/` | Branded site, one image for every company (host → organization), books through `/v1/public/*` |
 | `backend/` | Go HTTP API + Asynq worker |
+| `mobile/` | Expo app (SDK 58) for the company panel; calls the Go API directly (`EXPO_PUBLIC_API_URL` + `/v1/*`, own Bearer tokens, `X-Organization` on `/v1/tenant/*`). Read `mobile/README.md` + `mobile/AGENTS.md` |
+| `deploy/env/schema` | Production env schema (`scripts/prod-env.sh`, `make env-check`) |
 | `compose.local.yml` / `compose.prod.yml` | Docker |
 | `docs/` | Architecture, development, extending; `docs/design/` one design doc per domain area |
 | `AGENTS.md` | Skill index |
@@ -37,24 +39,28 @@ Canonical env: **repo-root** `.env`. First clone: `.agents/skills/boilerplate-fi
 | Cmd+K / Meilisearch | `search-engine` |
 | GitHub OAuth / encrypted secrets | `github-integration` |
 | Date field | `admin-date-picker` |
+| Mobile CI, OpenAPI client types, mobile release | `mobile-ci` |
+| Before commit / PR | `verify-changes` |
 
 ## Working rules
 
 - Prefer the nearest app boundary before widening scope.
 - Backend: start from `backend/API_CONVENTIONS.md` and `backend/README.md`.
 - Do not treat `.next/` or generated output as source. Commit `backend/internal/database/db` after sqlc.
-- New `/v1` routes update `backend/docs/openapi.yaml` in the same change; then `pnpm api:generate`.
+- New `/v1` routes update `backend/docs/openapi.yaml` in the same change; then `pnpm api:generate` in `frontend/` and `npm run api:generate` in `mobile/` (commit both generated files).
 - Media URLs: API-owned only; never assemble S3 keys in the browser.
 - Never expose Meilisearch to the browser (`GET /v1/search` only).
 - Organizations are resolved per request from `X-Organization` (`orgctx`), never from the JWT (claims: `sub`, `roles`, `is_super_admin`, optional `imp`, `sid`). No workspaces, no `/business` shell.
 - Tenant data: `organization_id` on every table and query; another organization's record answers 404 (`add-tenant-resource`).
 - Handlers never call SMTP, SMS or a provider; go through notifications, the notification engine or the integration job runner.
-- Permission slugs only via migration + `internal/platform/rbac` + `frontend/src/config/permissions.ts`.
+- Permission slugs only via migration + `internal/platform/rbac` + `frontend/src/config/permissions.ts` (then `npm run permissions:gen` in `mobile/`).
+- New production env key: `deploy/env/schema` + `@version` bump, regenerate `.env.server.example`, `make env-check` (`docs/EXTENDING.md` → Environment variables).
 
 ## Surfaces (today)
 
 - `/platform` (`platform.*`): organizations, users, roles, usage and connection health, site domains, TSB catalog, notifications, settings (branding, auth, OAuth, step-up, storage, imports, exports, logs, activity).
 - `/t/{slug}` (`tenant.*` from the member's roles in that organization): branches, fleet, pricing, reservations, rentals, field tasks, inspections, KABİS, tolls, customers, agreements, finance, reports, settings (members, roles, integrations, public API, branded site, notifications, WhatsApp, templates).
 - `/r/{orgSlug}` customer portal, `/pay/{token}`, `/d/{token}`; `site/` branded site.
+- `mobile/`: sign-in, organization picker, branch filter, "Bugün" home, field tasks.
 
 Cmd+K search: `/v1/search` (platform) and `/v1/tenant/search` (organization), per-spec RBAC. Module map: `docs/ARCHITECTURE.md`.

@@ -4,10 +4,11 @@ Rentopya is a multi-company car rental SaaS built on a Next.js + Go boilerplate.
 
 ## Working rules
 
-- Prefer the nearest app boundary (`backend/`, `frontend/` or `site/`) before widening scope.
+- Prefer the nearest app boundary (`backend/`, `frontend/`, `site/` or `mobile/`) before widening scope.
 - Canonical env is the repo-root `.env`.
 - Do not treat `.next/` or generated output as source. Commit `backend/internal/database/db` after `make -C backend sqlc`.
-- New or changed `/v1` routes update `backend/docs/openapi.yaml` in the same change.
+- New or changed `/v1` routes update `backend/docs/openapi.yaml` in the same change. Then regenerate both clients: `cd frontend && pnpm api:generate` and `cd mobile && npm run api:generate`.
+- New production env key: `deploy/env/schema` + `@version` bump, `scripts/prod-env.sh example > .env.server.example`, `make env-check` ([docs/EXTENDING.md](./docs/EXTENDING.md) → Environment variables). Never hand-edit `.env.server.example`.
 - Media URLs are API-owned. Never assemble S3 keys or bucket URLs in the browser.
 - Organization-owned data: `organization_id` in every table and query, organization from `orgctx`, another organization's record → 404 (`.agents/skills/add-tenant-resource`).
 - Provider credentials are per organization and encrypted; never in env, logs or responses (`.agents/skills/integration-adapter`).
@@ -24,7 +25,7 @@ make -C backend lint
 make -C backend openapi-lint
 ```
 
-Database tests and the RT-A01 isolation test run only with `TEST_DATABASE_URL` (CI does not set it); run them locally when you touch tenant tables, queries or `/v1/tenant` routes.
+Database tests and the RT-A01 isolation test need `TEST_DATABASE_URL`. CI runs them against a Postgres service; run them locally too when you touch tenant tables, queries or `/v1/tenant` routes.
 
 ## Frontend
 
@@ -44,6 +45,21 @@ pnpm typecheck
 pnpm lint
 pnpm test
 ```
+
+## Mobile
+
+```sh
+cd mobile
+npm ci
+npm run typecheck && npm run lint && npm run i18n:check && npm test && npm run api:check
+npx expo-doctor
+```
+
+Read `mobile/README.md` and `mobile/AGENTS.md` first. Never run `eas` commands; release rules are in `.agents/skills/mobile-ci`.
+
+## CI and shipping
+
+`.github/workflows/ci.yml` runs on every branch push. A `changes` job picks the area jobs from the changed paths; docs-only pushes skip them, and `[ci-full]` in the head commit message runs everything. `ci` is the single required check. The `auto-pr` job is disabled (`if: false`): push a feature branch, open a PR, and the owner merges. Commit messages carry the Linear id (`TEC-1234: …`) and no AI attribution (`commit-policy` job).
 
 ## Docs
 

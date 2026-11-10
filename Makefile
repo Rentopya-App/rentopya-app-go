@@ -19,7 +19,7 @@ endef
 FRONTEND_PORT ?= 3000
 
 .PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev site-dev local-dev \
-	free-dev-ports prod-env prod-env-upgrade prod-env-check prod-sync prod-super-admin prod-config prod-up prod-down \
+	free-dev-ports prod-env prod-env-upgrade prod-env-check env-check compose-env-check prod-sync prod-super-admin prod-config prod-up prod-build prod-up-build prod-down \
 	prod-backup prod-backup-status tools create-super-admin search-reindex check-i18n \
 	messaging-reconcile prod-messaging-reconcile integration-jobs-reconcile prod-integration-jobs-reconcile \
 	acceptance acceptance-backend acceptance-e2e acceptance-stack-up acceptance-stack-down
@@ -119,6 +119,7 @@ local-dev: infra
 	$(MAKE) frontend-dev & \
 	wait
 
+# Production env from deploy/env/schema (docs/design/env-core.md).
 prod-env:
 	scripts/prod-env.sh init -o $(PROD_ENV_FILE)
 
@@ -128,18 +129,47 @@ prod-env-upgrade:
 prod-env-check:
 	scripts/prod-env.sh check $(PROD_ENV_FILE)
 
+# CI check (job `env`): .env.server.example matches the schema, .env.example has
+# every schema key and documents every compose.prod.yml variable, prod-env tests
+# pass. Fix drift: scripts/prod-env.sh example > .env.server.example
+env-check: compose-env-check
+	scripts/check-env-sync.sh
+
+# CI check: every env var the backend reads reaches the backend/worker
+# containers in compose.prod.yml, or has a decision in deploy/env/compose-env.allow.
+compose-env-check:
+	scripts/check-compose-env.sh
+	scripts/check-compose-env.test.sh
+
 prod-sync:
 	scripts/server-sync.sh
 
+# First production admin. SA_EMAIL is required; the password travels as an env
+# var (not argv). Without SA_PASSWORD a strong one is generated and printed once.
 prod-super-admin:
-	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml exec backend /app/create-super-admin \
-		-email "$(SA_EMAIL)" -password "$(SA_PASSWORD)" -name "$(or $(SA_NAME),Platform)" -surname "$(or $(SA_SURNAME),Admin)"
+	@test -n "$(SA_EMAIL)" || (echo "Usage: make prod-super-admin SA_EMAIL=you@example.com [SA_PASSWORD=...] [SA_RESET_PASSWORD=true]"; exit 1)
+	@SA_PASSWORD="$(SA_PASSWORD)" docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml exec \
+		-e SA_PASSWORD -e SA_RESET_PASSWORD="$(SA_RESET_PASSWORD)" backend /app/create-super-admin \
+		-email "$(SA_EMAIL)" -name "$(or $(SA_NAME),Platform)" -surname "$(or $(SA_SURNAME),Admin)" \
+		$(if $(SA_PASSWORD),,-generate-password)
 
 prod-config:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml config
 
+# Prebuilt images (TEC-1133): CI publishes them to GHCR and the server pulls
+# ${IMAGE_REPO}-<service>:${IMAGE_TAG} (set IMAGE_TAG=v0.N in the env file);
+# nothing is built on the host.
 prod-up:
-	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml up -d --build
+	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml up -d
+
+# Local build of the same images (compose.build.yml adds the build sections
+# back; contexts as in deploy/images.json). For smoke tests and the legacy
+# server-sync cron; use a non-release IMAGE_TAG such as `local`.
+prod-build:
+	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml -f compose.build.yml build
+
+prod-up-build:
+	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml -f compose.build.yml up -d --build
 
 prod-down:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml down
@@ -158,9 +188,9 @@ tools:
 	@echo "env:     $(ENV_FILE)"
 	@$(MAKE) -C backend tools
 
-# Bootstrap platform super_admin (loads root .env). Override: SA_EMAIL SA_PASSWORD SA_NAME SA_SURNAME
-SA_EMAIL    ?= admin@example.com
-SA_PASSWORD ?= Password1
+# Bootstrap platform super_admin (loads root .env). No default credentials:
+# SA_EMAIL is required; without SA_PASSWORD a strong password is generated and
+# printed once. SA_RESET_PASSWORD=true overwrites an existing user's password.
 SA_NAME     ?= Platform
 SA_SURNAME  ?= Admin
 
@@ -168,6 +198,7 @@ create-super-admin:
 	@$(load_env) $(MAKE) -C backend create-super-admin \
 		SA_EMAIL="$(SA_EMAIL)" \
 		SA_PASSWORD="$(SA_PASSWORD)" \
+		SA_RESET_PASSWORD="$(SA_RESET_PASSWORD)" \
 		SA_NAME="$(SA_NAME)" \
 		SA_SURNAME="$(SA_SURNAME)"
 

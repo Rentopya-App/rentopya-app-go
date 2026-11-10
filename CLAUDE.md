@@ -11,4 +11,4 @@ Project setup checked into the repo (works the same in every app cloned from thi
 - **MCP servers** (`.mcp.json`, approve once per machine): `shadcn` (component registry, runs in `frontend/`), `context7` (current library docs), `playwright` (browser checks).
 - **Subagent**: `boilerplate-reviewer` checks a diff against the hard rules above before a PR.
 - **Before saying done**: follow the `verify-changes` skill. Schema work: `db-migration` skill.
-- **Shipping**: push a feature branch; CI's `auto-pr` job opens and merges a PR when backend + frontend pass. `[no-automerge]` in the head commit message keeps it open.
+- **Shipping**: push a feature branch and open a PR; CI's `auto-pr` job is disabled (`if: false` in `.github/workflows/ci.yml`), so nothing is merged automatically and the owner merges into `main`.

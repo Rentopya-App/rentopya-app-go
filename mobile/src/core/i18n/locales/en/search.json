@@ -1,0 +1,14 @@
+{
+  "title": "Search",
+  "placeholder": "Vehicle, customer, branch, supplier…",
+  "hint_title": "Type to search",
+  "hint_body": "At least 2 characters. Only records you may see are listed.",
+  "disabled_title": "Search is off",
+  "disabled_body": "The search service is not configured here.",
+  "open_in_panel": "Open in panel",
+  "specs_vehicles": "Vehicles",
+  "specs_customers": "Customers",
+  "specs_branches": "Branches",
+  "specs_suppliers": "Suppliers",
+  "specs_rental_products": "Rental products"
+}

@@ -23,6 +23,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/platformhealth/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/platformhealth/sources"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/healthcheck"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
 )
@@ -37,7 +38,7 @@ func NewRegistry(q *db.Queries) *healthcheck.Registry {
 }
 
 // RegisterRoutes mounts /v1/platform/usage* and /v1/platform/health*.
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader) {
+func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, tokens *jwt.Manager, loader middleware.IdentityLoader) {
 	authn := middleware.Authenticate(tokens, loader)
 	read := middleware.RequirePermission(rbac.PermPlatformHealthRead)
 	route := func(pattern string, fn http.HandlerFunc) {

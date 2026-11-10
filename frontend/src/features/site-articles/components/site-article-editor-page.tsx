@@ -472,7 +472,7 @@ function ArticleForm({
       );
       return;
     }
-    appToast.error(e.message || t("common.error_generic"));
+    appToast.apiError(e, t("common.error_generic"));
   };
 
   const onValid = async (values: ArticleFormValues) => {

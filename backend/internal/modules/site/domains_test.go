@@ -21,6 +21,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/site/usecase"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -100,6 +101,13 @@ func (m *domainMemory) ClaimDueSiteDomains(_ context.Context, now pgtype.Timesta
 func (m *domainMemory) UpdateSiteDomainCheck(_ context.Context, p db.UpdateSiteDomainCheckParams) (db.SiteDomain, error) {
 	for id, r := range m.rows {
 		if r.ID == p.ID && r.OrganizationID == p.OrganizationID && r.Status == p.Status {
+			if p.Status_2 == "verified" {
+				for _, o := range m.rows {
+					if o.Host == r.Host && o.ID != r.ID && o.Status == "verified" {
+						return db.SiteDomain{}, &pgconn.PgError{Code: "23505", ConstraintName: "uq_site_domains_verified_host"}
+					}
+				}
+			}
 			r.Status, r.LastCheckedAt, r.VerifiedAt, r.LastError, r.NextCheckAt = p.Status_2, p.LastCheckedAt, p.VerifiedAt, p.LastError, p.NextCheckAt
 			r.Attempts++
 			r.OriginsDirty = true
@@ -137,6 +145,26 @@ func (m *domainMemory) DeleteDisabledSiteDomain(_ context.Context, p db.DeleteDi
 		}
 	}
 	return nil
+}
+func (m *domainMemory) SiteDomainVerifiedElsewhere(_ context.Context, p db.SiteDomainVerifiedElsewhereParams) (bool, error) {
+	for _, r := range m.rows {
+		if r.Host == p.Host && r.OrganizationID != p.OrganizationID && r.Status == "verified" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+func (m *domainMemory) FailRivalSiteDomainClaims(_ context.Context, p db.FailRivalSiteDomainClaimsParams) (int64, error) {
+	var n int64
+	for id, r := range m.rows {
+		leased := r.LeaseUntil.Valid && r.LeaseUntil.Time.After(p.Now.Time)
+		if r.Host == p.Host && r.OrganizationID != p.OrganizationID && r.Status == "pending" && !leased {
+			r.Status, r.LastError, r.LastCheckedAt, r.NextCheckAt = "failed", p.LastError, p.Now, stamp(p.Now.Time.Add(24*time.Hour))
+			m.rows[id] = r
+			n++
+		}
+	}
+	return n, nil
 }
 func stamp(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t, Valid: true} }
 func pendingDomain(now time.Time) db.SiteDomain {
@@ -514,8 +542,8 @@ func TestCustomDomainsIntegration(t *testing.T) {
 	if _, err = d.Recheck(ctx, e.b.id, domain.UUID); !errors.Is(err, usecase.ErrNotFound) {
 		t.Fatalf("cross-org verify: %v", err)
 	}
-	if _, err = d.Create(ctx, e.b.id, 0, host); !errors.Is(err, usecase.ErrDomainTaken) {
-		t.Fatalf("global duplicate: %v", err)
+	if _, err = d.Create(ctx, e.a.id, 0, host); !errors.Is(err, usecase.ErrDomainTaken) {
+		t.Fatalf("same organization duplicate: %v", err)
 	}
 	for i := 0; i < 2; i++ {
 		_, err = d.Create(ctx, e.a.id, 0, "other-"+uuid.NewString()+".customer.com")

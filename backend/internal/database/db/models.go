@@ -77,6 +77,16 @@ type AppLog struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type AppRelease struct {
+	ID         int64              `json:"id"`
+	Version    string             `json:"version"`
+	GitSha     string             `json:"git_sha"`
+	BuiltAt    pgtype.Timestamptz `json:"built_at"`
+	Notes      string             `json:"notes"`
+	DeployedAt pgtype.Timestamptz `json:"deployed_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type AppSetting struct {
 	ID            int16              `json:"id"`
 	LogoObjectKey pgtype.Text        `json:"logo_object_key"`
@@ -1649,6 +1659,7 @@ type Notification struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 	OrganizationID    pgtype.Int8        `json:"organization_id"`
 	IdempotencyKey    pgtype.Text        `json:"idempotency_key"`
+	SealedContent     pgtype.Text        `json:"sealed_content"`
 }
 
 type NotificationDelivery struct {
@@ -3266,21 +3277,23 @@ type TollSetting struct {
 }
 
 type User struct {
-	ID              int64              `json:"id"`
-	Uuid            uuid.UUID          `json:"uuid"`
-	Email           string             `json:"email"`
-	PasswordHash    string             `json:"password_hash"`
-	Name            string             `json:"name"`
-	Surname         string             `json:"surname"`
-	Status          string             `json:"status"`
-	EmailVerifiedAt pgtype.Timestamptz `json:"email_verified_at"`
-	LastLoginAt     pgtype.Timestamptz `json:"last_login_at"`
-	Locale          string             `json:"locale"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
-	DeactivatedAt   pgtype.Timestamptz `json:"deactivated_at"`
-	PasswordSet     bool               `json:"password_set"`
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	Email            string             `json:"email"`
+	PasswordHash     string             `json:"password_hash"`
+	Name             string             `json:"name"`
+	Surname          string             `json:"surname"`
+	Status           string             `json:"status"`
+	EmailVerifiedAt  pgtype.Timestamptz `json:"email_verified_at"`
+	LastLoginAt      pgtype.Timestamptz `json:"last_login_at"`
+	Locale           string             `json:"locale"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+	DeactivatedAt    pgtype.Timestamptz `json:"deactivated_at"`
+	PasswordSet      bool               `json:"password_set"`
+	DeletionDueAt    pgtype.Timestamptz `json:"deletion_due_at"`
+	RestoreTokenHash pgtype.Text        `json:"restore_token_hash"`
 }
 
 type UserRole struct {

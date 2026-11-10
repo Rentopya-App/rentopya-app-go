@@ -32,7 +32,7 @@ cp .env.example .env
 
 ```sh
 make local-dev            # infra (compose.local.yml) → Postgres bekle → migrate-up → :8080/:3000 boşalt → air + pnpm dev
-make create-super-admin   # varsayılan admin@example.com / Password1; SA_EMAIL SA_PASSWORD SA_NAME SA_SURNAME ile değişir
+make create-super-admin SA_EMAIL=siz@ornek.com   # varsayılan kimlik bilgisi yok; SA_PASSWORD verilmezse güçlü parola üretip bir kez yazar
 make site-dev             # markalı site :3100 → http://{subdomain}.localhost:3100
 ```
 
@@ -49,11 +49,11 @@ make site-dev             # markalı site :3100 → http://{subdomain}.localhost
 |------|-------------|
 | 1. Env üret | `make prod-env` = `scripts/prod-env.sh init -o .env.server` (yalnız uygulama URL'ini sorar; `--app-url URL` ile sorusuz). Dosya mod 600 |
 | 2. Kontrol | `make prod-config` (`docker compose … config`) |
-| 3. Başlat | `make prod-up` (`up -d --build`); Dokploy'da `.env.server` içeriği compose uygulamasının env'ine yapıştırılır |
+| 3. Başlat | `IMAGE_TAG=v0.N` ayarlanır, sonra `make prod-up` (GHCR imajlarını çeker, sunucuda build yok; yerel build: `make prod-up-build`); Dokploy'da `.env.server` içeriği compose uygulamasının env'ine yapıştırılır |
 | 4. Domain'ler (Dokploy) | panel → `frontend` :3000; `realtime.<app host>` → `centrifugo` :8000; `*.<app host>` (wildcard sertifika, DNS challenge) → `site` :3000 |
-| 5. İlk yönetici | `make prod-super-admin SA_EMAIL=… SA_PASSWORD=…` (backend container'ında `/app/create-super-admin`) |
+| 5. İlk yönetici | `make prod-super-admin SA_EMAIL=…` (backend container'ında `/app/create-super-admin`; `SA_PASSWORD` yoksa üretilen parola bir kez yazılır) |
 | 6. TSB kataloğu | `docker compose --env-file .env.server -f compose.prod.yml exec backend /app/catalog-import -file <container içi yol>.xlsx -apply` (önce `-apply` olmadan kuru çalıştırma) ya da Platform → Araç kataloğu → Aktarımlar |
-| Düz Docker host | `docker network create dokploy-network` bir kez; otomatik güncelleme `scripts/server-sync.sh` / `make prod-sync` (cron örneği DEVELOPMENT.md'de) |
+| Düz Docker host | `docker network create dokploy-network` bir kez; otomatik güncelleme `scripts/server-sync.sh` / `make prod-sync` (eskidi, Dokploy'a geçene kadar duruyor; cron örneği DEVELOPMENT.md'de) |
 
 Ağ: yalnız `frontend`, `site`, `centrifugo` `dokploy-network`'e katılır; backend, worker, Postgres, Redis, SeaweedFS, Meilisearch, wuzapi özel ağda kalır, hiçbir servis host portu açmaz. Tarayıcı API'ye yalnız panelin `/api/v1` proxy'si üzerinden ulaşır.
 
@@ -81,7 +81,7 @@ Migration yazma: [veri-modeli.md](./veri-modeli.md#migration-ekleme).
 
 ## 5. İlk yönetici ve ilk firma
 
-1. `make create-super-admin` (yerel) / `make prod-super-admin` (prod). Parola en az 8 karakter, büyük + küçük harf + rakam.
+1. `make create-super-admin SA_EMAIL=…` (yerel) / `make prod-super-admin SA_EMAIL=…` (prod). Varsayılan e-posta/parola yoktur. `SA_PASSWORD` kayıt (sign-up) parola kuralına uymalı (en az 8 karakter, büyük + küçük harf + rakam); verilmezse güçlü bir parola üretilip yalnızca bir kez ekrana yazılır. Var olan kullanıcının parolası yalnızca `SA_RESET_PASSWORD=true` ile değişir.
 2. `/platform/login` → Platform → **Firmalar** → **Firma oluştur**: Firma adı, Kısa ad (`/t/{kısa-ad}`), Sahip (Var olan kullanıcı ya da E-posta ile davet; davet 7 gün geçerli), paket (Komple / Yönetim). Firma oluşunca varsayılan "Merkez" şubesi açılır.
 3. Firma paneli `/t/{slug}`; sonraki adımlar: [../guides/firma-yoneticisi.md](../guides/firma-yoneticisi.md).
 

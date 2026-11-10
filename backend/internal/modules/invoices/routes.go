@@ -22,6 +22,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/einvoice/einvoicefake"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/envguard"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/features"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/integrations"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
@@ -69,7 +70,7 @@ type Engines struct {
 
 // RegisterRoutes mounts /v1/tenant/invoices. A nil resolver (tenancy off)
 // mounts nothing.
-func RegisterRoutes(mux *http.ServeMux, h *handler.Handler, engines Engines, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
+func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, engines Engines, tokens *jwt.Manager, loader middleware.IdentityLoader, resolver orgctx.Resolver) {
 	if resolver == nil {
 		return
 	}

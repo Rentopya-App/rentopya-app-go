@@ -1,0 +1,36 @@
+import { NativeTabs } from 'expo-router/native-tabs';
+import { useTranslation } from 'react-i18next';
+
+import { Permission, useCan } from '@/core/auth/permissions';
+import { useTabTint } from '@/features/shell/tab-tint';
+
+/** Company panel tabs (native). Module tabs join here, hidden when the member's role cannot use them. */
+export default function Tabs() {
+  const { t } = useTranslation('nav');
+  const tint = useTabTint();
+  const can = useCan();
+  return (
+    <NativeTabs tintColor={tint}>
+      <NativeTabs.Trigger name="(home)">
+        <NativeTabs.Trigger.Icon sf="house.fill" md="home" />
+        <NativeTabs.Trigger.Label>{t('home')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="tasks" hidden={!can(Permission.TenantFieldTasksExecute)}>
+        <NativeTabs.Trigger.Icon sf="checklist" md="checklist" />
+        <NativeTabs.Trigger.Label>{t('field_tasks:tab')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="vehicles" hidden={!can(Permission.TenantVehiclesRead)}>
+        <NativeTabs.Trigger.Icon sf="car.fill" md="directions_car" />
+        <NativeTabs.Trigger.Label>{t('vehicles_app:tab')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="rentals" hidden={!can(Permission.TenantRentalsRead)}>
+        <NativeTabs.Trigger.Icon sf="key.fill" md="car_rental" />
+        <NativeTabs.Trigger.Label>{t('rentals_app:tab')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="menu">
+        <NativeTabs.Trigger.Icon sf="line.3.horizontal" md="menu" />
+        <NativeTabs.Trigger.Label>{t('menu')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
+  );
+}

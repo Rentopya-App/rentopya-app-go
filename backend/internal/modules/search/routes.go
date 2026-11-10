@@ -1,53 +1,22 @@
 package search
 
 import (
-	"net/http"
-
-	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	searchhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/search/handler"
-	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
-	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
-	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/module"
 )
 
-// RegisterRoutes mounts command-palette search endpoints.
-func RegisterRoutes(
-	mux *http.ServeMux,
-	h *searchhandler.Handler,
-	tokens *jwt.Manager,
-	loader middleware.IdentityLoader,
-) {
-	authn := middleware.Authenticate(tokens, loader)
-	session := middleware.RequirePermission(rbac.PermAuthSession)
+// Module mounts the command-palette search endpoints: the platform palette
+// (any signed-in session) and organization-scoped search. Tenant specs and
+// hits are filtered by the caller's permissions in the X-Organization
+// organization and by organization_id in the index; with tenancy off the
+// tenant routes are not mounted.
+type Module struct{ H *searchhandler.Handler }
 
-	mux.Handle("GET /v1/search/specs", middleware.Chain(
-		http.HandlerFunc(h.Specs), authn, session,
-	))
-	mux.Handle("GET /v1/search", middleware.Chain(
-		http.HandlerFunc(h.Search), authn, session,
-	))
-}
+func (Module) Name() string { return "search" }
 
-// RegisterTenantRoutes mounts organization-scoped search. Specs and hits are
-// filtered by the caller's permissions in the X-Organization organization and
-// by organization_id in the index. A nil resolver (tenancy off) mounts nothing.
-func RegisterTenantRoutes(
-	mux *http.ServeMux,
-	h *searchhandler.Handler,
-	tokens *jwt.Manager,
-	loader middleware.IdentityLoader,
-	resolver orgctx.Resolver,
-) {
-	if resolver == nil {
-		return
-	}
-	authn := middleware.Authenticate(tokens, loader)
-	org := middleware.RequireOrganization(resolver)
-
-	mux.Handle("GET /v1/tenant/search/specs", middleware.Chain(
-		http.HandlerFunc(h.TenantSpecs), authn, org,
-	))
-	mux.Handle("GET /v1/tenant/search", middleware.Chain(
-		http.HandlerFunc(h.TenantSearch), authn, org,
-	))
+func (m Module) Routes(r *module.Router) {
+	r.Session("GET /v1/search/specs", m.H.Specs)
+	r.Session("GET /v1/search", m.H.Search)
+	r.Organization("GET /v1/tenant/search/specs", m.H.TenantSpecs)
+	r.Organization("GET /v1/tenant/search", m.H.TenantSearch)
 }

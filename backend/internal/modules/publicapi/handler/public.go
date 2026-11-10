@@ -135,6 +135,26 @@ type route struct {
 	action string
 }
 
+type limitCheck struct{ action, subject string }
+
+// routeLimits are the windows of a route's extra limit: per caller (key, or
+// key:session) and, for a browser booking session, per client IP as well.
+// Sessions are minted freely (POST /v1/public/sessions), so a per-session
+// window alone does not bound one visitor: rotating sessions would create
+// reservations, quotes and payment links (customer notifications, provider
+// calls) at the per-IP read rate (TEC-1170). Secret-key callers are partner
+// servers that share one IP, so they keep the per-key window only.
+func routeLimits(opt route, c model.Credential, subject, ip string) []limitCheck {
+	if opt.limit <= 0 {
+		return nil
+	}
+	out := []limitCheck{{"pubapi:" + opt.action, subject}}
+	if c.SessionID != "" && ip != "" {
+		out = append(out, limitCheck{"pubapi:" + opt.action + ":ip", ip})
+	}
+	return out
+}
+
 // capture records the answer of a write for the idempotency store.
 type capture struct {
 	http.ResponseWriter
@@ -186,8 +206,10 @@ func (h *Public) guard(opt route, fn http.HandlerFunc) http.HandlerFunc {
 		if !h.allow(w, r, "pubapi:cred", subject, c.RateLimit, time.Minute) {
 			return
 		}
-		if opt.limit > 0 && !h.allow(w, r, "pubapi:"+opt.action, subject, opt.limit, opt.window) {
-			return
+		for _, l := range routeLimits(opt, c, subject, ip) {
+			if !h.allow(w, r, l.action, l.subject, opt.limit, opt.window) {
+				return
+			}
 		}
 		if opt.scope != "" && !c.Has(opt.scope) {
 			writeError(w, r, usecase.ErrScope)
@@ -464,7 +486,7 @@ func (h *Public) PaymentLink(w http.ResponseWriter, r *http.Request) {
 }
 
 // Mount registers the public routes on mux.
-func (h *Public) Mount(mux *http.ServeMux) {
+func (h *Public) Mount(mux httpkit.Mux) {
 	read := func(scope string) route { return route{scope: scope} }
 	write := func(scope string, limit int, window time.Duration, action string) route {
 		return route{scope: scope, write: true, limit: limit, window: window, action: action}

@@ -297,7 +297,7 @@ func (s *Service) CreateRule(ctx context.Context, orgID int64, in model.Capacity
 
 // UpdateRule replaces a capacity rule.
 func (s *Service) UpdateRule(ctx context.Context, orgID int64, id uuid.UUID, in model.CapacityRuleInput) (model.CapacityRule, error) {
-	if _, err := s.GetRule(ctx, orgID, id); err != nil {
+	if err := s.writableRule(ctx, orgID, id); err != nil {
 		return model.CapacityRule{}, err
 	}
 	f, err := s.validateRule(ctx, orgID, in, &id)
@@ -317,16 +317,30 @@ func (s *Service) UpdateRule(ctx context.Context, orgID int64, id uuid.UUID, in 
 	return s.GetRule(ctx, orgID, id)
 }
 
-// DeleteRule soft-deletes a capacity rule.
-func (s *Service) DeleteRule(ctx context.Context, orgID int64, id uuid.UUID) error {
-	rule, err := s.GetRule(ctx, orgID, id)
+// writableRule checks that the caller may change an existing rule: a branch
+// rule outside the caller's branch scope reads as not found, a rule for
+// every branch needs every branch.
+func (s *Service) writableRule(ctx context.Context, orgID int64, id uuid.UUID) error {
+	row, err := s.q.GetCapacityRule(ctx, db.GetCapacityRuleParams{OrganizationID: orgID, Uuid: id})
+	if notFound(err) {
+		return ErrRuleNotFound
+	}
 	if err != nil {
 		return err
 	}
-	if rule.Branch == nil {
-		if err := orgctx.RequireAllBranches(ctx); err != nil {
-			return err
-		}
+	if !row.BranchID.Valid {
+		return orgctx.RequireAllBranches(ctx)
+	}
+	if orgctx.CheckBranch(ctx, row.BranchID.Int64) != nil {
+		return ErrRuleNotFound
+	}
+	return nil
+}
+
+// DeleteRule soft-deletes a capacity rule.
+func (s *Service) DeleteRule(ctx context.Context, orgID int64, id uuid.UUID) error {
+	if err := s.writableRule(ctx, orgID, id); err != nil {
+		return err
 	}
 	n, err := s.q.SoftDeleteCapacityRule(ctx, db.SoftDeleteCapacityRuleParams{OrganizationID: orgID, Uuid: id})
 	if err != nil {

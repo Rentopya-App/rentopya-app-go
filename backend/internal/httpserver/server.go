@@ -9,14 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/buildinfo"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/cache"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/config"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
-	accessmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/access"
 	accesshandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/access/handler"
-	activitymodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/activity"
 	activityhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/activity/handler"
 	activityusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/activity/usecase"
 	agreementsmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/agreements"
@@ -115,7 +114,6 @@ import (
 	kabismodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis"
 	kabishandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis/handler"
 	kabisusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/kabis/usecase"
-	logsmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs"
 	logshandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs/handler"
 	logsusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/logs/usecase"
 	notifmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifications"
@@ -169,7 +167,6 @@ import (
 	reservationadapters "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/adapters"
 	reservationhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/handler"
 	reservationusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/usecase"
-	searchmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/search"
 	searchhandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/search/handler"
 	searchusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/search/usecase"
 	settingsmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/settings"
@@ -217,14 +214,17 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/appleauth"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/bulkengine"
 	bulkadapters "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/bulkengine/adapters"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/clientip"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/crypto"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/events"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/features"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/integrations"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ioengine"
 	ioadapters "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ioengine/adapters"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/mail"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/module"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/oidc"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx/orgcache"
@@ -253,6 +253,10 @@ type Deps struct {
 	Realtime realtime.Publisher
 	Worker   *queue.Worker
 	Events   events.Bus
+	// ReportClock is the "now" of the read-only reports (vehicle
+	// profitability, reports, operations overview). Nil means time.Now;
+	// tests freeze it so report figures do not move with the wall clock.
+	ReportClock func() time.Time
 }
 
 // Server is the HTTP composition root for infrastructure routes.
@@ -275,12 +279,20 @@ type Server struct {
 	oauthProvSvc  *oauthproviderusecase.Service
 	authSettings  *authsettingsusecase.Service
 	mux           *http.ServeMux
+	routes        *httpkit.RouteRecorder
 	http          *http.Server
 }
 
 // New wires router and middleware for the API skeleton.
 func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
-	mux := http.NewServeMux()
+	ipResolver, err := clientip.NewResolver(cfg.HTTP.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("httpserver: TRUSTED_PROXIES: %w", err)
+	}
+	serveMux := http.NewServeMux()
+	// Every route goes through the recorder, so tests can check the complete
+	// route table against backend/docs/openapi.yaml (routes_test.go).
+	mux := httpkit.NewRouteRecorder(serveMux)
 	eventBus := deps.Events
 	if eventBus == nil {
 		eventBus = events.NewBus(log)
@@ -297,7 +309,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		realtime:    deps.Realtime,
 		worker:      deps.Worker,
 		events:      eventBus,
-		mux:         mux,
+		mux:         serveMux,
+		routes:      mux,
 	}
 
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
@@ -337,6 +350,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	uc := authusecase.New(repo, tokens)
 	uc.SetNotifier(notifSvc)
 	uc.SetLogger(log)
+	// Restore link of the account deletion e-mail; the token sits in the
+	// fragment so it reaches no server log (docs/design/account-deletion.md).
+	uc.SetAccountRestoreURL(strings.TrimRight(cfg.Auth.FrontendURL, "/") + "/platform/restore-account#")
 
 	searchReg := searchengine.NewRegistry(
 		searchadapters.NewUsers(deps.Queries),
@@ -397,6 +413,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("httpserver: field encryption: %w", err)
 	}
+	// Security e-mails keep their content sealed until delivery.
+	notifSealer, err := fieldCipher.Sealer(notifusecase.SealPurpose)
+	if err != nil {
+		return nil, fmt.Errorf("httpserver: notification sealer: %w", err)
+	}
+	notifSvc.WithSealer(notifSealer)
 	stepUpSvc := stepup.NewService(deps.Queries, stepUpStore, stepUpWebAuthn, repo)
 	stepUpSvc.SetSecretBox(secretBox)
 
@@ -837,10 +859,16 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Vehicle profitability report (TEC-727): read-only over the ledger,
 	// expenses and fleet tables.
 	profitabilitySvc := profitabilityusecase.New(deps.Queries)
+	if deps.ReportClock != nil {
+		profitabilitySvc.SetClock(deps.ReportClock)
+	}
 	// Reports (TEC-738): occupancy, income / expense, channels, aging and
 	// the branch comparison, read-only (occupancy and branches reuse the
 	// profitability engine).
 	reportsSvc := reportsusecase.New(deps.Queries, profitabilitySvc)
+	if deps.ReportClock != nil {
+		reportsSvc.SetClock(deps.ReportClock)
+	}
 	ioReg := ioengine.NewRegistry(
 		ioadapters.NewUsers(deps.Queries),
 		ioadapters.NewRoles(deps.Queries),
@@ -1053,7 +1081,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}, tokens, loader, tenantResolver)
 	// Operations overview (TEC-716): the tenant home page and the sidebar
 	// badge counts, read-only over the modules above.
-	overviewmodule.RegisterRoutes(mux, overviewhandler.New(overviewusecase.New(deps.Queries)), tokens, loader, tenantResolver)
+	overviewSvc := overviewusecase.New(deps.Queries)
+	if deps.ReportClock != nil {
+		overviewSvc.SetClock(deps.ReportClock)
+	}
+	overviewmodule.RegisterRoutes(mux, overviewhandler.New(overviewSvc), tokens, loader, tenantResolver)
 	profitabilitymodule.RegisterRoutes(mux, profitabilityhandler.New(profitabilitySvc),
 		exportH.TenantExport(profitabilitymodule.Resource, profitabilitymodule.ExportQueryKeys...), tokens, loader, tenantResolver)
 	reportsmodule.RegisterRoutes(mux, reportshandler.New(reportsSvc), exportH.TenantExport, tokens, loader, tenantResolver)
@@ -1162,19 +1194,24 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		deps.Storage,
 		settingsusecase.NewSystemService(cfg, deps.DB, deps.Redis, deps.Storage, searchClient),
 	), tokens, loader)
-	accessmodule.RegisterRoutes(mux, accesshandler.New(stepUpSvc, activityRec), tokens, loader)
 	authsettingsmodule.RegisterRoutes(mux, authsettingshandler.New(authSettingsSvc, activityRec), tokens, loader)
 	githubmodule.RegisterRoutes(mux, githubhandler.New(githubSvc, activityRec), tokens, loader)
 	oauthprovidermodule.RegisterRoutes(mux, oauthproviderhandler.New(oauthProvSvc, activityRec), tokens, loader)
-	activitymodule.RegisterRoutes(mux, activityhandler.New(activityusecase.New(deps.Queries)), tokens, loader)
-	logsmodule.RegisterRoutes(mux, logshandler.New(logsSvc), tokens, loader)
+	// Self-registering modules (docs/design/module-registry.md). Modules move
+	// here one at a time from the explicit RegisterRoutes calls above.
+	modRouter := module.NewRouter(module.Deps{Mux: mux, Tokens: tokens, Loader: loader, Resolver: tenantResolver})
 	searchSvc := searchusecase.New(searchClient, searchReg, log)
-	searchH := searchhandler.New(searchSvc)
-	searchmodule.RegisterRoutes(mux, searchH, tokens, loader)
-	searchmodule.RegisterTenantRoutes(mux, searchH, tokens, loader, tenantResolver)
+	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
+		access:   accesshandler.New(stepUpSvc, activityRec),
+		search:   searchhandler.New(searchSvc),
+		activity: activityhandler.New(activityusecase.New(deps.Queries)),
+		logs:     logshandler.New(logsSvc),
+	})...); err != nil {
+		return nil, fmt.Errorf("httpserver: %w", err)
+	}
 	storagemodule.RegisterRoutes(
 		mux,
-		storagehandler.New(storageusecase.New(deps.Storage, deps.Queries, log)),
+		storagehandler.New(storageusecase.New(deps.Storage, deps.Queries, log), cfg.Storage.MaxBytes),
 		tokens,
 		loader,
 	)
@@ -1185,7 +1222,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 
 	s.http = &http.Server{
 		Addr:         cfg.HTTP.Addr,
-		Handler:      middleware.RequestID(middleware.ServerErrors(log)(mux)),
+		Handler:      middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(serveMux))),
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,
@@ -1288,8 +1325,23 @@ func (s *Server) handleAppConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleHealthz is the liveness probe. It also reports the baked-in release
+// (internal/buildinfo) so a deploy can be checked from outside: version is
+// v0.N on a release image, sha-<short> on a branch build and "dev" locally.
+// Release notes stay out of this unauthenticated response.
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, healthzBody(buildinfo.Current()))
+}
+
+func healthzBody(rel buildinfo.Release) map[string]string {
+	body := map[string]string{"status": "ok", "version": rel.Version}
+	if rel.GitSHA != "" {
+		body["git_sha"] = rel.GitSHA
+	}
+	if rel.BuiltAt != "" {
+		body["built_at"] = rel.BuiltAt
+	}
+	return body
 }
 
 func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {

@@ -12,7 +12,9 @@ func validProdConfig() Config {
 	c.App.Env = "production"
 	c.HTTP.Addr = ":8080"
 	c.DB.Host, c.DB.User, c.DB.Name = "db", "u", "n"
+	c.DB.Password = "real-db-password"
 	c.Redis.Addr = "redis:6379"
+	c.Redis.Password = "real-redis-password"
 	c.Queue.Concurrency = 1
 	c.JWT.AccessTTL, c.JWT.RefreshTTL = time.Minute, time.Hour
 	c.JWT.AccessSecret = strings.Repeat("a", 40)
@@ -75,5 +77,66 @@ func TestParseReviewAccounts(t *testing.T) {
 	}
 	if len(parseReviewAccounts("")) != 0 {
 		t.Fatal("empty must disable")
+	}
+}
+
+func TestValidateSMTP(t *testing.T) {
+	for _, mode := range []string{"", SMTPTLSAuto, SMTPTLSStartTLS, SMTPTLSImplicit} {
+		c := validProdConfig()
+		c.SMTP.TLSMode = mode
+		if err := c.validate(); err != nil {
+			t.Errorf("TLSMode %q rejected in production: %v", mode, err)
+		}
+	}
+	bad := validProdConfig()
+	bad.SMTP.TLSMode = "bogus"
+	if err := bad.validate(); err == nil {
+		t.Error("invalid TLSMode accepted")
+	}
+	plain := validProdConfig()
+	plain.SMTP.TLSMode = SMTPTLSNone
+	if err := plain.validate(); err == nil {
+		t.Error("SMTP_TLS=none accepted in production")
+	}
+	plain.App.Env = "staging"
+	if err := plain.validate(); err != nil {
+		t.Errorf("SMTP_TLS=none must stay possible in staging (mail catcher): %v", err)
+	}
+
+	insecure := validProdConfig()
+	insecure.SMTP.TLSInsecureSkipVerify = true
+	if err := insecure.validate(); err == nil {
+		t.Error("SMTP_TLS_INSECURE_SKIP_VERIFY accepted in production")
+	}
+	insecure.App.Env = "staging"
+	if err := insecure.validate(); err == nil {
+		t.Error("SMTP_TLS_INSECURE_SKIP_VERIFY accepted in staging")
+	}
+	insecure.App.Env = "development"
+	if err := insecure.validate(); err != nil {
+		t.Errorf("SMTP_TLS_INSECURE_SKIP_VERIFY must be allowed in development: %v", err)
+	}
+}
+
+func TestLoadSMTPTLSDefaults(t *testing.T) {
+	t.Setenv("SMTP_TLS", "")
+	t.Setenv("SMTP_TIMEOUT", "")
+	t.Setenv("APP_ENV", "development")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.SMTP.TLSMode != SMTPTLSNone {
+		t.Errorf("development default SMTP_TLS = %q, want none (local mail catcher)", cfg.SMTP.TLSMode)
+	}
+	if cfg.SMTP.Timeout != 10*time.Second {
+		t.Errorf("default SMTP_TIMEOUT = %v, want 10s", cfg.SMTP.Timeout)
+	}
+	t.Setenv("SMTP_TLS", "STARTTLS")
+	if cfg, err = Load(); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.SMTP.TLSMode != SMTPTLSStartTLS {
+		t.Errorf("SMTP_TLS normalized to %q, want starttls", cfg.SMTP.TLSMode)
 	}
 }

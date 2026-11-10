@@ -147,6 +147,14 @@ export const authService = {
     );
   },
 
+  /** Restore link of the deletion e-mail (`/platform/restore-account#token`). */
+  async restoreAccount(token: string) {
+    return unwrap<StatusPayload>(
+      await apiClient.POST("/v1/auth/account/restore", { body: { token } }),
+      { silent: true },
+    );
+  },
+
   async forgotPassword(body: ForgotPasswordRequest) {
     return unwrap<StatusPayload>(
       await apiClient.POST("/v1/auth/password/forgot", { body }),

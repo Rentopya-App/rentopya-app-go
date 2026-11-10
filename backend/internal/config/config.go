@@ -200,6 +200,10 @@ type HTTPConfig struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
+	// TrustedProxies lists CIDRs / IPs whose X-Forwarded-For hops are believed
+	// (TRUSTED_PROXIES, comma-separated). Empty = loopback + private ranges;
+	// "none" = never trust forwarding headers. See platform/clientip.
+	TrustedProxies []string
 }
 
 type DBConfig struct {
@@ -262,7 +266,29 @@ type SMTPConfig struct {
 	Password string
 	From     string
 	FromName string
+	// Timeout bounds the whole send (dial + TLS handshake + every SMTP
+	// command). A hung SMTP server must never block a worker or a request.
+	Timeout time.Duration
+	// TLSMode selects transport security (SMTP_TLS):
+	//   auto     implicit TLS on port 465, otherwise STARTTLS required (default
+	//            outside development/test);
+	//   starttls STARTTLS required on any port;
+	//   implicit TLS from the first byte (SMTPS) on any port;
+	//   none     plaintext, for the local mail catcher only (default in
+	//            development/test; refused in production).
+	TLSMode string
+	// TLSInsecureSkipVerify disables certificate verification for self-signed
+	// servers in development; validate() refuses it outside development/test.
+	TLSInsecureSkipVerify bool
 }
+
+// SMTP transport security modes (SMTP_TLS).
+const (
+	SMTPTLSAuto     = "auto"
+	SMTPTLSStartTLS = "starttls"
+	SMTPTLSImplicit = "implicit"
+	SMTPTLSNone     = "none"
+)
 
 type LogConfig struct {
 	Level  string
@@ -320,12 +346,14 @@ func Load() (Config, error) {
 			ReadTimeout:  getDuration("HTTP_READ_TIMEOUT", 10*time.Second),
 			WriteTimeout: getDuration("HTTP_WRITE_TIMEOUT", 30*time.Second),
 			IdleTimeout:  getDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
+
+			TrustedProxies: splitCSV(getEnv("TRUSTED_PROXIES", "")),
 		},
 		DB: DBConfig{
 			Host:     getEnv("DB_HOST", "127.0.0.1"),
 			Port:     getInt("DB_PORT", 5432),
 			User:     getEnv("DB_USER", "app"),
-			Password: getEnv("DB_PASSWORD", "change_me"),
+			Password: getEnv("DB_PASSWORD", defaultDBPassword),
 			Name:     getEnv("DB_NAME", "app"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 			MaxConns: int32(getInt("DB_MAX_CONNS", 20)),
@@ -347,6 +375,8 @@ func Load() (Config, error) {
 			Password: getEnv("SMTP_PASSWORD", ""),
 			From:     firstNonEmpty(getEnv("MAIL_FROM", ""), getEnv("SMTP_FROM", "noreply@localhost")),
 			FromName: getEnv("MAIL_FROM_NAME", "Rentopya"),
+			Timeout:  getDuration("SMTP_TIMEOUT", 10*time.Second),
+			// TLSMode and TLSInsecureSkipVerify are set below, once APP_ENV is known.
 		},
 		Queue: QueueConfig{
 			Enabled:         getBool("QUEUE_ENABLED", true),
@@ -380,8 +410,8 @@ func Load() (Config, error) {
 			QRTrustGeoHeaders:     getBool("AUTH_QR_TRUST_GEO_HEADERS", false),
 		},
 		JWT: JWTConfig{
-			AccessSecret:  getEnv("JWT_ACCESS_SECRET", "app-dev-access-secret-change-me-32b"),
-			RefreshSecret: getEnv("JWT_REFRESH_SECRET", "app-dev-refresh-secret-change-me-32b"),
+			AccessSecret:  getEnv("JWT_ACCESS_SECRET", defaultJWTAccessSecret),
+			RefreshSecret: getEnv("JWT_REFRESH_SECRET", defaultJWTRefreshSecret),
 			AccessTTL:     getDuration("JWT_ACCESS_TTL", 15*time.Minute),
 			RefreshTTL:    getDuration("JWT_REFRESH_TTL", 168*time.Hour),
 		},
@@ -401,7 +431,7 @@ func Load() (Config, error) {
 			Enabled:     getBool("SEARCH_ENABLED", true),
 			Driver:      strings.ToLower(getEnv("SEARCH_DRIVER", "meilisearch")),
 			MeiliHost:   getEnv("MEILI_HOST", "http://127.0.0.1:7700"),
-			MeiliKey:    getEnv("MEILI_MASTER_KEY", "app-dev-meili-master-key-change-me"),
+			MeiliKey:    getEnv("MEILI_MASTER_KEY", defaultMeiliMasterKey),
 			IndexPrefix: getEnv("MEILI_INDEX_PREFIX", "app"),
 		},
 		Sentry: SentryConfig{
@@ -423,7 +453,7 @@ func Load() (Config, error) {
 			NetgsmLiveBaseURL:     getEnv("NETGSM_LIVE_BASE_URL", "https://api.netgsm.com.tr"),
 			NetgsmSandboxBaseURL:  getEnv("NETGSM_SANDBOX_BASE_URL", ""),
 			LogProvider:           getBool("SMS_LOG_PROVIDER", false),
-			NetgsmAllowProduction: getBool(envguard.AllowNetgsmKey, false),
+			NetgsmAllowProduction: getBool("NETGSM_ALLOW_PRODUCTION_IN_NON_PROD", false),
 		},
 		WhatsApp: WhatsAppConfig{
 			WuzapiBaseURL:    getEnv("WUZAPI_BASE_URL", ""),
@@ -444,8 +474,8 @@ func Load() (Config, error) {
 			AppNetworkName:     getEnv("APP_NETWORK_NAME", ""),
 		},
 		Guard: ProductionGuardConfig{
-			KabisAllowProduction:    getBool(envguard.AllowKabisKey, false),
-			EInvoiceAllowProduction: getBool(envguard.AllowEInvoiceKey, false),
+			KabisAllowProduction:    getBool("KABIS_ALLOW_PRODUCTION_IN_NON_PROD", false),
+			EInvoiceAllowProduction: getBool("EINVOICE_ALLOW_PRODUCTION_IN_NON_PROD", false),
 		},
 		Alerts: AlertsConfig{
 			Email:        strings.TrimSpace(getEnv("ALERT_EMAIL", "")),
@@ -453,31 +483,34 @@ func Load() (Config, error) {
 		},
 	}
 
+	// The local mail catcher (compose.local.yml) speaks plaintext; every other
+	// environment requires TLS unless SMTP_TLS says otherwise.
+	defaultSMTPTLS := SMTPTLSAuto
+	if cfg.App.IsLocal() {
+		defaultSMTPTLS = SMTPTLSNone
+	}
+	cfg.SMTP.TLSMode = strings.ToLower(strings.TrimSpace(getEnv("SMTP_TLS", defaultSMTPTLS)))
+	cfg.SMTP.TLSInsecureSkipVerify = getBool("SMTP_TLS_INSECURE_SKIP_VERIFY", false)
+
 	if err := cfg.validate(); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
 }
 
-// Development-only fallbacks. validate() rejects them outside development.
 // ProductName is the user-visible product name: the passkey prompt's relying
 // party name and the authenticator app's TOTP issuer. APP_NAME stays the
 // technical service name used in logs.
 const ProductName = "Rentopya"
 
-const (
-	defaultEncryptionKey       = "app-dev-encryption-key-32bytes!!"
-	defaultAdapterSecret       = "app-dev-auth-adapter-secret-change-me"
-	defaultCentrifugoAPIKey    = "app-centrifugo-api-key-change-me"
-	defaultCentrifugoTokenHMAC = "app-centrifugo-token-hmac-change-me"
-)
-
+// validate checks the loaded config. Secret defaults are refused outside
+// development/test by secretGuard (guard.go), driven by deploy/env/schema.
 func (c Config) validate() error {
+	if err := validateAppEnv(c.App.Env); err != nil {
+		return err
+	}
 	if c.App.Name == "" {
 		return fmt.Errorf("config: APP_NAME is required")
-	}
-	if !envguard.Valid(c.App.Env) {
-		return fmt.Errorf("config: APP_ENV must be development, staging or production (got %q)", c.App.Env)
 	}
 	if c.HTTP.Addr == "" {
 		return fmt.Errorf("config: APP_HTTP_ADDR is required")
@@ -494,32 +527,17 @@ func (c Config) validate() error {
 	if c.JWT.AccessTTL <= 0 || c.JWT.RefreshTTL <= 0 {
 		return fmt.Errorf("config: JWT TTLs must be positive")
 	}
-	if c.App.Env != "development" && c.App.Env != "test" {
-		if c.JWT.AccessSecret == "" || c.JWT.RefreshSecret == "" {
-			return fmt.Errorf("config: JWT_ACCESS_SECRET and JWT_REFRESH_SECRET are required outside development")
-		}
-		if c.JWT.AccessSecret == "app-dev-access-secret-change-me-32b" ||
-			c.JWT.RefreshSecret == "app-dev-refresh-secret-change-me-32b" {
-			return fmt.Errorf("config: replace default JWT secrets outside development")
-		}
-		if len(c.JWT.AccessSecret) < 32 {
-			return fmt.Errorf("config: JWT_ACCESS_SECRET must be at least 32 characters outside development")
-		}
-		// Fallbacks below are public (.env.example / source); refuse them so
-		// production never encrypts secrets or signs tokens with known keys.
-		if c.Encryption.Key == "" || c.Encryption.Key == defaultEncryptionKey {
-			return fmt.Errorf("config: set a unique APP_ENCRYPTION_KEY outside development")
-		}
-		if c.Auth.AdapterSecret == defaultAdapterSecret {
-			return fmt.Errorf("config: replace default AUTH_ADAPTER_SECRET outside development")
-		}
-		if c.Centrifugo.Enabled && (c.Centrifugo.TokenHMAC == defaultCentrifugoTokenHMAC ||
-			c.Centrifugo.APIKey == defaultCentrifugoAPIKey) {
-			return fmt.Errorf("config: replace default CENTRIFUGO_TOKEN_HMAC_SECRET / CENTRIFUGO_API_KEY outside development")
-		}
+	if err := c.secretGuard(); err != nil {
+		return err
+	}
+	if !c.App.IsLocal() && len(c.JWT.AccessSecret) < 32 {
+		return fmt.Errorf("config: JWT_ACCESS_SECRET must be at least 32 characters outside development")
 	}
 	if c.JWT.AccessSecret == "" {
 		return fmt.Errorf("config: JWT_ACCESS_SECRET is required")
+	}
+	if err := c.validateSMTP(); err != nil {
+		return err
 	}
 	if c.Search.Enabled {
 		if c.Search.MeiliHost == "" {
@@ -528,14 +546,27 @@ func (c Config) validate() error {
 		if c.Search.IndexPrefix == "" {
 			return fmt.Errorf("config: MEILI_INDEX_PREFIX is required when SEARCH_ENABLED=true")
 		}
-		if c.App.Env != "development" && c.App.Env != "test" {
-			if c.Search.MeiliKey == "" {
-				return fmt.Errorf("config: MEILI_MASTER_KEY is required when SEARCH_ENABLED=true")
-			}
-			if c.Search.MeiliKey == "app-dev-meili-master-key-change-me" {
-				return fmt.Errorf("config: replace default MEILI_MASTER_KEY outside development")
-			}
-		}
+	}
+	return nil
+}
+
+// validateSMTP checks the mail transport settings: a known SMTP_TLS mode, no
+// plaintext mail in production, and no skipped certificate checks outside
+// development/test.
+func (c Config) validateSMTP() error {
+	switch c.SMTP.TLSMode {
+	case "", SMTPTLSAuto, SMTPTLSStartTLS, SMTPTLSImplicit, SMTPTLSNone:
+	default:
+		return fmt.Errorf("config: SMTP_TLS must be one of auto|starttls|implicit|none")
+	}
+	if c.App.Env == envguard.Production && c.SMTP.TLSMode == SMTPTLSNone {
+		return fmt.Errorf("config: SMTP_TLS=none (plaintext mail) is not allowed in production; use auto, starttls or implicit")
+	}
+	if !c.App.IsLocal() && c.SMTP.TLSInsecureSkipVerify {
+		return fmt.Errorf("config: SMTP_TLS_INSECURE_SKIP_VERIFY must not be set outside development")
+	}
+	if c.SMTP.Timeout < 0 {
+		return fmt.Errorf("config: SMTP_TIMEOUT must not be negative")
 	}
 	return nil
 }
@@ -544,8 +575,8 @@ func loadStorageConfig() StorageConfig {
 	driver := strings.ToLower(getEnv("STORAGE_DRIVER", "minio"))
 	s3Endpoint := getEnv("S3_ENDPOINT", "http://127.0.0.1:9000")
 	s3Bucket := getEnv("S3_BUCKET", "app")
-	s3Access := getEnv("S3_ACCESS_KEY", "storageadmin")
-	s3Secret := getEnv("S3_SECRET_KEY", "storageadmin")
+	s3Access := getEnv("S3_ACCESS_KEY", defaultS3AccessKey)
+	s3Secret := getEnv("S3_SECRET_KEY", defaultS3SecretKey)
 	s3Region := getEnv("S3_REGION", "us-east-1")
 	s3PathStyle := getBool("S3_USE_PATH_STYLE", true)
 	s3Public := getEnv("S3_PUBLIC_BASE_URL", "")

@@ -43,8 +43,8 @@ export type ApiRequest = {
   token?: string;
   /** The site's origin: the API checks it against the session. */
   origin?: string;
-  /** The visitor's IP (per-IP rate limits). */
-  clientIp?: string;
+  /** The visitor's X-Forwarded-For chain (per-IP rate limits; the API picks the hop). */
+  forwardedFor?: string;
   idempotencyKey?: string;
   reservationToken?: string;
 };
@@ -58,7 +58,7 @@ export async function apiFetch<T>(
   if (req.body !== undefined) headers.set("Content-Type", "application/json");
   if (req.token) headers.set("Authorization", `Bearer ${req.token}`);
   if (req.origin) headers.set("X-Forwarded-Origin", req.origin);
-  if (req.clientIp) headers.set("X-Forwarded-For", req.clientIp);
+  if (req.forwardedFor) headers.set("X-Forwarded-For", req.forwardedFor);
   if (req.idempotencyKey) headers.set("Idempotency-Key", req.idempotencyKey);
   if (req.reservationToken)
     headers.set("X-Reservation-Token", req.reservationToken);

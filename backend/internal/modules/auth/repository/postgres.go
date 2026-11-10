@@ -642,7 +642,8 @@ func mapUser(row db.User) model.User {
 		ID: row.ID, UUID: row.Uuid, Email: row.Email, PasswordHash: row.PasswordHash,
 		Name: row.Name, Surname: row.Surname, Status: row.Status, Locale: locale,
 		EmailVerified: row.EmailVerifiedAt.Valid, CreatedAt: row.CreatedAt.Time,
-		DeactivatedAt: timePtr(row.DeactivatedAt), PasswordSet: row.PasswordSet,
+		DeactivatedAt: timePtr(row.DeactivatedAt), DeletionDueAt: timePtr(row.DeletionDueAt),
+		PasswordSet: row.PasswordSet,
 	}
 }
 
@@ -669,9 +670,14 @@ func pgText(v *string) pgtype.Text {
 	return pgtype.Text{String: *v, Valid: true}
 }
 
-// DeactivateUser marks the user disabled with deactivated_at (rows are kept).
-func (r *Postgres) DeactivateUser(ctx context.Context, userID int64) (model.User, error) {
-	row, err := r.q.DeactivateUser(ctx, userID)
+// DeactivateUser disables the user and schedules the purge at dueAt; only
+// the hash of the restore token is stored.
+func (r *Postgres) DeactivateUser(ctx context.Context, userID int64, dueAt time.Time, restoreHash string) (model.User, error) {
+	row, err := r.q.DeactivateUser(ctx, db.DeactivateUserParams{
+		ID:               userID,
+		DeletionDueAt:    pgtype.Timestamptz{Time: dueAt, Valid: true},
+		RestoreTokenHash: pgtype.Text{String: restoreHash, Valid: true},
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.User{}, ErrNotFound

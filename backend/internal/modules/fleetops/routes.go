@@ -12,6 +12,7 @@ import (
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/middleware"
 	fleetopshandler "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/fleetops/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/fleetops/model"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/httpkit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/jwt"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/rbac"
@@ -42,7 +43,7 @@ type EngineHandlers struct {
 // RegisterRoutes mounts the fleet operations routes. A nil resolver
 // (tenancy off) mounts nothing.
 func RegisterRoutes(
-	mux *http.ServeMux,
+	mux httpkit.Mux,
 	h *fleetopshandler.Handler,
 	engines EngineHandlers,
 	tokens *jwt.Manager,

@@ -13,6 +13,7 @@ export const routes = {
     forgotPassword: "/platform/forgot-password",
     resetPassword: "/platform/reset-password",
     verifyEmail: "/platform/verify-email",
+    restoreAccount: "/platform/restore-account",
   },
   /**
    * Shell-independent pages for every signed-in user. `/` is the public

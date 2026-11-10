@@ -30,7 +30,18 @@ variables and tr / en templates:
   `rental.overdue`;
 - finance: `invoice.issued`, `account.payment_due` (reminder before the
   due date, 09:00 Istanbul);
-- operations (members): `field_task.assigned`, `field_task.overdue`.
+- operations (members): `field_task.assigned`, `field_task.overdue`,
+  `field_task.handover_upcoming` (push reminder to the assignee of an open
+  handover task, 60 min by default);
+- reservations (members): `reservation.approval_waiting` (push to every
+  member whose roles grant `tenant.reservations.approve` and whose branch
+  scope covers the pickup branch, once per waiting status; found by the
+  minute sweep).
+
+Member pushes go through the notification center (inbox, web push, Expo):
+the payload `kind` is the event code, which picks the lock-screen-safe
+mobile text in `notifications/pushtext`, and `data.url` is the panel path
+(`/t/{slug}/...`) the mobile app maps to its own screens.
 
 Sources:
 

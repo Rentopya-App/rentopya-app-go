@@ -3,7 +3,6 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	oauthproviderusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/integrations/oauthprovider/usecase"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/activity"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/authctx"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/clientip"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/password"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/ratelimit"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/resourcemeta"
@@ -109,6 +109,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	tokens, err := h.uc.Login(r.Context(), in.Email, in.Password, in.TOTPCode, sessionMeta(r))
 	if err != nil {
+		if h.limiter != nil && (errors.Is(err, usecase.ErrInvalidCredentials) || errors.Is(err, usecase.ErrInvalidMFACode)) {
+			h.limiter.RecordLoginFailure(r.Context(), in.Email)
+		}
 		writeUsecaseError(w, r, err)
 		return
 	}
@@ -537,20 +540,11 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	return nil
 }
 
+// sessionMeta captures the client for session rows and rate limits. The IP is
+// resolved once by clientip.Middleware (X-Forwarded-For honoured only behind
+// a trusted proxy), never parsed from headers here.
 func sessionMeta(r *http.Request) model.SessionMeta {
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip != "" {
-		ip = strings.TrimSpace(strings.Split(ip, ",")[0])
-	}
-	if ip == "" {
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err == nil {
-			ip = host
-		} else {
-			ip = r.RemoteAddr
-		}
-	}
-	return model.SessionMeta{UserAgent: r.UserAgent(), IP: ip}
+	return model.SessionMeta{UserAgent: r.UserAgent(), IP: clientip.From(r)}
 }
 
 func writeUsecaseError(w http.ResponseWriter, r *http.Request, err error) {
@@ -576,7 +570,19 @@ func writeUsecaseError(w http.ResponseWriter, r *http.Request, err error) {
 			})
 		return
 	}
+	var soleOwner *usecase.LastOrganizationOwnerError
+	if errors.As(err, &soleOwner) {
+		details := make([]response.Detail, 0, len(soleOwner.Organizations))
+		for _, o := range soleOwner.Organizations {
+			details = append(details, response.Detail{Field: "organization", Message: o.Name, Code: o.Slug})
+		}
+		response.ErrorWithDetails(w, r, http.StatusConflict, response.CodeLastOrganizationOwner,
+			"You are the only owner of an organization. Hand over ownership before deleting your account.", details)
+		return
+	}
 	switch {
+	case errors.Is(err, usecase.ErrInvalidRestoreLink):
+		response.BadRequest(w, r, response.CodeInvalidRestoreLink, "The restore link is invalid or expired")
 	case errors.Is(err, usecase.ErrAccountDeactivated):
 		response.Error(w, r, http.StatusForbidden, response.CodeAccountDeactivated, "This account has been deleted")
 	case errors.Is(err, usecase.ErrInvalidEmailCode):

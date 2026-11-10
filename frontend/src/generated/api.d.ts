@@ -13,7 +13,8 @@ export interface paths {
         };
         /**
          * Liveness probe
-         * @description Process is alive. Does not check dependencies.
+         * @description Process is alive. Does not check dependencies. Also reports the release
+         *     baked into the image (version, git SHA, build time; never the notes).
          */
         get: operations["getHealthz"];
         put?: never;
@@ -1859,7 +1860,9 @@ export interface paths {
          * Email an account-deletion confirmation code
          * @description Sends a 6-digit confirmation code (10 minutes) to the caller's email.
          *     Intended for passwordless accounts (Apple / Google / email code) that
-         *     cannot complete a password / passkey / TOTP step-up.
+         *     cannot complete a password / passkey / TOTP step-up. The only open
+         *     owner of an organization gets `409 LAST_ORGANIZATION_OWNER` (no code
+         *     is sent; see `/v1/auth/account/deactivate`).
          */
         post: operations["postAuthAccountDeactivateRequest"];
         delete?: never;
@@ -1878,20 +1881,60 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Delete (deactivate) own account
-         * @description Account deletion keeps all data: the user becomes `disabled` with
-         *     `deactivated_at`, every refresh session is revoked, stored Apple
-         *     refresh tokens are revoked via Apple `/auth/revoke` (best effort), and
-         *     every sign-in path returns `403 ACCOUNT_DEACTIVATED` afterwards.
+         * Delete own account (30-day restore window)
+         * @description Self-service account deletion (App Store 5.1.1(v), KVKK m.7;
+         *     docs/design/account-deletion.md). The user becomes `disabled` with
+         *     `deactivated_at` and `deletion_due_at` = now + 30 days; every refresh
+         *     session, mobile push device and browser push subscription is removed,
+         *     stored Apple refresh tokens are revoked via Apple `/auth/revoke` (best
+         *     effort), and every sign-in path returns `403 ACCOUNT_DEACTIVATED`.
+         *     The confirmation e-mail carries a restore link
+         *     (`<FRONTEND_URL>/platform/restore-account#<token>`, see
+         *     `/v1/auth/account/restore`); only the token's SHA-256 is stored and
+         *     the stored e-mail copy drops the link once delivered. After the
+         *     window the worker erases the account: sign-in methods, sessions,
+         *     devices, inbox and organization memberships are deleted and the user
+         *     row is anonymised (rental, contract, finance and audit records keep
+         *     referencing it as "Silinmiş kullanıcı").
          *
          *     Confirm with either a recent step-up grant (`/v1/auth/step-up/*`,
          *     send `{}`) or `code` from `/v1/auth/account/deactivate/request`.
          *     Without either → `403 STEP_UP_REQUIRED`. Wrong code →
          *     `400 INVALID_EMAIL_CODE`. The last super admin gets `409 CONFLICT`.
-         *     Refused while impersonating (`403 FORBIDDEN`). A platform admin can
-         *     reactivate the user by setting status `active`.
+         *     The only open owner (template `owner` role; owners whose own deletion
+         *     is pending do not count) of a live organization gets
+         *     `409 LAST_ORGANIZATION_OWNER`, with one `details[]` entry per
+         *     organization (`field = organization`, `message` = name, `code` =
+         *     slug): hand over ownership first. Refused while impersonating
+         *     (`403 FORBIDDEN`). A platform admin can reactivate the user before
+         *     the purge by setting status `active`.
          */
         post: operations["postAuthAccountDeactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/account/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a deleted account with the e-mailed link
+         * @description Public. The token from the deletion e-mail's restore link reopens the
+         *     account (`active`, deletion date and token cleared) while its 30-day
+         *     window is open, and sends `auth.account_restored`. The user then
+         *     signs in as usual (sessions and push devices were removed at
+         *     deletion). Unknown, used or late tokens → `400 INVALID_RESTORE_LINK`.
+         *     Rate limited per IP (`429 RATE_LIMITED`).
+         */
+        post: operations["postAuthAccountRestore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1920,8 +1963,9 @@ export interface paths {
          *     expire 30 s after the session. Channel events (`data.type`):
          *     `scanned`, `approved` (with `exchange_token`), `rejected`.
          *
-         *     The request's User-Agent and client IP (first `X-Forwarded-For` hop) are
-         *     stored for the approval screen. Errors: `429 RATE_LIMITED` (60 / 15 min
+         *     The request's User-Agent and client IP are stored for the approval
+         *     screen. The IP honours `X-Forwarded-For` only behind a trusted proxy
+         *     (`TRUSTED_PROXIES`; right-most untrusted hop). Errors: `429 RATE_LIMITED` (60 / 15 min
          *     per IP), `503 REALTIME_DISABLED`.
          */
         post: operations["postAuthQRSession"];
@@ -2067,7 +2111,7 @@ export interface paths {
         };
         /**
          * List own inbox
-         * @description Requires `notifications.read`. Supports `limit`,`offset`,`q`,`sort`,`status`,`channel`,`unread`. Platform / account shell inbox: only notifications without an organization (organization notifications appear in `GET /v1/tenant/notifications`).
+         * @description Requires `notifications.read`. E-mail rows are never listed. Supports `limit`,`offset`,`q`,`sort`,`status`,`channel`,`unread`. Platform / account shell inbox: only notifications without an organization (organization notifications appear in `GET /v1/tenant/notifications`).
          */
         get: operations["getNotifications"];
         put?: never;
@@ -2176,7 +2220,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get own notification */
+        /**
+         * Get own notification
+         * @description E-mail rows answer 404 (their bodies carry one-time codes and links that only the mailbox may read).
+         */
         get: operations["getNotificationByUUID"];
         put?: never;
         post?: never;
@@ -2578,7 +2625,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a member from the organization
-         * @description `tenant.members.write`. Only owners remove an owner; the last owner cannot be removed (`409 LAST_ORGANIZATION_OWNER`).
+         * @description `tenant.members.write`. Only owners remove an owner; the last owner cannot be removed (`409 LAST_ORGANIZATION_OWNER`). Open invitations for the member's e-mail in this organization are revoked with the membership.
          */
         delete: operations["deleteTenantMember"];
         options?: never;
@@ -2640,8 +2687,10 @@ export interface paths {
          * @description `tenant.members.write`. E-mails a single-use link
          *     `${PUBLIC_FRONTEND_URL}/invite/{token}` valid for 7 days; the token
          *     (32 random bytes) is stored as its sha256 hash and never returned.
-         *     Re-inviting an e-mail revokes its open invitation; inviting a member
-         *     answers `409 ALREADY_MEMBER`.
+         *     Re-inviting an e-mail revokes its open invitation, so the caller must
+         *     also be allowed to grant every role and branch of that invitation
+         *     (`403 FORBIDDEN` otherwise: an admin cannot replace an owner
+         *     invitation); inviting a member answers `409 ALREADY_MEMBER`.
          *
          *     Same guards as member updates (`403 FORBIDDEN`): only owners invite
          *     owners; a non-owner can only grant roles whose permissions it holds;
@@ -3742,7 +3791,7 @@ export interface paths {
         };
         /**
          * List own inbox in the organization panel
-         * @description Requires `notifications.read` and membership of the `X-Organization` organization. Lists the caller's notifications of that organization (tenant export / import / bulk jobs) plus the ones without an organization; other organizations' notifications never appear. Same query parameters as `GET /v1/notifications`.
+         * @description Requires `notifications.read` and membership of the `X-Organization` organization. Lists the caller's notifications of that organization (tenant export / import / bulk jobs) plus the ones without an organization; other organizations' notifications never appear. E-mail rows are never listed. Same query parameters as `GET /v1/notifications`.
          */
         get: operations["getTenantNotifications"];
         put?: never;
@@ -8494,7 +8543,7 @@ export interface paths {
         put?: never;
         /**
          * Register a custom site domain
-         * @description tenant.site.manage. At most three per organization; normalized host is globally unique. DOMAIN_LIMIT or DOMAIN_TAKEN is a conflict. Verification is asynchronous.
+         * @description tenant.site.manage. At most three per organization. Only a verified domain reserves its normalized host: several organizations may hold pending claims, the first to verify wins and the others fail. DOMAIN_TAKEN when the host is verified by another organization or already registered by this one; DOMAIN_LIMIT and DOMAIN_TAKEN are conflicts. Verification is asynchronous.
          */
         post: operations["postTenantSiteDomain"];
         delete?: never;
@@ -16463,6 +16512,979 @@ export interface paths {
         patch: operations["patchSiteLead"];
         trace?: never;
     };
+    "/v1/platform/storage/meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Storage explorer list metadata
+         * @description `platform.storage.read`.
+         */
+        get: operations["getPlatformStorageMeta"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List storage objects
+         * @description `platform.storage.read`. Folders and files under `prefix`, or a virtual `view`. Sort: `name`, `size`, `updated_at`, `type`.
+         */
+        get: operations["getPlatformStorageObjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/item": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one storage object
+         * @description `platform.storage.read`.
+         */
+        get: operations["getPlatformStorageObject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Storage usage summary
+         * @description `platform.storage.read`.
+         */
+        get: operations["getPlatformStorageUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an object
+         * @description `platform.storage.read`. Always `Content-Disposition: attachment`.
+         */
+        get: operations["getPlatformStorageObjectDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview an object inline
+         * @description `platform.storage.read`. Inline only for safe types (images, PDF, plain text, audio, video); others download.
+         */
+        get: operations["getPlatformStorageObjectPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List versions of an object
+         * @description `platform.storage.read`.
+         */
+        get: operations["getPlatformStorageVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Storage activity
+         * @description `platform.storage.read`. Optionally for one `key`.
+         */
+        get: operations["getPlatformStorageActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List user shares of an object
+         * @description `platform.storage.read`.
+         */
+        get: operations["getPlatformStorageShares"];
+        put?: never;
+        /**
+         * Share an object with a user
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageShare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/shares/{uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a share
+         * @description `platform.storage.write`.
+         */
+        delete: operations["deletePlatformStorageShare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List public / signed links of an object
+         * @description `platform.storage.read`.
+         */
+        get: operations["getPlatformStorageLinks"];
+        put?: never;
+        /**
+         * Create a public or signed link
+         * @description `platform.storage.write`. `public` links use a slug (`/v1/public/storage/{slug}`); `signed` links return a one-time `token` (`/v1/public/storage/s/{token}`).
+         */
+        post: operations["postPlatformStorageLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/links/{uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a link
+         * @description `platform.storage.write`.
+         */
+        delete: operations["deletePlatformStorageLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/folders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a folder
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageFolder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a file (multipart)
+         * @description `platform.storage.write`. Capped by `STORAGE_MAX_BYTES` (413 above it).
+         */
+        post: operations["postPlatformStorageUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/uploads/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a direct upload
+         * @description `platform.storage.write`. Returns a presigned URL when the driver supports it; finish with `/uploads/complete`.
+         */
+        post: operations["postPlatformStorageUploadSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/uploads/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish a direct upload
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageUploadComplete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy an object
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageCopy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move an object
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageMove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename an object
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageRename"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move objects to the trash
+         * @description `platform.storage.write`. Answers `status: trashed`.
+         */
+        post: operations["postPlatformStorageDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore objects from the trash
+         * @description `platform.storage.write`. Answers `status: restored`.
+         */
+        post: operations["postPlatformStorageRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/objects/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete objects permanently
+         * @description `platform.storage.write`. Answers `status: deleted`.
+         */
+        post: operations["postPlatformStoragePurge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/versions/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an object version
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageVersionRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/versions/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete an object version
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageVersionDelete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/storage/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Star an object
+         * @description `platform.storage.write`.
+         */
+        post: operations["postPlatformStorageStar"];
+        /**
+         * Unstar an object
+         * @description `platform.storage.write`.
+         */
+        delete: operations["deletePlatformStorageStar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/storage/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open a public storage link
+         * @description No auth. Forbidden when the link expired or was revoked.
+         */
+        get: operations["getPublicStorageObject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/storage/s/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open a signed storage link
+         * @description No auth; the token is the credential. Forbidden when the link expired or was revoked.
+         */
+        get: operations["getPublicSignedStorageObject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/vapid-public-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Web push public key
+         * @description Any signed-in user. Empty when web push is not configured.
+         */
+        get: operations["getNotificationsVapidPublicKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/push-subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Subscribe this browser to web push
+         * @description Upserts by endpoint for the caller.
+         */
+        post: operations["postNotificationsPushSubscription"];
+        /** Unsubscribe this browser from web push */
+        delete: operations["deleteNotificationsPushSubscription"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List platform activity (audit log)
+         * @description `platform.activity.read`.
+         */
+        get: operations["getPlatformActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/activity/meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity list metadata
+         * @description `platform.activity.read`.
+         */
+        get: operations["getPlatformActivityMeta"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/users/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export users
+         * @description Queues an export (`platform.users.export`, step-up). Poll `GET /v1/platform/exports/{uuid}`.
+         */
+        post: operations["postPlatformUsersExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/roles/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export roles
+         * @description Queues an export (`platform.roles.export`, step-up). Poll `GET /v1/platform/exports/{uuid}`.
+         */
+        post: operations["postPlatformRolesExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/notifications/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export notifications
+         * @description Queues an export (`platform.notifications.export`, step-up). Poll `GET /v1/platform/exports/{uuid}`.
+         */
+        post: operations["postPlatformNotificationsExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/activity/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export activity
+         * @description Queues an export (`platform.activity.read`, step-up). Poll `GET /v1/platform/exports/{uuid}`.
+         */
+        post: operations["postPlatformActivityExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List export jobs
+         * @description `platform.exports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        get: operations["getPlatformExportJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/exports/{uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an export job
+         * @description `platform.exports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        get: operations["getPlatformExportJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/exports/{uuid}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a completed export
+         * @description `platform.exports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        get: operations["getPlatformExportDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List import jobs
+         * @description `platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        get: operations["getPlatformImportJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/imports/{uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an import job
+         * @description `platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        get: operations["getPlatformImportJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/imports/{uuid}/mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Save the column mapping of an import
+         * @description `platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        patch: operations["patchPlatformImportMapping"];
+        trace?: never;
+    };
+    "/v1/platform/imports/{uuid}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry-run an import
+         * @description `platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        post: operations["postPlatformImportPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/imports/{uuid}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a previewed import
+         * @description `platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        post: operations["postPlatformImportConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/imports/{uuid}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Roll back an applied import
+         * @description `platform.imports.read`. Admins (`platform.settings.write`) see every job, others their own.
+         */
+        post: operations["postPlatformImportRollback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/users/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a users import file
+         * @description Creates an import job (`platform.users.import`). Continue with `/v1/platform/imports/{uuid}/mapping`, `/preview` and `/confirm`.
+         */
+        post: operations["postPlatformUsersImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/users/import/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a users import sample
+         * @description `platform.users.import`.
+         */
+        get: operations["getPlatformUsersImportSample"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/roles/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a roles import file
+         * @description Creates an import job (`platform.roles.import`). Continue with `/v1/platform/imports/{uuid}/mapping`, `/preview` and `/confirm`.
+         */
+        post: operations["postPlatformRolesImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/roles/import/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a roles import sample
+         * @description `platform.roles.import`.
+         */
+        get: operations["getPlatformRolesImportSample"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -19892,6 +20914,8 @@ export interface components {
              * @example RATE_LIMITED
              * @example STEP_UP_REQUIRED
              * @example ACCOUNT_DEACTIVATED
+             * @example INVALID_RESTORE_LINK
+             * @example LAST_ORGANIZATION_OWNER
              * @example INVALID_EMAIL_CODE
              * @example INVALID_ID_TOKEN
              * @example OAUTH_ACCOUNT_NOT_LINKED
@@ -20352,6 +21376,10 @@ export interface components {
         AccountDeactivateRequest: {
             /** @description Code from `/v1/auth/account/deactivate/request`; omit to use a step-up grant */
             code?: string;
+        };
+        AccountRestoreRequest: {
+            /** @description Token after `#` in the deletion e-mail's restore link */
+            token: string;
         };
         ForgotPasswordRequest: {
             /** Format: email */
@@ -21415,6 +22443,19 @@ export interface components {
         HealthzResponse: {
             /** @example ok */
             status: string;
+            /**
+             * @description Release baked into the image: `v0.N` on a release image (main),
+             *     `sha-<short>` on a branch build, `dev` on a local build.
+             * @example v0.1
+             */
+            version: string;
+            /** @description Full commit SHA the image was built from. Omitted on local builds. */
+            git_sha?: string;
+            /**
+             * Format: date-time
+             * @description Image build time (RFC 3339). Omitted on local builds.
+             */
+            built_at?: string;
         };
         BulkTarget: {
             /** @enum {string} */
@@ -32071,6 +33112,340 @@ export interface components {
             /** Format: date-time */
             synced_at: string | null;
         };
+        /** @enum {string} */
+        StorageFileKind: "folder" | "image" | "video" | "audio" | "pdf" | "archive" | "spreadsheet" | "document" | "code" | "unknown";
+        StorageObject: {
+            id: string;
+            name: string;
+            key: string;
+            prefix: string;
+            bucket: string;
+            /** @enum {string} */
+            kind: "file" | "folder";
+            file_kind: components["schemas"]["StorageFileKind"];
+            /** Format: int64 */
+            size: number;
+            mime_type: string;
+            etag?: string;
+            version_id?: string;
+            version?: string;
+            is_public: boolean;
+            is_starred: boolean;
+            is_shared: boolean;
+            /** @enum {string} */
+            access: "private" | "public" | "shared";
+            owner?: string;
+            storage_class?: string;
+            content_disposition?: string;
+            cache_control?: string;
+            metadata: {
+                [key: string]: string;
+            };
+            created_at: string;
+            updated_at: string;
+            /** @description Set for objects in the trash */
+            trash_uuid?: string;
+            trash_expires_at?: string;
+        };
+        StorageObjectList: {
+            items: components["schemas"]["StorageObject"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+            prefix: string;
+            view: string;
+        };
+        StorageUsage: {
+            /** Format: int64 */
+            total_bytes: number;
+            /** Format: int64 */
+            used_bytes: number;
+            /** Format: int64 */
+            available_bytes: number;
+            /** Format: int64 */
+            quota_bytes: number;
+            /** Format: int64 */
+            total_files: number;
+            /** Format: int64 */
+            total_folders: number;
+            by_kind: {
+                kind: string;
+                /** Format: int64 */
+                bytes: number;
+                /** Format: int64 */
+                count: number;
+            }[];
+            largest: components["schemas"]["StorageObject"][];
+            recent: components["schemas"]["StorageObject"][];
+        };
+        StorageVersion: {
+            version_id: string;
+            label: string;
+            /** Format: int64 */
+            size: number;
+            etag?: string;
+            is_latest: boolean;
+            /** @enum {string} */
+            status: "current" | "archived";
+            created_at: string;
+            created_by?: string;
+        };
+        StorageActivity: {
+            uuid: string;
+            object_key: string;
+            action: string;
+            actor: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            created_at: string;
+        };
+        StorageActivityPage: {
+            items: components["schemas"]["StorageActivity"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        StorageShare: {
+            uuid: string;
+            object_key: string;
+            user_uuid: string;
+            name: string;
+            email: string;
+            /** @enum {string} */
+            role: "viewer" | "editor" | "owner";
+            created_at: string;
+        };
+        StorageLink: {
+            uuid: string;
+            object_key: string;
+            /** @enum {string} */
+            kind: "public" | "signed";
+            slug?: string;
+            url: string;
+            /** @description Only in the create response of a signed link */
+            token?: string;
+            expires_at?: string;
+            can_view: boolean;
+            can_download: boolean;
+            can_upload: boolean;
+            /** @enum {string} */
+            status: "active" | "expired" | "revoked";
+            created_at: string;
+        };
+        StorageUploadSession: {
+            session_id: string;
+            key: string;
+            method: string;
+            upload_url: string;
+            presigned_url?: string;
+            /** @description Seconds */
+            expires_in: number;
+        };
+        StorageKeyRequest: {
+            key: string;
+        };
+        StorageKeysRequest: {
+            keys: string[];
+        };
+        StorageFolderRequest: {
+            prefix?: string;
+            name: string;
+        };
+        StorageCopyMoveRequest: {
+            source_key: string;
+            dest_key: string;
+        };
+        StorageRenameRequest: {
+            key: string;
+            name: string;
+        };
+        StorageVersionRequest: {
+            key: string;
+            version_id: string;
+        };
+        StorageShareRequest: {
+            key: string;
+            /** Format: uuid */
+            user_uuid: string;
+            /** @enum {string} */
+            role: "viewer" | "editor" | "owner";
+        };
+        StorageLinkRequest: {
+            key: string;
+            /** @enum {string} */
+            kind: "public" | "signed";
+            /** @description Public links only; generated when empty */
+            slug?: string;
+            /** @description Seconds; 0 never expires */
+            expires_in?: number;
+            /** @default true */
+            can_view: boolean;
+            /** @default true */
+            can_download: boolean;
+            /** @default false */
+            can_upload: boolean;
+        };
+        StorageUploadForm: {
+            /** Format: binary */
+            file: string;
+            prefix?: string;
+            /** @description Full object key; overrides prefix + file name */
+            key?: string;
+        };
+        StorageUploadSessionRequest: {
+            prefix?: string;
+            key?: string;
+            filename?: string;
+            content_type?: string;
+            /** Format: int64 */
+            size?: number;
+        };
+        EnvelopeStorageObject: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["StorageObject"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageObjectList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["StorageObjectList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageUsage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["StorageUsage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageVersionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["StorageVersion"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageActivityPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["StorageActivityPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageShare: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["StorageShare"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageShareList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["StorageShare"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageLink: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["StorageLink"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageLinkList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["StorageLink"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeStorageUploadSession: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["StorageUploadSession"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        PushSubscriptionInput: {
+            endpoint: string;
+            key_p256dh?: string;
+            key_auth?: string;
+        };
+        PushSubscriptionEndpoint: {
+            endpoint: string;
+        };
+        EnvelopeVapidPublicKey: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                vapid_public_key: string;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopePushSubscription: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                /** Format: uuid */
+                uuid: string;
+                endpoint: string;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ActivityEvent: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: int64 */
+            actor_user_id?: number;
+            action: string;
+            resource: string;
+            /** Format: uuid */
+            resource_uuid?: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeActivityPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["ActivityEvent"][];
+                /** Format: int64 */
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeExportJobPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["ExportJob"][];
+                /** Format: int64 */
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeImportJobPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["ImportJob"][];
+                /** Format: int64 */
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
     };
     responses: {
         /** @description WhatsApp session */
@@ -35560,6 +36935,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
         };
@@ -35590,6 +36966,33 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postAuthAccountRestore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountRestoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Restored (`data.status = restored`) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalError"];
         };
@@ -62883,6 +64286,1432 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getPlatformStorageMeta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resource meta */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeResourceMeta"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformStorageObjects: {
+        parameters: {
+            query?: {
+                prefix?: string;
+                view?: "all" | "starred" | "shared" | "public" | "trash" | "recent";
+                q?: components["parameters"]["Q"];
+                /** @description Comma-separated fields; prefix `-` for descending */
+                sort?: components["parameters"]["Sort"];
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+                /** @description File kind filter */
+                kind?: components["schemas"]["StorageFileKind"];
+                access?: "private" | "public" | "shared";
+                modified_from?: string;
+                modified_to?: string;
+                recursive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Objects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObjectList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformStorageObject: {
+        parameters: {
+            query: {
+                /** @description Object key */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Object */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlatformStorageUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageUsage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformStorageObjectDownload: {
+        parameters: {
+            query: {
+                /** @description Object key */
+                key: string;
+                version_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlatformStorageObjectPreview: {
+        parameters: {
+            query: {
+                /** @description Object key */
+                key: string;
+                version_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlatformStorageVersions: {
+        parameters: {
+            query: {
+                /** @description Object key */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageVersionList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlatformStorageActivity: {
+        parameters: {
+            query?: {
+                key?: string;
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageActivityPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformStorageShares: {
+        parameters: {
+            query: {
+                /** @description Object key */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Shares */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageShareList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStorageShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Share */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageShare"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deletePlatformStorageShare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlatformStorageLinks: {
+        parameters: {
+            query: {
+                /** @description Object key */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Links */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageLinkList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStorageLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Link */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageLink"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deletePlatformStorageLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStorageFolder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageFolderRequest"];
+            };
+        };
+        responses: {
+            /** @description Folder */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    postPlatformStorageUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["StorageUploadForm"];
+            };
+        };
+        responses: {
+            /** @description Uploaded object */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            /** @description Upload exceeds the maximum size (PAYLOAD_TOO_LARGE) */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    postPlatformStorageUploadSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageUploadSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Upload session */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageUploadSession"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    postPlatformStorageUploadComplete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description Object */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStorageCopy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageCopyMoveRequest"];
+            };
+        };
+        responses: {
+            /** @description Object at the destination */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    postPlatformStorageMove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageCopyMoveRequest"];
+            };
+        };
+        responses: {
+            /** @description Object at the destination */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    postPlatformStorageRename: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageRenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Renamed object */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    postPlatformStorageDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageKeysRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStorageRestore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageKeysRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStoragePurge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageKeysRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStorageVersionRestore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Object */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStorageObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStorageVersionDelete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformStorageStar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description Starred */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deletePlatformStorageStar: {
+        parameters: {
+            query: {
+                /** @description Object key */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unstarred */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicStorageObject: {
+        parameters: {
+            query?: {
+                /** @description `1` forces attachment */
+                download?: "1";
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicSignedStorageObject: {
+        parameters: {
+            query?: {
+                /** @description `1` forces attachment */
+                download?: "1";
+            };
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getNotificationsVapidPublicKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVapidPublicKey"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    postNotificationsPushSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionInput"];
+            };
+        };
+        responses: {
+            /** @description Subscription */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePushSubscription"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    deleteNotificationsPushSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionEndpoint"];
+            };
+        };
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    getPlatformActivity: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+                q?: components["parameters"]["Q"];
+                /** @description Comma-separated fields; prefix `-` for descending */
+                sort?: components["parameters"]["Sort"];
+                resource?: string;
+                action?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeActivityPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformActivityMeta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resource meta */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeResourceMeta"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    postPlatformUsersExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Export job queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    postPlatformRolesExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Export job queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    postPlatformNotificationsExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Export job queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    postPlatformActivityExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Export job queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformExportJobs: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExportJobPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformExportJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlatformExportDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPlatformImportJobs: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportJobPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformImportJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Import job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    patchPlatformImportMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportMappingRequest"];
+            };
+        };
+        responses: {
+            /** @description Import job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformImportPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Import job with preview summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformImportConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Import queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformImportRollback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rolled back job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postPlatformUsersImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImportUploadForm"];
+            };
+        };
+        responses: {
+            /** @description Import job */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformUsersImportSample: {
+        parameters: {
+            query?: {
+                format?: "json" | "xlsx" | "csv" | "tsv";
+                locale?: "tr" | "en";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sample file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    postPlatformRolesImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImportUploadForm"];
+            };
+        };
+        responses: {
+            /** @description Import job */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeImportJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformRolesImportSample: {
+        parameters: {
+            query?: {
+                format?: "json" | "xlsx" | "csv" | "tsv";
+                locale?: "tr" | "en";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sample file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
 }
