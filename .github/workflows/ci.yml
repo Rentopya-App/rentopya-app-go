@@ -385,8 +385,10 @@ jobs:
       # schema.d.ts equal to `npm run api:generate` (mobile-ci skill).
       - name: API types up to date
         run: npm run api:check
+      # Pinned: expo-doctor@1.21.7 (2026-11-11) ships without its @expo/env
+      # dependency and crashes with MODULE_NOT_FOUND. Bump deliberately.
       - name: Expo doctor
-        run: npx expo-doctor
+        run: npx --yes expo-doctor@1.21.6
       - name: Release script
         working-directory: .
         run: |
@@ -546,6 +548,8 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
           push: false
+          # Always re-resolve FROM images (pinned bases, no stale cached tag).
+          pull: true
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
             GIT_SHA=${{ github.sha }}
@@ -598,6 +602,8 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
           push: true
+          # Always re-resolve FROM images (pinned bases, no stale cached tag).
+          pull: true
           tags: ${{ steps.meta.outputs.image }}:test-${{ steps.meta.outputs.sha }}
           build-args: |
             VERSION=test-${{ steps.meta.outputs.sha }}
@@ -726,6 +732,8 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
           push: true
+          # Always re-resolve FROM images (pinned bases, no stale cached tag).
+          pull: true
           tags: |
             ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
             ${{ steps.meta.outputs.image }}:${{ needs.release-meta.outputs.version }}
