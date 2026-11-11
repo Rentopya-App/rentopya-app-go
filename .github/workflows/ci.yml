@@ -385,8 +385,10 @@ jobs:
       # schema.d.ts equal to `npm run api:generate` (mobile-ci skill).
       - name: API types up to date
         run: npm run api:check
+      # Pinned: expo-doctor@1.21.7 (2026-11-11) ships without its @expo/env
+      # dependency and crashes with MODULE_NOT_FOUND. Bump deliberately.
       - name: Expo doctor
-        run: npx expo-doctor
+        run: npx --yes expo-doctor@1.21.6
       - name: Release script
         working-directory: .
         run: |
