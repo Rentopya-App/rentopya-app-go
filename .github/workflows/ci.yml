@@ -546,6 +546,8 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
           push: false
+          # Always re-resolve FROM images (pinned bases, no stale cached tag).
+          pull: true
           build-args: |
             VERSION=${{ steps.meta.outputs.version }}
             GIT_SHA=${{ github.sha }}
@@ -598,6 +600,8 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
           push: true
+          # Always re-resolve FROM images (pinned bases, no stale cached tag).
+          pull: true
           tags: ${{ steps.meta.outputs.image }}:test-${{ steps.meta.outputs.sha }}
           build-args: |
             VERSION=test-${{ steps.meta.outputs.sha }}
@@ -726,6 +730,8 @@ jobs:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
           push: true
+          # Always re-resolve FROM images (pinned bases, no stale cached tag).
+          pull: true
           tags: |
             ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
             ${{ steps.meta.outputs.image }}:${{ needs.release-meta.outputs.version }}
