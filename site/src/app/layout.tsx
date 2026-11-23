@@ -54,7 +54,9 @@ async function pageAlternates(
   const offered = site.locales.filter(isLocale);
   const fallback = isLocale(site.default_locale) ? site.default_locale : "tr";
   const languages: Record<string, string> = {};
-  if (offered.length > 1) {
+  // Only when the page has another address in another language ("/" has one).
+  const distinct = new Set(offered.map((l) => localizePath(path, l)));
+  if (offered.length > 1 && distinct.size > 1) {
     for (const l of offered) languages[l] = localizePath(path, l);
     languages["x-default"] = localizePath(path, fallback);
   }

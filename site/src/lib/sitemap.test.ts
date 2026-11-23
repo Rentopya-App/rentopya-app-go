@@ -81,3 +81,13 @@ test("lists every page in each offered language with hreflang alternates (TEC-12
   );
   assert.equal((xml.match(/<url>/g) ?? []).length, 3);
 });
+
+test("lists a path that reads the same in every language once", () => {
+  const xml = buildSitemapXml(
+    "https://acme.rentopya.app",
+    [{ path: "/", lastmod: "2026-11-20T10:00:00Z" }],
+    { locales: ["tr", "en"], defaultLocale: "tr" },
+  );
+  assert.equal((xml.match(/<url>/g) ?? []).length, 1);
+  assert.doesNotMatch(xml, /hreflang/);
+});
