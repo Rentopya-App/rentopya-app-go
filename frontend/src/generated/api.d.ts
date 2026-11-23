@@ -8700,7 +8700,7 @@ export interface paths {
         put?: never;
         /**
          * Mark manual TLS active
-         * @description platform.site_domains.manage. Only verified domains using manual mode; otherwise DOMAIN_TLS_MODE conflict.
+         * @description platform.site_domains.manage. Only verified domains using manual mode; otherwise DOMAIN_TLS_MODE conflict. The API first dials the host on 443 with SNI and requires a trusted, unexpired certificate for it; otherwise 409 DOMAIN_TLS_UNVERIFIED (the reason is stored in last_error).
          */
         post: operations["postPlatformSiteDomainTLSActive"];
         delete?: never;
@@ -32684,6 +32684,16 @@ export interface components {
             last_error: string;
             /** @enum {string} */
             tls_status: "pending" | "provisioning" | "active" | "failed" | "manual";
+            /**
+             * Format: date-time
+             * @description Last certificate check (TLS handshake with SNI).
+             */
+            tls_checked_at: string | null;
+            /**
+             * Format: date-time
+             * @description Expiry of the certificate the host served at the last successful check.
+             */
+            tls_expires_at: string | null;
             /** @enum {string} */
             provisioner: "manual" | "dokploy" | "traefik_file";
             /** Format: date-time */

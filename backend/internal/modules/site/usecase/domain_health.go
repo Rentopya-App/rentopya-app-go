@@ -23,13 +23,18 @@ func (d *Domains) Collect(ctx context.Context, _ time.Time) (healthcheck.Report,
 	if err != nil {
 		return healthcheck.Report{}, err
 	}
+	soon := d.opts.Now().Add(14 * 24 * time.Hour)
 	for _, r := range rows {
-		if r.Status != "failed" && r.TlsStatus != "failed" && r.TlsStatus != "manual" {
+		expiring := r.Status == "verified" && r.TlsStatus == "active" && r.TlsExpiresAt.Valid && r.TlsExpiresAt.Time.Before(soon)
+		if r.Status != "failed" && r.TlsStatus != "failed" && r.TlsStatus != "manual" && !expiring {
 			continue
 		}
 		severity, message := healthcheck.SeverityCritical, r.LastError
-		if r.TlsStatus == "manual" && r.Status == "verified" {
+		switch {
+		case r.TlsStatus == "manual" && r.Status == "verified":
 			severity, message = healthcheck.SeverityWarning, d.view(r).TLSInstructions
+		case expiring:
+			severity, message = healthcheck.SeverityWarning, "TLS certificate expires on "+r.TlsExpiresAt.Time.UTC().Format("2006-01-02")+"; renew it before it lapses"
 		}
 		orgID := r.OrganizationID
 		occurred := r.UpdatedAt.Time

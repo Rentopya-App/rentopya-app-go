@@ -156,6 +156,8 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusConflict, "DOMAIN_TAKEN", err.Error())
 	case errors.Is(err, usecase.ErrDomainMode):
 		response.Error(w, r, http.StatusConflict, "DOMAIN_TLS_MODE", err.Error())
+	case errors.Is(err, usecase.ErrDomainTLSUnverified):
+		response.Error(w, r, http.StatusConflict, "DOMAIN_TLS_UNVERIFIED", err.Error())
 	default:
 		writeError(w, r, err)
 	}

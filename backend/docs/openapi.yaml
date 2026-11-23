@@ -13793,7 +13793,7 @@ paths:
       tags: [Platform]
       operationId: postPlatformSiteDomainTLSActive
       summary: Mark manual TLS active
-      description: "platform.site_domains.manage. Only verified domains using manual mode; otherwise DOMAIN_TLS_MODE conflict."
+      description: "platform.site_domains.manage. Only verified domains using manual mode; otherwise DOMAIN_TLS_MODE conflict. The API first dials the host on 443 with SNI and requires a trusted, unexpired certificate for it; otherwise 409 DOMAIN_TLS_UNVERIFIED (the reason is stored in last_error)."
       security:
         - bearerAuth: []
       parameters:
@@ -43838,7 +43838,7 @@ components:
 
     SiteDomain:
       type: object
-      required: [uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, tls_status, provisioner, created_at, updated_at, dns_records]
+      required: [uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, tls_status, tls_checked_at, tls_expires_at, provisioner, created_at, updated_at, dns_records]
       properties:
         uuid: { type: string, format: uuid }
         organization_id: { type: integer, format: int64 }
@@ -43849,6 +43849,8 @@ components:
         verified_at: { type: ["string", "null"], format: date-time }
         last_error: { type: string }
         tls_status: { type: string, enum: [pending, provisioning, active, failed, manual] }
+        tls_checked_at: { type: ["string", "null"], format: date-time, description: Last certificate check (TLS handshake with SNI). }
+        tls_expires_at: { type: ["string", "null"], format: date-time, description: Expiry of the certificate the host served at the last successful check. }
         provisioner: { type: string, enum: [manual, dokploy, traefik_file] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }

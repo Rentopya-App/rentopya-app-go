@@ -59,7 +59,7 @@
   "general.copied": "Adres kopyalandı.",
   "general.open": "Siteyi aç",
   "general.status_title": "Yayın ve rezervasyon durumu",
-  "general.published_at": "Yayındaki sürüm r{{revision}} · {{date}}",
+  "general.published_at": "Yayındaki sürüm r{{revision}} · {{{date}}}",
   "general.never_published": "Henüz yayınlanmadı: site açık olsa da ziyaretçiler bir şey görmez. Yayın sekmesinden yayınlayın.",
   "general.blockers_title": "Çevrimiçi rezervasyon neden kapalı?",
   "general.blockers.site_disabled": "Site kapalı.",
@@ -176,7 +176,7 @@
   "images.invalid_type": "Yalnızca PNG, JPEG veya WebP yükleyebilirsiniz.",
   "images.too_large": "Dosya en fazla {{size}} MB olabilir.",
   "publish.state_title": "Yayın durumu",
-  "publish.live_revision": "Yayındaki sürüm: r{{revision}} ({{date}})",
+  "publish.live_revision": "Yayındaki sürüm: r{{revision}} ({{{date}}})",
   "publish.pending_changes": "Taslakta yayınlanmamış değişiklikler var.",
   "publish.up_to_date": "Taslak yayındaki sürümle aynı.",
   "publish.publish": "Yayınla",
@@ -660,5 +660,9 @@
   "articles.toast.deleted": "Yazı silindi.",
   "articles.toast.fix_errors": "Kaydetmeden önce işaretli alanları düzeltin.",
   "sections.guide_hint": "Sitenin rehber yazılarından en yeni üçü gösterilir; yayında yazı yoksa bölüm gizlenir.",
-  "sections.guide_link": "Yazıları yönet"
+  "sections.guide_link": "Yazıları yönet",
+  "domains.tls_expires": "Sertifika bitişi: {{date}}",
+  "platform_domains.errors.DOMAIN_TLS_UNVERIFIED": "Sertifika doğrulanamadı: alan adı geçerli bir HTTPS sertifikası sunmuyor. Dokploy'da yönlendirmeyi ve Let's Encrypt'i kontrol edin; ayrıntı satırdaki hata mesajında.",
+  "platform_domains.errors.DOMAIN_TLS_MODE": "Bu işlem yalnızca doğrulanmış ve manuel moddaki alan adları için yapılabilir.",
+  "platform_domains.errors.generic": "İşlem tamamlanamadı. Lütfen tekrar deneyin."
 }
