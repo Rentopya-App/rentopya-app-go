@@ -22,6 +22,7 @@ import {
   telHref,
   type NavLink,
 } from "@/lib/links";
+import { accountLink } from "@/components/site/account";
 import { PATH_HEADER } from "@/lib/request";
 import { mediaUrl, type Ctx } from "@/lib/server";
 
@@ -125,7 +126,7 @@ export async function Header({ ctx }: { ctx: Ctx }) {
     ctx.locale,
     defaultHeaderLinks(ctx),
   );
-  const portal = site.portal_url;
+  const account = await accountLink(ctx);
   const find = site.booking_enabled ? "/vehicles" : "/branches";
   return (
     <header className="cl-header">
@@ -138,9 +139,9 @@ export async function Header({ ctx }: { ctx: Ctx }) {
         </nav>
         <div className="cl-header-actions">
           <LanguageSwitch ctx={ctx} path={raw} />
-          {portal ? (
-            <a href={portal} className="cl-login">
-              {t("nav.login")}
+          {account ? (
+            <a href={account.href} className="cl-login">
+              {account.label}
             </a>
           ) : null}
           <Link href={find} className="rt-button cl-cta cl-header-find">
@@ -164,7 +165,7 @@ export async function Header({ ctx }: { ctx: Ctx }) {
                 {links.map((l) => (
                   <ClAnchor key={`${l.href}-${l.label}`} link={l} path={path} />
                 ))}
-                {portal ? <a href={portal}>{t("nav.login")}</a> : null}
+                {account ? <a href={account.href}>{account.label}</a> : null}
               </nav>
             </div>
           </details>

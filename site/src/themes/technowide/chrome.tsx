@@ -23,6 +23,7 @@ import {
   telHref,
   type NavLink,
 } from "@/lib/links";
+import { accountLink } from "@/components/site/account";
 import { PATH_HEADER } from "@/lib/request";
 import { mediaUrl, type Ctx } from "@/lib/server";
 
@@ -149,7 +150,7 @@ export async function Header({ ctx }: { ctx: Ctx }) {
     ctx.locale,
     defaultHeaderLinks(ctx),
   );
-  const portal = site.portal_url;
+  const account = await accountLink(ctx);
   return (
     <header className="tw-header">
       <div className="tw-header-top">
@@ -157,10 +158,9 @@ export async function Header({ ctx }: { ctx: Ctx }) {
           <Brand ctx={ctx} />
           <div className="tw-header-tools">
             <LanguageSwitch ctx={ctx} path={raw} />
-            {portal ? (
-              <a href={portal} className="tw-login">
-                {t("nav.login")}
-                <ArrowUpRight aria-hidden size={15} />
+            {account ? (
+              <a href={account.href} className="tw-login">
+                {account.label}
               </a>
             ) : null}
             <Link href="/lookup" className="tw-register">
@@ -190,9 +190,9 @@ export async function Header({ ctx }: { ctx: Ctx }) {
                     </NavAnchor>
                   ))}
                 </nav>
-                {portal ? (
-                  <a href={portal} className="tw-drawer-login">
-                    {t("nav.login")}
+                {account ? (
+                  <a href={account.href} className="tw-drawer-login">
+                    {account.label}
                   </a>
                 ) : null}
                 <Link href="/lookup" className="tw-register">

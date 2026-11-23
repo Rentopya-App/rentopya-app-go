@@ -20,7 +20,11 @@ export function createQueryClient() {
       },
     },
     queryCache: new QueryCache({
-      onError: (error) => {
+      // `meta: { silent: true }`: the screen renders the error itself (the
+      // customer portal's 401 means "not signed in yet", not an expired
+      // staff session).
+      onError: (error, query) => {
+        if (query.meta?.silent) return;
         if (error instanceof ApiError) emitApiError(error);
       },
     }),

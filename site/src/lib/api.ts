@@ -47,6 +47,8 @@ export type ApiRequest = {
   forwardedFor?: string;
   idempotencyKey?: string;
   reservationToken?: string;
+  /** Customer portal session (TEC-1284), sent as X-Customer-Session. */
+  customerSession?: string;
 };
 
 /** Calls an API path (starting with /v1) and returns the envelope's data. */
@@ -62,6 +64,8 @@ export async function apiFetch<T>(
   if (req.idempotencyKey) headers.set("Idempotency-Key", req.idempotencyKey);
   if (req.reservationToken)
     headers.set("X-Reservation-Token", req.reservationToken);
+  if (req.customerSession)
+    headers.set("X-Customer-Session", req.customerSession);
 
   let res: Response;
   try {

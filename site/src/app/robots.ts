@@ -23,8 +23,8 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
       // Robots rules match prefixes: "/ara" alone would also hide "/araclar",
       // so the search page is matched exactly ("$") or with its query ("?").
       disallow: [
-        ...(["/book/", "/reservation/", "/account"] as const).flatMap((p) =>
-          Object.values(alternates(p)),
+        ...(["/book/", "/reservation/", "/account", "/login"] as const).flatMap(
+          (p) => Object.values(alternates(p)),
         ),
         ...Object.values(alternates("/search")).flatMap((p) => [
           `${p}$`,

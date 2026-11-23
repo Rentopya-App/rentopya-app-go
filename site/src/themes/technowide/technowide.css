@@ -1002,6 +1002,44 @@
   .theme-technowide .rt-lookup > .rt-card {
     width: 100%;
   }
+  /* Customer area (TEC-1284): reservation cards, section titles, documents. */
+  .theme-technowide .rt-account-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 16px;
+  }
+  .theme-technowide .rt-account-list .rt-panel {
+    display: grid;
+    gap: 12px;
+  }
+  .theme-technowide .rt-section-title {
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 8px 0 0;
+  }
+  .theme-technowide .rt-doc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 10px;
+  }
+  .theme-technowide .rt-doc-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .theme-technowide .rt-otp {
+    font-size: 1.5rem;
+    letter-spacing: 0.4em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
   .theme-technowide .rt-ref-list {
     list-style: none;
     padding: 0;
