@@ -50,9 +50,23 @@ func publicFieldErr(err error) error {
 				field += "." + rest
 			}
 		}
-		out.add(field, d.Code, d.Message)
+		code, message := publicCouponCode(field, d.Code, d.Message)
+		out.add(field, code, message)
 	}
 	return out
+}
+
+// CouponInvalid is the one answer the public API gives for a coupon that does
+// not apply (TEC-1281). Distinct reasons (not_found, expired, channel, scope,
+// customer_scope, …) let anyone enumerate codes, including private and
+// corporate ones. Only min_amount stays: it tells the customer what to change.
+const CouponInvalid = "coupon_invalid"
+
+func publicCouponCode(field, code, message string) (string, string) {
+	if field != "coupon_code" || !strings.HasPrefix(code, "coupon_") || code == "coupon_min_amount" {
+		return code, message
+	}
+	return CouponInvalid, "the coupon code is not valid for this booking"
 }
 
 // customerFieldErr prefixes the customers use case's validation details

@@ -682,6 +682,129 @@ func (q *Queries) ListPortalContacts(ctx context.Context, arg ListPortalContacts
 	return items, nil
 }
 
+const listPortalCustomersByEmail = `-- name: ListPortalCustomersByEmail :many
+SELECT c.id AS customer_id, c.phone, c.email, lr.id AS reservation_id, lr.uuid AS reservation_uuid
+FROM customers c
+JOIN LATERAL (
+    SELECT r.id, r.uuid, r.starts_at
+    FROM reservations r
+    WHERE r.organization_id = $1
+      AND r.customer_id = c.id
+    ORDER BY r.starts_at DESC, r.id DESC
+    LIMIT 1
+) lr ON true
+WHERE c.organization_id = $1
+  AND c.deleted_at IS NULL
+  AND c.anonymized_at IS NULL
+  AND c.email <> ''
+  AND lower(btrim(c.email)) = $2::text
+ORDER BY lr.starts_at DESC, lr.id DESC
+LIMIT 20
+`
+
+type ListPortalCustomersByEmailParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	Email          string `json:"email"`
+}
+
+type ListPortalCustomersByEmailRow struct {
+	CustomerID      int64     `json:"customer_id"`
+	Phone           string    `json:"phone"`
+	Email           string    `json:"email"`
+	ReservationID   int64     `json:"reservation_id"`
+	ReservationUuid uuid.UUID `json:"reservation_uuid"`
+}
+
+// Sign-in by contact (TEC-1283): renters with this e-mail address and a
+// reservation, newest pick-up first.
+func (q *Queries) ListPortalCustomersByEmail(ctx context.Context, arg ListPortalCustomersByEmailParams) ([]ListPortalCustomersByEmailRow, error) {
+	rows, err := q.db.Query(ctx, listPortalCustomersByEmail, arg.OrganizationID, arg.Email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPortalCustomersByEmailRow{}
+	for rows.Next() {
+		var i ListPortalCustomersByEmailRow
+		if err := rows.Scan(
+			&i.CustomerID,
+			&i.Phone,
+			&i.Email,
+			&i.ReservationID,
+			&i.ReservationUuid,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPortalCustomersByPhone = `-- name: ListPortalCustomersByPhone :many
+SELECT c.id AS customer_id, c.phone, c.email, lr.id AS reservation_id, lr.uuid AS reservation_uuid
+FROM customers c
+JOIN LATERAL (
+    SELECT r.id, r.uuid, r.starts_at
+    FROM reservations r
+    WHERE r.organization_id = $1
+      AND r.customer_id = c.id
+    ORDER BY r.starts_at DESC, r.id DESC
+    LIMIT 1
+) lr ON true
+WHERE c.organization_id = $1
+  AND c.deleted_at IS NULL
+  AND c.anonymized_at IS NULL
+  AND c.phone <> ''
+  AND right(regexp_replace(c.phone, '[^0-9]', '', 'g'), 10) = $2::text
+ORDER BY lr.starts_at DESC, lr.id DESC
+LIMIT 20
+`
+
+type ListPortalCustomersByPhoneParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	National       string `json:"national"`
+}
+
+type ListPortalCustomersByPhoneRow struct {
+	CustomerID      int64     `json:"customer_id"`
+	Phone           string    `json:"phone"`
+	Email           string    `json:"email"`
+	ReservationID   int64     `json:"reservation_id"`
+	ReservationUuid uuid.UUID `json:"reservation_uuid"`
+}
+
+// Sign-in by contact (TEC-1283): renters of the organization whose phone has
+// these last 10 digits and who have a reservation, newest pick-up first. The
+// use case compares the keyed hash of the full normalized number.
+func (q *Queries) ListPortalCustomersByPhone(ctx context.Context, arg ListPortalCustomersByPhoneParams) ([]ListPortalCustomersByPhoneRow, error) {
+	rows, err := q.db.Query(ctx, listPortalCustomersByPhone, arg.OrganizationID, arg.National)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPortalCustomersByPhoneRow{}
+	for rows.Next() {
+		var i ListPortalCustomersByPhoneRow
+		if err := rows.Scan(
+			&i.CustomerID,
+			&i.Phone,
+			&i.Email,
+			&i.ReservationID,
+			&i.ReservationUuid,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPortalReservations = `-- name: ListPortalReservations :many
 SELECT r.id, r.uuid, r.reference, r.status, r.payment_status, r.starts_at, r.ends_at, r.currency,
     r.total_amount, r.prepayment_amount, r.paid_amount,

@@ -47,6 +47,16 @@ GET  /v1/customer/{orgSlug}/session
 6. **Session.** A 32-byte token (base64url) is created and only its SHA-256 is stored. The session slides a **30 minute idle expiry** inside a **2 hour hard cap**; the sliding update happens at most once a minute. `logout` revokes it.
 7. **Audit** (`activity_events`, resource `tenant.customer_portal`, never a code): `customer_portal.code_sent`, `code_not_sent` (reason: cooldown / rate_limited / no_channel / send_failed), `sign_in_unmatched`, `sign_in_failed` (reason), `signed_in`, `signed_out`, `document_downloaded`, `payment_link_created` / `_reused`, `request_created`. The OTP service writes its own `sms.otp.*` entries as well.
 
+### Sign-in by contact alone (TEC-1283)
+
+`reference` is optional on `auth/start` and `auth/verify`. Without it, the contact alone signs in:
+
+- **Who.** Renters only (customer cards that have at least one reservation); drivers keep signing in with a reference. `ListPortalCustomersByPhone` / `ListPortalCustomersByEmail` narrow the organization's customers by an indexed normalized form (phone: last 10 digits; e-mail: lower-cased, trimmed; migration `000145`, partial indexes without deleted or anonymized rows). The use case then compares the keyed hashes of the full normalized value in constant time, as for a reference. Contact values are plain operational data in `customers`, so a separate blind-index column would add key handling without protecting anything.
+- **Several cards with one contact.** The card with the newest pick-up wins; the session is that card's renter session, so it lists all of that card's reservations (`reservation_id` of the session = that newest reservation).
+- **Code.** Subject `contact:<keyed hash prefix>` (stable between start and verify, never the contact itself). The open-challenge and binding checks are the same as for a reference: another contact never uses up or tries the code; a reference sign-in has its own code.
+- **Answers.** The same generic `202` / `400 OTP_INVALID` as a reference sign-in; an unknown contact or a driver-only number sends nothing. Audit entries carry `mode` (`contact` | `reference`) and an empty reference.
+- **Limits.** Per IP and per contact as below; the per-reference window does not apply without a reference. The OTP service's per-contact and per-organization hourly limits still cap SMS cost.
+
 ### Rate limits
 
 These are Redis windows that fail open like the other public routes. The OTP service's DB counters still hold without Redis.

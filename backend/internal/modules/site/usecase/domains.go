@@ -57,6 +57,7 @@ type DomainQueries interface {
 	MarkSiteDomainOriginsSynced(context.Context, db.MarkSiteDomainOriginsSyncedParams) error
 	DeleteDisabledSiteDomain(context.Context, db.DeleteDisabledSiteDomainParams) error
 	MarkSiteDomainTLSActive(context.Context, db.MarkSiteDomainTLSActiveParams) (int64, error)
+	RecordSiteDomainTLSCheck(context.Context, db.RecordSiteDomainTLSCheckParams) error
 }
 
 // DNSResolver is implemented by net.Resolver and by deterministic test resolvers.
@@ -83,6 +84,8 @@ type DomainOptions struct {
 	SyncOrigins func(context.Context, int64) error
 	Enqueue     func(context.Context) error
 	Now         func() time.Time
+	// TLSProber proves a certificate before TLS counts as active (default NetTLSProber).
+	TLSProber TLSProber
 }
 
 type Domains struct {
@@ -104,6 +107,9 @@ func NewDomains(q DomainQueries, base BaseURL, opts DomainOptions) *Domains {
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now
+	}
+	if opts.TLSProber == nil {
+		opts.TLSProber = NetTLSProber{}
 	}
 	return &Domains{q: q, base: base, opts: opts}
 }
@@ -145,7 +151,8 @@ func (d *Domains) view(r db.SiteDomain) model.Domain {
 	}
 	out := model.Domain{UUID: r.Uuid, OrganizationID: r.OrganizationID, Host: r.Host, Status: r.Status,
 		VerificationToken: r.VerificationToken, LastCheckedAt: domainTime(r.LastCheckedAt), VerifiedAt: domainTime(r.VerifiedAt),
-		LastError: r.LastError, TLSStatus: r.TlsStatus, Provisioner: r.Provisioner, CreatedAt: r.CreatedAt.Time,
+		LastError: r.LastError, TLSStatus: r.TlsStatus, TLSCheckedAt: domainTime(r.TlsCheckedAt), TLSExpiresAt: domainTime(r.TlsExpiresAt),
+		Provisioner: r.Provisioner, CreatedAt: r.CreatedAt.Time,
 		UpdatedAt: r.UpdatedAt.Time, DNSRecords: records}
 	if r.Provisioner == "manual" {
 		out.TLSInstructions = "Add " + r.Host + " in Dokploy: compose service site, port 3000, HTTPS, Let's Encrypt; then mark TLS active. Remove its route when disabled or failed."
@@ -273,12 +280,31 @@ func (d *Domains) Remove(ctx context.Context, orgID int64, id uuid.UUID) error {
 	}
 	return nil
 }
+
+// MarkTLSActive records the manual certificate as active, but only after the host proved it:
+// a TLS handshake with SNI must present a trusted, unexpired certificate for the host
+// (TEC-1279). A failed check keeps the TLS state, stores the reason and answers
+// ErrDomainTLSUnverified.
 func (d *Domains) MarkTLSActive(ctx context.Context, id uuid.UUID) (model.Domain, error) {
-	out, err := d.Get(ctx, 0, id)
+	row, err := d.q.GetPlatformSiteDomain(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Domain{}, ErrNotFound
+	}
 	if err != nil {
 		return model.Domain{}, err
 	}
-	n, err := d.q.MarkSiteDomainTLSActive(ctx, db.MarkSiteDomainTLSActiveParams{Uuid: id, OrganizationID: out.OrganizationID})
+	if row.Provisioner != "manual" || row.Status != "verified" {
+		return model.Domain{}, ErrDomainMode
+	}
+	now := d.opts.Now()
+	probe, err := d.opts.TLSProber.Probe(ctx, row.Host)
+	if err != nil {
+		perr := d.q.RecordSiteDomainTLSCheck(ctx, db.RecordSiteDomainTLSCheckParams{ID: row.ID, OrganizationID: row.OrganizationID,
+			TlsStatus: row.TlsStatus, LastError: err.Error(), CheckedAt: domainTS(now), ExpiresAt: row.TlsExpiresAt})
+		return model.Domain{}, errors.Join(err, perr)
+	}
+	n, err := d.q.MarkSiteDomainTLSActive(ctx, db.MarkSiteDomainTLSActiveParams{Uuid: id, OrganizationID: row.OrganizationID,
+		CheckedAt: domainTS(now), ExpiresAt: domainTS(probe.NotAfter)})
 	if err != nil {
 		return model.Domain{}, err
 	}
@@ -416,6 +442,7 @@ func (d *Domains) Sweep(ctx context.Context) (int, error) {
 	done := []db.SiteDomain{}
 	failures := []error{}
 	providers := map[string]DomainProvisioner{}
+	previousTLS := map[int64]string{}
 	for _, r := range rows {
 		// Failed rows are retried only for reconciliation, or on an explicit recheck.
 		checked, err := d.check(ctx, r)
@@ -424,6 +451,7 @@ func (d *Domains) Sweep(ctx context.Context) (int, error) {
 			continue
 		}
 		r = checked
+		previousTLS[r.ID] = r.TlsStatus
 		if d.opts.SyncOrigins != nil {
 			if err = d.opts.SyncOrigins(ctx, r.OrganizationID); err != nil {
 				failures = append(failures, domainSweepError(r, "sync origins", err))
@@ -489,6 +517,12 @@ func (d *Domains) Sweep(ctx context.Context) (int, error) {
 					failures = append(failures, domainSweepError(r, "persist TLS status", err))
 					continue
 				}
+				if r.Status == "verified" && r.TlsStatus == "active" {
+					if err := d.checkTLS(ctx, r, previousTLS[r.ID]); err != nil {
+						failures = append(failures, domainSweepError(r, "persist certificate check", err))
+						continue
+					}
+				}
 				if r.Status == "disabled" {
 					failures = append(failures, domainSweepError(r, "delete disabled domain", d.q.DeleteDisabledSiteDomain(ctx, db.DeleteDisabledSiteDomainParams{ID: r.ID, OrganizationID: r.OrganizationID})))
 				}
@@ -511,6 +545,35 @@ func (d *Domains) Sweep(ctx context.Context) (int, error) {
 		}
 	}
 	return len(rows), joined
+}
+
+// checkTLS proves the certificate of a domain whose route reports TLS as active. A failure
+// moves it to failed (health: critical) instead of leaving a broken certificate "active";
+// only a route that an automated provisioner set up within the last hour waits for its
+// first certificate (provisioning, rechecked every five minutes). Only persistence errors
+// are returned: a bad certificate is a domain state, not a sweep failure.
+func (d *Domains) checkTLS(ctx context.Context, r db.SiteDomain, previous string) error {
+	now := d.opts.Now()
+	probe, err := d.opts.TLSProber.Probe(ctx, r.Host)
+	if err == nil {
+		return d.q.RecordSiteDomainTLSCheck(ctx, db.RecordSiteDomainTLSCheckParams{ID: r.ID, OrganizationID: r.OrganizationID,
+			TlsStatus: "active", LastError: "", CheckedAt: domainTS(now), ExpiresAt: domainTS(probe.NotAfter)})
+	}
+	status := "failed"
+	fresh := r.VerifiedAt.Valid && now.Sub(r.VerifiedAt.Time) < tlsProvisionWindow
+	if r.Provisioner != "manual" && previous != "active" && fresh {
+		status = "provisioning"
+	}
+	if perr := d.q.RecordSiteDomainTLSCheck(ctx, db.RecordSiteDomainTLSCheckParams{ID: r.ID, OrganizationID: r.OrganizationID,
+		TlsStatus: status, LastError: err.Error(), CheckedAt: domainTS(now), ExpiresAt: r.TlsExpiresAt}); perr != nil {
+		return perr
+	}
+	if status == "provisioning" {
+		return d.q.RetrySiteDomainReconciliation(ctx, db.RetrySiteDomainReconciliationParams{
+			OrganizationID: r.OrganizationID, ID: r.ID, NextCheckAt: domainTS(now.Add(tlsProvisionRetry)),
+		})
+	}
+	return nil
 }
 
 func domainSweepError(r db.SiteDomain, stage string, err error) error {

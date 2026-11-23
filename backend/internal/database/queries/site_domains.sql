@@ -23,13 +23,13 @@ WHERE host = $1 AND organization_id <> $2 AND status = 'pending'
 SELECT * FROM site_domains WHERE organization_id = $1 ORDER BY created_at,id;
 
 -- name: ListPlatformSiteDomains :many
-SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at FROM site_domains ORDER BY created_at DESC,id DESC LIMIT $1 OFFSET $2;
+SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at FROM site_domains ORDER BY created_at DESC,id DESC LIMIT $1 OFFSET $2;
 
 -- name: GetSiteDomain :one
 SELECT * FROM site_domains WHERE organization_id = $1 AND uuid = $2;
 
 -- name: GetPlatformSiteDomain :one
-SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at FROM site_domains WHERE uuid = $1;
+SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at FROM site_domains WHERE uuid = $1;
 
 -- name: LookupSiteDomain :one
 SELECT organization_id FROM site_domains WHERE host = $1 AND status = 'verified';
@@ -69,18 +69,31 @@ UPDATE site_domains SET origins_dirty = false WHERE id = $1 AND status = $2 AND 
 DELETE FROM site_domains WHERE id = $1 AND organization_id = $2 AND status = 'disabled' AND NOT origins_dirty;
 
 -- name: MarkSiteDomainTLSActive :execrows
-UPDATE site_domains SET tls_status = 'active', last_error = '', attention_since = NULL
-WHERE uuid = $1 AND organization_id = $2 AND provisioner = 'manual' AND status = 'verified';
+-- Only after the caller proved the certificate (TLS handshake with SNI and chain verification).
+UPDATE site_domains SET tls_status = 'active', last_error = '', attention_since = NULL,
+ tls_checked_at = sqlc.arg(checked_at)::timestamptz, tls_expires_at = sqlc.arg(expires_at)::timestamptz
+WHERE uuid = sqlc.arg(uuid) AND organization_id = sqlc.arg(organization_id) AND provisioner = 'manual' AND status = 'verified';
+
+-- name: RecordSiteDomainTLSCheck :exec
+-- The result of a certificate check of a verified domain. Unlike UpdateSiteDomainTLS it may move a
+-- manually activated domain to failed: a broken certificate is never reported as active.
+UPDATE site_domains SET tls_status = sqlc.arg(tls_status)::text, last_error = sqlc.arg(last_error)::text,
+ tls_checked_at = sqlc.arg(checked_at)::timestamptz, tls_expires_at = sqlc.narg(expires_at)::timestamptz,
+ attention_since = CASE WHEN sqlc.arg(tls_status)::text = 'failed' THEN coalesce(attention_since, sqlc.arg(checked_at)::timestamptz)
+  WHEN status <> 'failed' THEN NULL ELSE attention_since END
+WHERE id = sqlc.arg(id) AND organization_id = sqlc.arg(organization_id) AND status = 'verified';
 
 -- name: RetrySiteDomainReconciliation :exec
 UPDATE site_domains SET next_check_at = $3
 WHERE organization_id = $1 AND id = $2;
 
 -- name: ListSiteDomainHealthIssues :many
+-- Failed verification or TLS, manual TLS work, and active certificates that expire within 14 days.
 SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at,
  verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts,
- next_check_at, lease_until, origins_dirty, created_at, updated_at
+ next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at
 FROM site_domains WHERE status = 'failed' OR tls_status IN ('failed','manual')
+ OR (status = 'verified' AND tls_status = 'active' AND tls_expires_at < now() + interval '14 days')
 ORDER BY updated_at DESC,id DESC LIMIT $1;
 
 -- name: SiteDomainHealthCounts :one
