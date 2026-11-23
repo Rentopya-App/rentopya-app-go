@@ -296,9 +296,9 @@ func (h *Public) Session(w http.ResponseWriter, r *http.Request) {
 		response.ValidationError(w, r, []response.Detail{{Field: "publishable_key", Code: "required", Message: "publishable_key is required"}})
 		return
 	}
-	if !h.allow(w, r, "pubapi:session:key", usecase.TokenHash(key)[:32], 1200, time.Minute) {
-		return
-	}
+	// No window per publishable key: the key is public (site resolve), so a
+	// shared bucket let anyone exhaust it and switch off a site's booking for
+	// every visitor (TEC-1280). Minting is bounded per client IP above.
 	origin := strings.TrimSpace(r.Header.Get("Origin"))
 	if origin == "" {
 		origin = strings.TrimSpace(r.Header.Get(HeaderForwardedOrigin))
