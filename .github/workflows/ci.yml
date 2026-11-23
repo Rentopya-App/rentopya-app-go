@@ -387,7 +387,14 @@ jobs:
         run: npm run api:check
       # Pinned: expo-doctor@1.21.7 (2026-11-11) ships without its @expo/env
       # dependency and crashes with MODULE_NOT_FOUND. Bump deliberately.
+      # The SDK version check compares against what Expo published today, not
+      # the repo: every new SDK patch release turned CI red with no change
+      # here. Bumping native modules changes the fingerprint (a store build),
+      # so it is a release decision: run `npx expo install --check` locally.
+      # Every other doctor check still runs.
       - name: Expo doctor
+        env:
+          EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK: "1"
         run: npx --yes expo-doctor@1.21.6
       - name: Release script
         working-directory: .

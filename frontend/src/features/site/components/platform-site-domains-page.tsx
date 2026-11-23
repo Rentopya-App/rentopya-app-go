@@ -19,6 +19,8 @@ import { routes } from "@/config/routes";
 import type { SiteDomain } from "@/features/site/types";
 import { platformRequest } from "@/lib/api/platform-request";
 import { useLocale } from "@/providers/locale-provider";
+import { isApiError } from "@/lib/api";
+import { date } from "@/lib/utils/format";
 import { appToast } from "@/providers/toast-provider";
 
 const BASE = "/v1/platform/site-domains";
@@ -30,7 +32,7 @@ const KEY = ["platform", "site-domains"] as const;
  * then marks them active here.
  */
 export function PlatformSiteDomainsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const queryClient = useQueryClient();
   const list = useQuery({
     queryKey: KEY,
@@ -50,8 +52,21 @@ export function PlatformSiteDomainsPage() {
         `${BASE}/${encodeURIComponent(uuid)}/${op}`,
         { body: {} },
       ),
+    // The certificate check failure is explained here (and in the row's last error).
+    meta: { silent: true },
     onSuccess: (_d, { op }) => {
       appToast.success(t(`site.platform_domains.toast.${op}`));
+      void queryClient.invalidateQueries({ queryKey: KEY });
+    },
+    onError: (error) => {
+      const code = isApiError(error) ? error.code : "";
+      appToast.error(
+        t(
+          code === "DOMAIN_TLS_UNVERIFIED" || code === "DOMAIN_TLS_MODE"
+            ? `site.platform_domains.errors.${code}`
+            : "site.platform_domains.errors.generic",
+        ),
+      );
       void queryClient.invalidateQueries({ queryKey: KEY });
     },
   });
@@ -106,12 +121,25 @@ export function PlatformSiteDomainsPage() {
           labelKey: "site.domains.columns.tls",
           enableSorting: false,
           cell: ({ row }) => (
-            <StatusChip
-              label={t(`site.domains.tls.${row.original.tls_status}`)}
-              tone={
-                row.original.tls_status === "active" ? "success" : "warning"
-              }
-            />
+            <div className="flex flex-col items-start gap-1">
+              <StatusChip
+                label={t(`site.domains.tls.${row.original.tls_status}`)}
+                tone={
+                  row.original.tls_status === "active"
+                    ? "success"
+                    : row.original.tls_status === "failed"
+                      ? "danger"
+                      : "warning"
+                }
+              />
+              {row.original.tls_expires_at ? (
+                <span className="text-muted-foreground text-xs">
+                  {t("site.domains.tls_expires", {
+                    date: date(row.original.tls_expires_at, undefined, locale),
+                  })}
+                </span>
+              ) : null}
+            </div>
           ),
         }),
         createColumn<SiteDomain>({

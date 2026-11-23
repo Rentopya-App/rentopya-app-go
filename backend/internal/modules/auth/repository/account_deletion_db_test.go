@@ -184,7 +184,9 @@ func TestAccountDeletionLifecycle(t *testing.T) {
 		Scan(&email, &name, &surname, &status, &hash, &deleted, &verified, &restoreLeft); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(email, "ada") || name != "Silinmiş kullanıcı" || surname != "" || status != "disabled" ||
+	// The address is replaced by one derived from the row's uuid only (a
+	// substring check for "ada" would also hit random uuids like "…-cada-…").
+	if email == ada.Email || email != "deleted-"+ada.Uuid.String()+"@deleted.invalid" || name != "Silinmiş kullanıcı" || surname != "" || status != "disabled" ||
 		hash != "" || !deleted || verified || restoreLeft {
 		t.Fatalf("not anonymised: %s %s %s %s %v", email, name, surname, status, deleted)
 	}

@@ -45,6 +45,9 @@ func dnsFor(host, token string) *domainDNS {
 func domainService(q usecase.DomainQueries, opts usecase.DomainOptions) *usecase.Domains {
 	base, _ := usecase.ParseBaseURL("https://sites.rentopia.com")
 	opts.TargetHost = "edge.rentopia.com"
+	if opts.TLSProber == nil {
+		opts.TLSProber = &fakeTLS{}
+	}
 	return usecase.NewDomains(q, base, opts)
 }
 
@@ -517,7 +520,7 @@ func TestCustomDomainsIntegration(t *testing.T) {
 	base, err := usecase.ParseBaseURL("https://sites.test")
 	e.must(err)
 	resolver := dnsFor("rent.customer.com", "")
-	d := usecase.NewDomains(e.q, base, usecase.DomainOptions{TargetHost: "edge.rentopia.com", Resolver: resolver,
+	d := usecase.NewDomains(e.q, base, usecase.DomainOptions{TargetHost: "edge.rentopia.com", Resolver: resolver, TLSProber: &fakeTLS{},
 		Providers: map[string]usecase.DomainProvisioner{"manual": usecase.ManualProvisioner{}}, SyncOrigins: e.svc.SyncDomainOrigins, Now: func() time.Time { return now }})
 	e.svc.SetCustomDomains(d)
 	on := true
@@ -648,9 +651,37 @@ func (m *domainMemory) MarkSiteDomainTLSActive(_ context.Context, p db.MarkSiteD
 	if !ok || r.OrganizationID != p.OrganizationID || r.Status != "verified" || r.Provisioner != "manual" {
 		return 0, nil
 	}
-	r.TlsStatus = "active"
+	r.TlsStatus, r.LastError, r.TlsCheckedAt, r.TlsExpiresAt = "active", "", p.CheckedAt, p.ExpiresAt
 	m.rows[p.Uuid] = r
 	return 1, nil
+}
+
+func (m *domainMemory) RecordSiteDomainTLSCheck(_ context.Context, p db.RecordSiteDomainTLSCheckParams) error {
+	for id, r := range m.rows {
+		if r.ID == p.ID && r.OrganizationID == p.OrganizationID && r.Status == "verified" {
+			r.TlsStatus, r.LastError, r.TlsCheckedAt, r.TlsExpiresAt = p.TlsStatus, p.LastError, p.CheckedAt, p.ExpiresAt
+			m.rows[id] = r
+		}
+	}
+	return nil
+}
+
+// fakeTLS stands in for the certificate check (no network in unit tests).
+type fakeTLS struct {
+	err      error
+	notAfter time.Time
+	calls    int
+}
+
+func (f *fakeTLS) Probe(context.Context, string) (usecase.TLSProbe, error) {
+	f.calls++
+	if f.err != nil {
+		return usecase.TLSProbe{}, f.err
+	}
+	if f.notAfter.IsZero() {
+		return usecase.TLSProbe{NotAfter: time.Now().Add(60 * 24 * time.Hour)}, nil
+	}
+	return usecase.TLSProbe{NotAfter: f.notAfter}, nil
 }
 
 type stagingProvisioner struct {
@@ -756,8 +787,10 @@ func TestDomainOriginSyncRetry(t *testing.T) {
 
 func (m *domainMemory) ListSiteDomainHealthIssues(_ context.Context, limit int32) ([]db.SiteDomain, error) {
 	rows := []db.SiteDomain{}
+	soon := time.Now().Add(14 * 24 * time.Hour)
 	for _, r := range m.rows {
-		if r.Status == "failed" || r.TlsStatus == "failed" || r.TlsStatus == "manual" {
+		expiring := r.Status == "verified" && r.TlsStatus == "active" && r.TlsExpiresAt.Valid && r.TlsExpiresAt.Time.Before(soon)
+		if r.Status == "failed" || r.TlsStatus == "failed" || r.TlsStatus == "manual" || expiring {
 			rows = append(rows, r)
 		}
 	}
@@ -815,7 +848,7 @@ func TestCustomDomainsFrozenClock(t *testing.T) {
 	resolver := dnsFor(host, "")
 	base, err := usecase.ParseBaseURL("https://sites.test")
 	e.must(err)
-	d := usecase.NewDomains(e.q, base, usecase.DomainOptions{TargetHost: "edge.rentopia.com", Resolver: resolver,
+	d := usecase.NewDomains(e.q, base, usecase.DomainOptions{TargetHost: "edge.rentopia.com", Resolver: resolver, TLSProber: &fakeTLS{},
 		Providers: map[string]usecase.DomainProvisioner{"manual": usecase.ManualProvisioner{}}, Now: func() time.Time { return now }})
 	domain, err := d.Create(ctx, e.a.id, 0, host)
 	e.must(err)

@@ -30,6 +30,7 @@ import {
 } from "@/features/site/hooks/use-site";
 import type { SiteDomain } from "@/features/site/types";
 import { isApiError } from "@/lib/api";
+import { date } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { appToast } from "@/providers/toast-provider";
 
@@ -99,7 +100,7 @@ function DnsRecords({ domain }: { domain: SiteDomain }) {
  * HTTPS is provisioned by the platform.
  */
 export function SiteDomainsTab({ canManage }: { canManage: boolean }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const domains = useSiteDomains();
   const { add, verify, remove } = useSiteDomainActions();
   const [adding, setAdding] = useState(false);
@@ -168,10 +169,19 @@ export function SiteDomainsTab({ canManage }: { canManage: boolean }) {
           labelKey: "site.domains.columns.tls",
           enableSorting: false,
           cell: ({ row }) => (
-            <StatusChip
-              label={t(`site.domains.tls.${row.original.tls_status}`)}
-              tone={tlsTone[row.original.tls_status]}
-            />
+            <div className="flex flex-col items-start gap-1">
+              <StatusChip
+                label={t(`site.domains.tls.${row.original.tls_status}`)}
+                tone={tlsTone[row.original.tls_status]}
+              />
+              {row.original.tls_expires_at ? (
+                <span className="text-muted-foreground text-xs">
+                  {t("site.domains.tls_expires", {
+                    date: date(row.original.tls_expires_at, undefined, locale),
+                  })}
+                </span>
+              ) : null}
+            </div>
           ),
         }),
         createColumn<SiteDomain>({
