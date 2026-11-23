@@ -13,7 +13,7 @@ import {
   Phone,
   ShieldCheck,
 } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 import { notFound } from "next/navigation";
 
 import {

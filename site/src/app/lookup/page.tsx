@@ -1,6 +1,6 @@
 import { ArrowUpRight, Ticket } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { PageHeading, PageSection } from "@/components/site/page-heading";
 import { buttonVariants } from "@/components/ui/button";

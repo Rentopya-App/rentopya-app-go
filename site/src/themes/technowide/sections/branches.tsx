@@ -1,5 +1,5 @@
 import { ArrowUpRight, Building2, MapPin, Plane } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import type { Ctx } from "@/lib/server";
 import type { Location } from "@/lib/types";

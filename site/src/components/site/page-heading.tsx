@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { embedPath } from "@/lib/embed";
 import type { Ctx } from "@/lib/server";

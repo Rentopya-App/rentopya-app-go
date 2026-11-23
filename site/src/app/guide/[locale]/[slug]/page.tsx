@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { articleMediaUrl, articlePath } from "@/lib/articles";
 import { loadArticle } from "@/lib/articles-server";
+import { localizePath } from "@/lib/routes";
 import { getCtx } from "@/lib/server";
 import { themeFor } from "@/themes";
 
@@ -17,7 +18,11 @@ export async function generateMetadata({
   const { site } = await getCtx();
   const article = await loadArticle(locale, slug);
   if (!article) return {};
-  const path = articlePath(article.locale, article.slug);
+  // Articles exist in one language: their URL is in that language.
+  const path = localizePath(
+    articlePath(article.locale, article.slug),
+    article.locale,
+  );
   const title = article.seo_title || article.title;
   const description =
     (article.seo_description || article.summary).slice(0, 300) || undefined;

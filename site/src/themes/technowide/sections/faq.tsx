@@ -1,5 +1,5 @@
 import { ArrowUpRight, ChevronDown } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { Paragraphs } from "@/components/site/text";
 import type { Ctx } from "@/lib/server";

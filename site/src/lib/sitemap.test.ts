@@ -53,3 +53,31 @@ test("unsafe paths, duplicates and bad origins are skipped", () => {
   );
   assert.equal(buildSitemapXml("https://a.com", null).includes("<url>"), false);
 });
+
+test("lists every page in each offered language with hreflang alternates (TEC-1285)", () => {
+  const xml = buildSitemapXml(
+    "https://acme.rentopya.app",
+    [
+      { path: "/vehicles", lastmod: "2026-11-20T10:00:00Z" },
+      {
+        path: "/guide/tr/kis-lastigi",
+        locale: "tr",
+        lastmod: "2026-11-21T10:00:00Z",
+      },
+    ],
+    { locales: ["tr", "en"], defaultLocale: "tr" },
+  );
+  assert.match(xml, /xmlns:xhtml="http:\/\/www.w3.org\/1999\/xhtml"/);
+  assert.match(xml, /<loc>https:\/\/acme.rentopya.app\/araclar<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/acme.rentopya.app\/vehicles<\/loc>/);
+  assert.match(
+    xml,
+    /hreflang="x-default" href="https:\/\/acme.rentopya.app\/araclar"/,
+  );
+  // An article exists in one language only: one URL, no alternates.
+  assert.match(
+    xml,
+    /<loc>https:\/\/acme.rentopya.app\/rehber\/tr\/kis-lastigi<\/loc><lastmod>[^<]+<\/lastmod><\/url>/,
+  );
+  assert.equal((xml.match(/<url>/g) ?? []).length, 3);
+});

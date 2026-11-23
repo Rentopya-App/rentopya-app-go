@@ -12,11 +12,16 @@ import {
 } from "@/lib/reservation-tokens";
 import { bookingPath, embedContext } from "@/lib/embed-server";
 import { openEmbed, sealEmbed } from "@/lib/embed";
-import { bookingApi, getSite } from "@/lib/server";
+import { bookingApi, getCtx, getSite } from "@/lib/server";
 import type { Booked, PaymentLink, Quote } from "@/lib/types";
 
 async function go(path: string): Promise<never> {
-  redirect(await bookingPath(path));
+  // The embed keeps its own neutral paths; the site answers in the page's
+  // language (localized URLs, TEC-1285).
+  const target = await bookingPath(path);
+  redirect(
+    target.startsWith("/embed") ? target : (await getCtx()).href(target),
+  );
 }
 
 const str = (f: FormData, k: string) => {

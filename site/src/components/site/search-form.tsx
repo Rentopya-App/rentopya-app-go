@@ -101,7 +101,11 @@ export function SearchForm({
   return (
     <form
       id={id}
-      action={embedPath("/search", ctx.embed).split("?")[0]}
+      action={
+        ctx.embed
+          ? embedPath("/search", ctx.embed).split("?")[0]
+          : ctx.href("/search")
+      }
       method="get"
       aria-label={title ? undefined : t("search.title")}
       aria-labelledby={title ? labelId : undefined}

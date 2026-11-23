@@ -15,12 +15,14 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  const { t } = await getCtx();
+  const { t, href } = await getCtx();
   const page = pageOf((await searchParams).page);
   return {
     title: t("page.guide"),
     description: t("tw.guide.lead"),
-    alternates: { canonical: page > 1 ? `/guide?page=${page}` : "/guide" },
+    alternates: {
+      canonical: href(page > 1 ? `/guide?page=${page}` : "/guide"),
+    },
   };
 }
 

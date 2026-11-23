@@ -1,5 +1,5 @@
 import { ArrowUpRight, Check } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { Paragraphs } from "@/components/site/text";
 import { siteMediaUrl } from "@/lib/media";

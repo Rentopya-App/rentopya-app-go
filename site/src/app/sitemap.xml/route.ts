@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
 
 import { ApiError, apiFetch } from "@/lib/api";
+import { isLocale } from "@/lib/i18n";
 import { forwardedForFrom } from "@/lib/request";
+import type { Locale } from "@/lib/types";
 import { resolveSite } from "@/lib/resolve";
 import { buildSitemapXml, type SitemapEntry } from "@/lib/sitemap";
 
@@ -29,7 +31,12 @@ export async function GET(request: NextRequest) {
       status: err instanceof ApiError && err.status === 404 ? 404 : 503,
     });
   }
-  return new Response(buildSitemapXml(site.origin, entries), {
+  const locales = site.locales.filter(isLocale);
+  const languages = {
+    locales: locales.length ? locales : (["tr"] as Locale[]),
+    defaultLocale: isLocale(site.default_locale) ? site.default_locale : "tr",
+  };
+  return new Response(buildSitemapXml(site.origin, entries, languages), {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
       "Cache-Control": "public, max-age=300",

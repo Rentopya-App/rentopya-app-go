@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { applyExtras } from "@/app/actions";
 import { BookingGrid, QuoteSummary, Steps } from "@/components/site/booking";

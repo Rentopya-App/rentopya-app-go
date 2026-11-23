@@ -9,7 +9,8 @@ import type { EmbedContext } from "./embed";
 import { ApiError, apiFetch, type ApiRequest } from "./api";
 import { LOCALE_COOKIE, pickLocale, translator, type Translate } from "./i18n";
 import { PREVIEW_HEADER, previewToken } from "./preview";
-import { forwardedForFrom } from "./request";
+import { LOCALE_HEADER, forwardedForFrom } from "./request";
+import { localizePath } from "./routes";
 import { resolveSite } from "./resolve";
 import {
   SESSION_COOKIE,
@@ -40,6 +41,8 @@ export type Ctx = {
   site: Site;
   locale: Locale;
   t: Translate;
+  /** An internal site path in this page's language ("/vehicles" → "/araclar"). */
+  href: (path: string) => string;
   content: SiteContent;
   embed: EmbedContext | null;
 };
@@ -58,8 +61,11 @@ export const getCtx = cache(async (): Promise<Ctx> => {
   const site = await getSite();
   const jar = await cookies();
   const embed = await embedContext();
+  // The URL's language wins (localized paths, TEC-1285), then the visitor's
+  // choice; the proxy sets the header only for languages the site offers.
+  const fromPath = (await headers()).get(LOCALE_HEADER);
   const locale = pickLocale(
-    embed ? embed.fields.locale : jar.get(LOCALE_COOKIE)?.value,
+    embed ? embed.fields.locale : fromPath || jar.get(LOCALE_COOKIE)?.value,
     site.locales,
     site.default_locale,
   );
@@ -67,6 +73,7 @@ export const getCtx = cache(async (): Promise<Ctx> => {
     site,
     embed,
     locale,
+    href: (path: string) => localizePath(path, locale),
     t: translator(locale),
     content: site.config.content?.[locale] ?? EMPTY_CONTENT,
   };

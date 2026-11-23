@@ -9,7 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { headers } from "next/headers";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { homeArticleCards } from "@/lib/articles";
 import { campaignCards } from "@/lib/campaigns";
