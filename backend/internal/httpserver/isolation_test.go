@@ -27,6 +27,7 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/config"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/dbtest"
 	branchusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/branches/usecase"
 	notifmodel "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifications/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/notifications/providers"
@@ -135,6 +136,13 @@ func TestTenantIsolationRT_A01(t *testing.T) {
 	if dsn == "" {
 		t.Skip("TEST_DATABASE_URL not set")
 	}
+	// A private database: the final check expects B's records to be byte for
+	// byte unchanged, so the only writer may be this test. On the shared
+	// TEST_DATABASE_URL database, other packages' tests (go test runs packages
+	// in parallel) run cross-organization sweeps with their own fake clocks
+	// and resolvers (site domain verification, toll pass re-matching, ...)
+	// that legitimately touch B's rows and made this check flaky.
+	dsn = dbtest.FreshDatabase(t, dsn)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
