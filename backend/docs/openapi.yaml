@@ -12512,6 +12512,9 @@ paths:
         `Idempotent-Replayed: true`; another body → `422 IDEMPOTENCY_KEY_REUSED`). The quote is an immutable price snapshot
         valid until `valid_until` (organization setting, default 30 minutes); only quotes made through the public API with
         the same channel can be booked here. Extras, a coupon code and delivery / collection details are priced in.
+        A coupon that does not apply answers `422` with one code for every reason, `coupon_invalid` on `coupon_code`,
+        except `coupon_min_amount` (so codes cannot be enumerated). Quotes that carry a coupon code are limited to 30 per
+        hour per organization and client IP (`429 RATE_LIMITED`).
       security:
         - publicBearer: []
       parameters:
