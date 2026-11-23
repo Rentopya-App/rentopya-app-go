@@ -59,7 +59,7 @@
   "general.copied": "Address copied.",
   "general.open": "Open site",
   "general.status_title": "Publishing and booking state",
-  "general.published_at": "Live revision r{{revision}} · {{date}}",
+  "general.published_at": "Live revision r{{revision}} · {{{date}}}",
   "general.never_published": "Never published: visitors see nothing even while the site is on. Publish it from the Publishing tab.",
   "general.blockers_title": "Why is online booking off?",
   "general.blockers.site_disabled": "The site is off.",
@@ -176,7 +176,7 @@
   "images.invalid_type": "Only PNG, JPEG or WebP can be uploaded.",
   "images.too_large": "The file can be at most {{size}} MB.",
   "publish.state_title": "Publishing state",
-  "publish.live_revision": "Live revision: r{{revision}} ({{date}})",
+  "publish.live_revision": "Live revision: r{{revision}} ({{{date}}})",
   "publish.pending_changes": "The draft has unpublished changes.",
   "publish.up_to_date": "The draft matches the live revision.",
   "publish.publish": "Publish",
@@ -660,5 +660,9 @@
   "articles.toast.deleted": "Article deleted.",
   "articles.toast.fix_errors": "Fix the marked fields before saving.",
   "sections.guide_hint": "Shows the three newest published guide articles; hidden while none is published.",
-  "sections.guide_link": "Manage articles"
+  "sections.guide_link": "Manage articles",
+  "domains.tls_expires": "Certificate expires: {{date}}",
+  "platform_domains.errors.DOMAIN_TLS_UNVERIFIED": "Certificate check failed: the domain does not serve a valid HTTPS certificate. Check the route and Let's Encrypt in Dokploy; the row's error message has the details.",
+  "platform_domains.errors.DOMAIN_TLS_MODE": "Only verified domains in manual mode support this action.",
+  "platform_domains.errors.generic": "The action could not be completed. Please try again."
 }

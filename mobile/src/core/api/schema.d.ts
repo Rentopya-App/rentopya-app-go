@@ -32684,6 +32684,16 @@ export interface components {
             last_error: string;
             /** @enum {string} */
             tls_status: "pending" | "provisioning" | "active" | "failed" | "manual";
+            /**
+             * Format: date-time
+             * @description Last certificate check (TLS handshake with SNI).
+             */
+            tls_checked_at: string | null;
+            /**
+             * Format: date-time
+             * @description Expiry of the certificate the host served at the last successful check.
+             */
+            tls_expires_at: string | null;
             /** @enum {string} */
             provisioner: "manual" | "dokploy" | "traefik_file";
             /** Format: date-time */

@@ -1952,6 +1952,7 @@ type Querier interface {
 	ListSiteCatalogBranches(ctx context.Context, organizationID int64) ([]ListSiteCatalogBranchesRow, error)
 	ListSiteCatalogExtras(ctx context.Context, organizationID int64) ([]ListSiteCatalogExtrasRow, error)
 	ListSiteCatalogProducts(ctx context.Context, organizationID int64) ([]ListSiteCatalogProductsRow, error)
+	// Failed verification or TLS, manual TLS work, and active certificates that expire within 14 days.
 	ListSiteDomainHealthIssues(ctx context.Context, limit int32) ([]SiteDomain, error)
 	// Include rotation predecessors: their booking sessions must lose removed origins too.
 	ListSiteDomainKeys(ctx context.Context, organizationID int64) ([]uuid.UUID, error)
@@ -2224,6 +2225,7 @@ type Querier interface {
 	// pending → held once the provider confirmed the pre-authorization.
 	MarkSecurityDepositHeld(ctx context.Context, arg MarkSecurityDepositHeldParams) (int64, error)
 	MarkSiteDomainOriginsSynced(ctx context.Context, arg MarkSiteDomainOriginsSyncedParams) error
+	// Only after the caller proved the certificate (TLS handshake with SNI and chain verification).
 	MarkSiteDomainTLSActive(ctx context.Context, arg MarkSiteDomainTLSActiveParams) (int64, error)
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
@@ -2419,6 +2421,9 @@ type Querier interface {
 	ReconcileSMSMessages(ctx context.Context, arg ReconcileSMSMessagesParams) ([]ReconcileSMSMessagesRow, error)
 	RecordDocumentApprovalLinkFailure(ctx context.Context, arg RecordDocumentApprovalLinkFailureParams) error
 	RecordOTPAttempt(ctx context.Context, arg RecordOTPAttemptParams) error
+	// The result of a certificate check of a verified domain. Unlike UpdateSiteDomainTLS it may move a
+	// manually activated domain to failed: a broken certificate is never reported as active.
+	RecordSiteDomainTLSCheck(ctx context.Context, arg RecordSiteDomainTLSCheckParams) error
 	RecordWebhookEndpointResult(ctx context.Context, arg RecordWebhookEndpointResultParams) error
 	// Security e-mails (EnqueueInput.SecretVars): once the row is final the
 	// stored title / body are replaced with the copies rendered without the

@@ -19,7 +19,7 @@ WITH due AS (
  ORDER BY next_check_at,id LIMIT 50 FOR UPDATE SKIP LOCKED
 )
 UPDATE site_domains d SET lease_until = $1::timestamptz + interval '10 minutes'
-FROM due WHERE d.id = due.id AND d.organization_id = due.organization_id RETURNING d.id, d.uuid, d.organization_id, d.host, d.status, d.verification_token, d.last_checked_at, d.verified_at, d.last_error, d.attention_since, d.tls_status, d.provisioner, d.provisioner_id, d.created_by, d.attempts, d.next_check_at, d.lease_until, d.origins_dirty, d.created_at, d.updated_at
+FROM due WHERE d.id = due.id AND d.organization_id = due.organization_id RETURNING d.id, d.uuid, d.organization_id, d.host, d.status, d.verification_token, d.last_checked_at, d.verified_at, d.last_error, d.attention_since, d.tls_status, d.provisioner, d.provisioner_id, d.created_by, d.attempts, d.next_check_at, d.lease_until, d.origins_dirty, d.created_at, d.updated_at, d.tls_checked_at, d.tls_expires_at
 `
 
 func (q *Queries) ClaimDueSiteDomains(ctx context.Context, dollar_1 pgtype.Timestamptz) ([]SiteDomain, error) {
@@ -52,6 +52,8 @@ func (q *Queries) ClaimDueSiteDomains(ctx context.Context, dollar_1 pgtype.Times
 			&i.OriginsDirty,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TlsCheckedAt,
+			&i.TlsExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -69,7 +71,7 @@ SELECT $1::bigint, $2::text, $3::text, $4::text,
  $5::bigint, $6::timestamptz, $6::timestamptz
 WHERE NOT EXISTS (SELECT 1 FROM site_domains v WHERE v.host = $2::text AND v.status = 'verified'
  AND v.organization_id <> $1::bigint)
-RETURNING id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at
+RETURNING id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at
 `
 
 type CreateSiteDomainParams struct {
@@ -113,6 +115,8 @@ func (q *Queries) CreateSiteDomain(ctx context.Context, arg CreateSiteDomainPara
 		&i.OriginsDirty,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TlsCheckedAt,
+		&i.TlsExpiresAt,
 	)
 	return i, err
 }
@@ -180,7 +184,7 @@ func (q *Queries) FailRivalSiteDomainClaims(ctx context.Context, arg FailRivalSi
 }
 
 const getPlatformSiteDomain = `-- name: GetPlatformSiteDomain :one
-SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at FROM site_domains WHERE uuid = $1
+SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at FROM site_domains WHERE uuid = $1
 `
 
 func (q *Queries) GetPlatformSiteDomain(ctx context.Context, argUuid uuid.UUID) (SiteDomain, error) {
@@ -207,12 +211,14 @@ func (q *Queries) GetPlatformSiteDomain(ctx context.Context, argUuid uuid.UUID) 
 		&i.OriginsDirty,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TlsCheckedAt,
+		&i.TlsExpiresAt,
 	)
 	return i, err
 }
 
 const getSiteDomain = `-- name: GetSiteDomain :one
-SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at FROM site_domains WHERE organization_id = $1 AND uuid = $2
+SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at FROM site_domains WHERE organization_id = $1 AND uuid = $2
 `
 
 type GetSiteDomainParams struct {
@@ -244,12 +250,14 @@ func (q *Queries) GetSiteDomain(ctx context.Context, arg GetSiteDomainParams) (S
 		&i.OriginsDirty,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TlsCheckedAt,
+		&i.TlsExpiresAt,
 	)
 	return i, err
 }
 
 const listPlatformSiteDomains = `-- name: ListPlatformSiteDomains :many
-SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at FROM site_domains ORDER BY created_at DESC,id DESC LIMIT $1 OFFSET $2
+SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at FROM site_domains ORDER BY created_at DESC,id DESC LIMIT $1 OFFSET $2
 `
 
 type ListPlatformSiteDomainsParams struct {
@@ -287,6 +295,8 @@ func (q *Queries) ListPlatformSiteDomains(ctx context.Context, arg ListPlatformS
 			&i.OriginsDirty,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TlsCheckedAt,
+			&i.TlsExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -301,11 +311,13 @@ func (q *Queries) ListPlatformSiteDomains(ctx context.Context, arg ListPlatformS
 const listSiteDomainHealthIssues = `-- name: ListSiteDomainHealthIssues :many
 SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at,
  verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts,
- next_check_at, lease_until, origins_dirty, created_at, updated_at
+ next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at
 FROM site_domains WHERE status = 'failed' OR tls_status IN ('failed','manual')
+ OR (status = 'verified' AND tls_status = 'active' AND tls_expires_at < now() + interval '14 days')
 ORDER BY updated_at DESC,id DESC LIMIT $1
 `
 
+// Failed verification or TLS, manual TLS work, and active certificates that expire within 14 days.
 func (q *Queries) ListSiteDomainHealthIssues(ctx context.Context, limit int32) ([]SiteDomain, error) {
 	rows, err := q.db.Query(ctx, listSiteDomainHealthIssues, limit)
 	if err != nil {
@@ -336,6 +348,8 @@ func (q *Queries) ListSiteDomainHealthIssues(ctx context.Context, limit int32) (
 			&i.OriginsDirty,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TlsCheckedAt,
+			&i.TlsExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -382,7 +396,7 @@ func (q *Queries) ListSiteDomainKeys(ctx context.Context, organizationID int64) 
 }
 
 const listSiteDomains = `-- name: ListSiteDomains :many
-SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at FROM site_domains WHERE organization_id = $1 ORDER BY created_at,id
+SELECT id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at FROM site_domains WHERE organization_id = $1 ORDER BY created_at,id
 `
 
 func (q *Queries) ListSiteDomains(ctx context.Context, organizationID int64) ([]SiteDomain, error) {
@@ -415,6 +429,8 @@ func (q *Queries) ListSiteDomains(ctx context.Context, organizationID int64) ([]
 			&i.OriginsDirty,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TlsCheckedAt,
+			&i.TlsExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -453,21 +469,61 @@ func (q *Queries) MarkSiteDomainOriginsSynced(ctx context.Context, arg MarkSiteD
 }
 
 const markSiteDomainTLSActive = `-- name: MarkSiteDomainTLSActive :execrows
-UPDATE site_domains SET tls_status = 'active', last_error = '', attention_since = NULL
-WHERE uuid = $1 AND organization_id = $2 AND provisioner = 'manual' AND status = 'verified'
+UPDATE site_domains SET tls_status = 'active', last_error = '', attention_since = NULL,
+ tls_checked_at = $1::timestamptz, tls_expires_at = $2::timestamptz
+WHERE uuid = $3 AND organization_id = $4 AND provisioner = 'manual' AND status = 'verified'
 `
 
 type MarkSiteDomainTLSActiveParams struct {
-	Uuid           uuid.UUID `json:"uuid"`
-	OrganizationID int64     `json:"organization_id"`
+	CheckedAt      pgtype.Timestamptz `json:"checked_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
 }
 
+// Only after the caller proved the certificate (TLS handshake with SNI and chain verification).
 func (q *Queries) MarkSiteDomainTLSActive(ctx context.Context, arg MarkSiteDomainTLSActiveParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markSiteDomainTLSActive, arg.Uuid, arg.OrganizationID)
+	result, err := q.db.Exec(ctx, markSiteDomainTLSActive,
+		arg.CheckedAt,
+		arg.ExpiresAt,
+		arg.Uuid,
+		arg.OrganizationID,
+	)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const recordSiteDomainTLSCheck = `-- name: RecordSiteDomainTLSCheck :exec
+UPDATE site_domains SET tls_status = $1::text, last_error = $2::text,
+ tls_checked_at = $3::timestamptz, tls_expires_at = $4::timestamptz,
+ attention_since = CASE WHEN $1::text = 'failed' THEN coalesce(attention_since, $3::timestamptz)
+  WHEN status <> 'failed' THEN NULL ELSE attention_since END
+WHERE id = $5 AND organization_id = $6 AND status = 'verified'
+`
+
+type RecordSiteDomainTLSCheckParams struct {
+	TlsStatus      string             `json:"tls_status"`
+	LastError      string             `json:"last_error"`
+	CheckedAt      pgtype.Timestamptz `json:"checked_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+}
+
+// The result of a certificate check of a verified domain. Unlike UpdateSiteDomainTLS it may move a
+// manually activated domain to failed: a broken certificate is never reported as active.
+func (q *Queries) RecordSiteDomainTLSCheck(ctx context.Context, arg RecordSiteDomainTLSCheckParams) error {
+	_, err := q.db.Exec(ctx, recordSiteDomainTLSCheck,
+		arg.TlsStatus,
+		arg.LastError,
+		arg.CheckedAt,
+		arg.ExpiresAt,
+		arg.ID,
+		arg.OrganizationID,
+	)
+	return err
 }
 
 const releaseSiteDomainLease = `-- name: ReleaseSiteDomainLease :exec
@@ -560,7 +616,7 @@ UPDATE site_domains SET status = $3, last_checked_at = $4, verified_at = $5,
  attention_since = CASE WHEN $3 = 'failed' THEN coalesce(attention_since,$4::timestamptz)
  WHEN tls_status <> 'failed' THEN NULL ELSE attention_since END,
  last_error = $6, attempts = attempts + 1, next_check_at = $7, origins_dirty = true
-WHERE id = $1 AND status = $2 AND organization_id = $8 RETURNING id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at
+WHERE id = $1 AND status = $2 AND organization_id = $8 RETURNING id, uuid, organization_id, host, status, verification_token, last_checked_at, verified_at, last_error, attention_since, tls_status, provisioner, provisioner_id, created_by, attempts, next_check_at, lease_until, origins_dirty, created_at, updated_at, tls_checked_at, tls_expires_at
 `
 
 type UpdateSiteDomainCheckParams struct {
@@ -607,6 +663,8 @@ func (q *Queries) UpdateSiteDomainCheck(ctx context.Context, arg UpdateSiteDomai
 		&i.OriginsDirty,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TlsCheckedAt,
+		&i.TlsExpiresAt,
 	)
 	return i, err
 }

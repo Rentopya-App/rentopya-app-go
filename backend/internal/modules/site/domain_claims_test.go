@@ -72,7 +72,7 @@ func TestDomainClaimsIntegration(t *testing.T) {
 	resolver := dnsFor(host, "")
 	base, err := usecase.ParseBaseURL("https://sites.test")
 	e.must(err)
-	d := usecase.NewDomains(e.q, base, usecase.DomainOptions{TargetHost: "edge.rentopia.com", Resolver: resolver,
+	d := usecase.NewDomains(e.q, base, usecase.DomainOptions{TargetHost: "edge.rentopia.com", Resolver: resolver, TLSProber: &fakeTLS{},
 		Providers: map[string]usecase.DomainProvisioner{"manual": usecase.ManualProvisioner{}}, Now: func() time.Time { return now }})
 
 	// Two organizations claim the same host: both pending, neither resolves.
@@ -144,7 +144,7 @@ func TestDomainClaimExpiryIntegration(t *testing.T) {
 	resolver := dnsFor(host, "")
 	base, err := usecase.ParseBaseURL("https://sites.test")
 	e.must(err)
-	d := usecase.NewDomains(e.q, base, usecase.DomainOptions{TargetHost: "edge.rentopia.com", Resolver: resolver,
+	d := usecase.NewDomains(e.q, base, usecase.DomainOptions{TargetHost: "edge.rentopia.com", Resolver: resolver, TLSProber: &fakeTLS{},
 		Providers: map[string]usecase.DomainProvisioner{"manual": usecase.ManualProvisioner{}}, Now: func() time.Time { return now }})
 	squat, err := d.Create(ctx, e.a.id, 0, host)
 	e.must(err)

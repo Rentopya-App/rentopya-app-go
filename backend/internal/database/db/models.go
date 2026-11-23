@@ -2898,6 +2898,8 @@ type SiteDomain struct {
 	OriginsDirty      bool               `json:"origins_dirty"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	TlsCheckedAt      pgtype.Timestamptz `json:"tls_checked_at"`
+	TlsExpiresAt      pgtype.Timestamptz `json:"tls_expires_at"`
 }
 
 type SiteLead struct {
