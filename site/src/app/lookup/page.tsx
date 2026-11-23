@@ -1,10 +1,11 @@
-import { ArrowUpRight, Ticket } from "lucide-react";
+import { Ticket } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "@/components/site/link";
 
 import { PageHeading, PageSection } from "@/components/site/page-heading";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { hasCustomerCookie } from "@/lib/customer";
 import { deviceReservations } from "@/lib/reservation-tokens";
 import { getCtx } from "@/lib/server";
 
@@ -14,8 +15,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Reservation lookup and membership: the customer portal (M3), plus this
- * device's bookings.
+ * Reservation lookup: sign-in to the customer area on this site
+ * (TEC-1284), plus this device's bookings.
  */
 export default async function LookupPage() {
   const ctx = await getCtx();
@@ -30,14 +31,13 @@ export default async function LookupPage() {
             <Ticket size={26} />
           </span>
           <p className="rt-lead">{t("lookup.intro")}</p>
-          {site.portal_url ? (
-            <a
-              href={site.portal_url}
+          {!site.preview ? (
+            <Link
+              href={(await hasCustomerCookie()) ? "/account" : "/login"}
               className={buttonVariants({ size: "lg" })}
             >
               {t("lookup.go")}
-              <ArrowUpRight aria-hidden size={18} />
-            </a>
+            </Link>
           ) : null}
           {mine.length ? (
             <Card className="rt-panel">

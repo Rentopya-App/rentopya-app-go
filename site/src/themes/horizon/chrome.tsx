@@ -21,6 +21,7 @@ import {
   telHref,
   type NavLink,
 } from "@/lib/links";
+import { accountLink } from "@/components/site/account";
 import { PATH_HEADER } from "@/lib/request";
 import { mediaUrl, type Ctx } from "@/lib/server";
 
@@ -136,7 +137,7 @@ export async function Header({ ctx }: { ctx: Ctx }) {
     ctx.locale,
     defaultHeaderLinks(ctx),
   );
-  const portal = site.portal_url;
+  const account = await accountLink(ctx);
   const address = site.config.contact.address;
   return (
     <header className="hz-header-wrap">
@@ -163,9 +164,9 @@ export async function Header({ ctx }: { ctx: Ctx }) {
         </nav>
         <div className="hz-header-actions">
           <LanguageSwitch ctx={ctx} path={raw} />
-          {portal ? (
-            <a href={portal} className="hz-header-login">
-              {t("nav.login")}
+          {account ? (
+            <a href={account.href} className="hz-header-login">
+              {account.label}
             </a>
           ) : null}
           <Link href="/lookup" className="hz-link hz-header-booking">
@@ -193,9 +194,9 @@ export async function Header({ ctx }: { ctx: Ctx }) {
                   />
                 ))}
               </nav>
-              {portal ? (
-                <a href={portal} className="hz-menu-secondary">
-                  {t("nav.login")}
+              {account ? (
+                <a href={account.href} className="hz-menu-secondary">
+                  {account.label}
                 </a>
               ) : null}
               <Link href="/lookup" className="hz-menu-secondary">

@@ -31,6 +31,7 @@ export function usePortalInfo(orgSlug: string) {
     queryKey: portalKeys.info(orgSlug),
     queryFn: () => portalService.info(orgSlug),
     retry: false,
+    meta: { silent: true },
     staleTime: 5 * 60_000,
   });
 }
@@ -40,6 +41,8 @@ export function usePortalSession(orgSlug: string) {
     queryKey: portalKeys.session(orgSlug),
     queryFn: () => portalService.session(orgSlug),
     retry: noRetryOn401,
+    // The portal shows its own signed-out state; never the staff toast.
+    meta: { silent: true },
   });
 }
 
@@ -48,6 +51,8 @@ export function usePortalReservations(orgSlug: string, enabled: boolean) {
     queryKey: portalKeys.reservations(orgSlug),
     queryFn: () => portalService.reservations(orgSlug),
     retry: noRetryOn401,
+    // The portal shows its own signed-out state; never the staff toast.
+    meta: { silent: true },
     enabled,
   });
 }
@@ -57,6 +62,8 @@ export function usePortalReservation(orgSlug: string, uuid: string) {
     queryKey: portalKeys.reservation(orgSlug, uuid),
     queryFn: () => portalService.reservation(orgSlug, uuid),
     retry: noRetryOn401,
+    // The portal shows its own signed-out state; never the staff toast.
+    meta: { silent: true },
   });
 }
 

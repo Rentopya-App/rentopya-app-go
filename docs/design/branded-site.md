@@ -51,6 +51,22 @@ Every page answers on a Turkish and an English path. One table, `site/src/lib/ro
 - `<head>`: canonical is the page's own localized URL; with more than one language, `hreflang` alternates for each plus `x-default` (default language). Articles exist in one language and announce only it. `sitemap.xml` lists every page once per offered language with `xhtml:link` alternates; `robots.txt` disallows the booking and account paths in both languages (search matched exactly, since `/ara` is a prefix of `/araclar`).
 - The message dictionaries are typed (`Record<MessageKey, string>`), so `tsc` fails when an English string is missing.
 
+### 1.2 Customer area (TEC-1284)
+
+Customers sign in and manage their reservations on the site itself, under its host and theme, instead of the panel's portal (`/r/{slug}` on the platform domain, which stays for organizations without a site).
+
+| Page | tr / en | What |
+|------|---------|------|
+| Sign-in | `/giris` / `/login` | Phone or e-mail → one-time code (the portal API's sign-in by contact, TEC-1283), then the code. Works without JavaScript; `autocomplete="one-time-code"`; resend after the wait; another contact. |
+| Account | `/hesabim` / `/account` | Greeting, the masked contact, sign-out, the customer card's reservations. |
+| Reservation | `/hesabim/{uuid}` / `/account/{uuid}` | Details, "pay what is due" (the hosted pay page), documents and invoices (PDF through the site), remote approval links, requests and the change / cancellation forms with the policy text and fee. |
+
+- **API.** The site server calls `/v1/customer/{organization.slug}/*` (`lib/customer.ts`) with `X-Customer-Session`; the browser never sees the API or the token. PDFs stream through `/account/{uuid}/documents/{doc}` and `/account/{uuid}/invoices/{invoice}` (only this organization's reservation PDFs; `application/pdf` only; `default-src 'none'; sandbox`; `no-store`).
+- **Cookies.** `rtp_cs`: the session token, HttpOnly, Secure (https sites), SameSite=Lax, path `/`, until the session's hard cap. `rtp_csp`: the sign-in step between "send code" and "verify", the typed contact sealed with AES-256-GCM (`lib/customer-seal.ts`, key derived from `SITE_EMBED_SECRET` with its own purpose), bound to the site origin, 10 minutes. The code page shows the contact masked; no phone number or e-mail address is ever in a URL.
+- **Forms.** Server actions in `app/customer-actions.ts`; every redirect stays on the site in the page's language; errors travel as short codes (`?error=code|limited|unavailable|expired|wait|session|invalid|failed|pay`). After sign-in only `/account` or `/account/{uuid}` may be the next page (`accountNext`). A 401 from the API clears the cookie and returns to sign-in.
+- **Header.** Every theme's account link points to `/login`, or to `/account` (labelled "Hesabım") when the session cookie is present (no API call per page). `/lookup` and the reservation page link to the sign-in page. Previews and the embedded widget never show or allow customer sign-in.
+- **Panel portal.** Its queries are `meta: { silent: true }`: a 401 there means "not signed in yet" and no longer shows the staff "session expired" toast. Redirecting `/r/{slug}` to the site and branding the panel portal for organizations without a site are follow-ups.
+
 ## 2. Hosts
 
 - `SITE_BASE_URL` (backend; prod default = `APP_URL`; dev `http://localhost:3100`) sets the base. A site answers on `{subdomain}.{host}[:port]` with the same scheme. This subdomain address is also the **preview** of every site.

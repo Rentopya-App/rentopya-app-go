@@ -12,6 +12,7 @@ import {
   telHref,
   type NavLink,
 } from "@/lib/links";
+import { accountLink } from "@/components/site/account";
 import { PATH_HEADER } from "@/lib/request";
 import { mediaUrl, type Ctx } from "@/lib/server";
 
@@ -79,7 +80,7 @@ export async function Header({ ctx }: { ctx: Ctx }) {
     ctx.locale,
     defaultHeaderLinks(ctx),
   );
-  const portal = site.portal_url;
+  const account = await accountLink(ctx);
   return (
     <header className="au-header">
       <div className="au-wrap au-header-inner">
@@ -91,8 +92,8 @@ export async function Header({ ctx }: { ctx: Ctx }) {
         </nav>
         <div className="au-header-actions">
           <LanguageSwitch ctx={ctx} path={raw} />
-          {portal ? (
-            <a href={portal} className="rt-button au-dark">
+          {account ? (
+            <a href={account.href} className="rt-button au-dark">
               {t("au.account")}
             </a>
           ) : (
@@ -117,7 +118,7 @@ export async function Header({ ctx }: { ctx: Ctx }) {
                 {links.map((l) => (
                   <AuAnchor key={`${l.href}-${l.label}`} link={l} path={path} />
                 ))}
-                {portal ? <a href={portal}>{t("au.account")}</a> : null}
+                {account ? <a href={account.href}>{t("au.account")}</a> : null}
               </nav>
             </div>
           </details>

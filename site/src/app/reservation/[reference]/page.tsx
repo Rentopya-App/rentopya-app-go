@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { pay } from "@/app/actions";
 import { BookingGrid, Steps } from "@/components/site/booking";
+import Link from "@/components/site/link";
 import { PageHeading, PageSection } from "@/components/site/page-heading";
 import { Paragraphs } from "@/components/site/text";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -45,14 +46,15 @@ export default async function ReservationPage({
   const sp = await searchParams;
   const token = await reservationToken(site, reference);
 
-  const portal = site.portal_url ? (
-    <a
-      href={site.portal_url}
+  // The customer area on this site (TEC-1284), not the panel's portal.
+  const portal = site.preview ? null : (
+    <Link
+      href={`/login?next=/account`}
       className={buttonVariants({ variant: "outline" })}
     >
       {t("res.portal_link")}
-    </a>
-  ) : null;
+    </Link>
+  );
 
   if (!token) {
     return (
