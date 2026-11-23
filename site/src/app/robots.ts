@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { indexable } from "@/lib/app-env";
+import { alternates } from "@/lib/routes";
 import { getSite } from "@/lib/server";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,18 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/book/", "/reservation/", "/search"],
+      // Booking steps and personal pages in every language (TEC-1285).
+      // Robots rules match prefixes: "/ara" alone would also hide "/araclar",
+      // so the search page is matched exactly ("$") or with its query ("?").
+      disallow: [
+        ...(["/book/", "/reservation/", "/account"] as const).flatMap((p) =>
+          Object.values(alternates(p)),
+        ),
+        ...Object.values(alternates("/search")).flatMap((p) => [
+          `${p}$`,
+          `${p}?`,
+        ]),
+      ],
     },
     host: site.origin,
     sitemap: `${site.origin}/sitemap.xml`,

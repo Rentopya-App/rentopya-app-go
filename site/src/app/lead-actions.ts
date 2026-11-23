@@ -18,6 +18,7 @@ import {
   type LeadResult,
   type LeadValues,
 } from "@/lib/leads";
+import { localizePath } from "@/lib/routes";
 import { bookingApi, getCtx } from "@/lib/server";
 
 /**
@@ -43,14 +44,17 @@ export async function submitLead(form: FormData) {
           httpOnly: true,
           sameSite: "lax",
           secure: site.origin.startsWith("https:"),
-          path: LEAD_PATHS[kind],
+          path: localizePath(LEAD_PATHS[kind], locale),
           maxAge: 5 * 60,
         });
       }
     } else {
-      jar.delete({ name: leadFlashCookie(kind), path: LEAD_PATHS[kind] });
+      jar.delete({
+        name: leadFlashCookie(kind),
+        path: localizePath(LEAD_PATHS[kind], locale),
+      });
     }
-    redirect(leadRedirect(kind, result));
+    redirect(localizePath(leadRedirect(kind, result), locale));
   };
 
   const { input, values, errors } = readLeadForm(

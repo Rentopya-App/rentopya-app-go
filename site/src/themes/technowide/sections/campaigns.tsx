@@ -1,5 +1,5 @@
 import { ArrowRight, ArrowUpRight, TicketPercent } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import {
   campaignCards,

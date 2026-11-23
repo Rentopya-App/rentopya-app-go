@@ -1,6 +1,9 @@
 /** Current path + query, set by the proxy for server components. */
 export const PATH_HEADER = "x-rtp-path";
 
+/** The language a localized path names (TEC-1285), set by the proxy only. */
+export const LOCALE_HEADER = "x-rtp-locale";
+
 /** One X-Forwarded-For hop: an IPv4 / IPv6 address, optionally with a port. */
 const HOP = /^[0-9a-fA-F:.[\]]{2,47}$/;
 

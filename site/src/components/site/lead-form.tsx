@@ -147,7 +147,11 @@ export function LeadConsents({
             {field === "consent_kvkk" ? (
               <>
                 {" "}
-                <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                <a
+                  href={ctx.href("/privacy")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   {t("lead.privacy_link")}
                   <span className="rt-sr-only"> {t("lead.new_tab")}</span>
                 </a>

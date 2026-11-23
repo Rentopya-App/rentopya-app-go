@@ -33,6 +33,24 @@ browser ── acme.rentopia.app ──▶ site (Next.js, one image)
 - `X-Forwarded-For` carries the visitor IP (the site forwards the chain it received from the edge proxy; the API believes it only from trusted proxies, `TRUSTED_PROXIES`), so the public API's per-IP and per-session limits apply per visitor, not per site container.
 - Every page renders dynamically (`force-dynamic`). The only cache is the per-process resolve cache, keyed by host (30 s; unknown hosts 10 s). Nothing about an organization exists at build time.
 
+### 1.1 Localized URLs (TEC-1285)
+
+Every page answers on a Turkish and an English path. One table, `site/src/lib/routes.ts` (`ROUTES`), drives links, rewrites, canonical URLs, hreflang alternates, the sitemap and robots:
+
+| Page | tr | en |
+|------|----|----|
+| Vehicles, branches, campaigns | `/araclar`, `/subeler`, `/kampanyalar` | `/vehicles`, `/branches`, `/campaigns` |
+| Corporate, franchise, guide, search | `/kurumsal`, `/bayilik`, `/rehber`, `/ara` | `/corporate`, `/franchise`, `/guide`, `/search` |
+| Lookup, booking, reservation | `/rezervasyon-sorgula`, `/kirala/…`, `/rezervasyon/…` | `/lookup`, `/book/…`, `/reservation/…` |
+| Customer area (TEC-1284) | `/giris`, `/hesabim` | `/login`, `/account` |
+| Content pages | `/hakkimizda`, `/sss`, `/iletisim`, `/kiralama-kosullari`, `/kvkk` | `/about`, `/faq`, `/contact`, `/terms`, `/privacy` |
+
+- The route folders use the English paths. The proxy rewrites a Turkish path to the English route and passes the path's language (`x-rtp-locale`, client copies dropped). A language-specific path names the page's language and becomes the visitor's choice (`site_locale` cookie); neutral paths (`/`, embed, media, payment hand-offs) keep the cookie or the site default.
+- A path in a language the site does not offer answers `308` to the same page in the default language (a Turkish-only site sends `/vehicles` to `/araclar`).
+- Code links with the internal path. `components/site/link.tsx` (every site `Link`) and `Ctx.href` localize it; server actions, lead redirects and the lead flash cookie path use the page's language; the language switch (`/lang`) moves to the same page in the other language.
+- `<head>`: canonical is the page's own localized URL; with more than one language, `hreflang` alternates for each plus `x-default` (default language). Articles exist in one language and announce only it. `sitemap.xml` lists every page once per offered language with `xhtml:link` alternates; `robots.txt` disallows the booking and account paths in both languages (search matched exactly, since `/ara` is a prefix of `/araclar`).
+- The message dictionaries are typed (`Record<MessageKey, string>`), so `tsc` fails when an English string is missing.
+
 ## 2. Hosts
 
 - `SITE_BASE_URL` (backend; prod default = `APP_URL`; dev `http://localhost:3100`) sets the base. A site answers on `{subdomain}.{host}[:port]` with the same scheme. This subdomain address is also the **preview** of every site.

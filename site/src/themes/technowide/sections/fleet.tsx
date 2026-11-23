@@ -1,5 +1,5 @@
 import { ArrowRight, ArrowUpRight } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { VehicleCard } from "@/components/site/vehicle-card";
 import type { Ctx } from "@/lib/server";

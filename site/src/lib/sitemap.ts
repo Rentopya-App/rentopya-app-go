@@ -5,6 +5,9 @@
  * plus a validated relative path.
  */
 
+import { localizePath } from "./routes.ts";
+import type { Locale } from "./types";
+
 export type SitemapEntry = { path: string; locale?: string; lastmod: string };
 
 /** Sitemap protocol limit per file. */
@@ -42,13 +45,18 @@ export function sitemapPath(raw: unknown): string | null {
   return raw;
 }
 
+/** The site's languages, for localized URLs and hreflang alternates. */
+export type SitemapLanguages = { locales: Locale[]; defaultLocale: Locale };
+
 export function buildSitemapXml(
   origin: string,
   entries: SitemapEntry[] | null | undefined,
+  languages?: SitemapLanguages,
 ): string {
   const base = sitemapOrigin(origin);
   const seen = new Set<string>();
   const urls: string[] = [];
+  const offered = languages?.locales.length ? languages.locales : null;
   for (const e of Array.isArray(entries) ? entries : []) {
     if (!base || urls.length >= MAX_URLS) break;
     const path = sitemapPath(e?.path);
@@ -58,11 +66,37 @@ export function buildSitemapXml(
     const lastmod = Number.isNaN(time)
       ? ""
       : `<lastmod>${new Date(time).toISOString()}</lastmod>`;
-    urls.push(`<url><loc>${xmlEscape(base + path)}</loc>${lastmod}</url>`);
+    if (!offered || !languages) {
+      urls.push(`<url><loc>${xmlEscape(base + path)}</loc>${lastmod}</url>`);
+      continue;
+    }
+    // A page in one language (an article) is listed in that language only;
+    // other pages once per offered language, each naming the others
+    // (localized URLs, TEC-1285).
+    const own: Locale[] =
+      e.locale === "tr" || e.locale === "en" ? [e.locale] : offered;
+    const links =
+      own.length > 1
+        ? own
+            .map(
+              (l) =>
+                `<xhtml:link rel="alternate" hreflang="${l}" href="${xmlEscape(base + localizePath(path, l))}"/>`,
+            )
+            .join("") +
+          `<xhtml:link rel="alternate" hreflang="x-default" href="${xmlEscape(base + localizePath(path, languages.defaultLocale))}"/>`
+        : "";
+    for (const l of own) {
+      if (urls.length >= MAX_URLS) break;
+      urls.push(
+        `<url><loc>${xmlEscape(base + localizePath(path, l))}</loc>${lastmod}${links}</url>`,
+      );
+    }
   }
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    languages
+      ? '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+      : '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     ...urls,
     "</urlset>",
     "",

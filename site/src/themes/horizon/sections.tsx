@@ -11,7 +11,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { SearchForm } from "@/components/site/search-form";
 import { Paragraphs } from "@/components/site/text";

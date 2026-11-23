@@ -1,8 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import Script from "next/script";
+
+import { SiteLocaleProvider } from "@/components/site/locale-context";
 
 import { fontVariables } from "@/lib/fonts";
 import { getCtx, mediaUrl } from "@/lib/server";
+import { isLocale } from "@/lib/i18n";
+import { PATH_HEADER } from "@/lib/request";
+import { localizePath } from "@/lib/routes";
 import { safeGa4Id, themeCss } from "@/lib/theme";
 import { themeFor } from "@/themes";
 
@@ -30,9 +36,31 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
     },
     icons: favicon ? { icon: favicon } : undefined,
-    alternates: { canonical: "/" },
+    // Localized URLs (TEC-1285): this page's address in its language, and
+    // the same page in every language the site offers. Pages with their own
+    // canonical (articles, paginated guide) override it.
+    alternates: await pageAlternates(site, locale),
     // A draft preview is never indexed.
     robots: site.preview ? { index: false, follow: false } : undefined,
+  };
+}
+
+async function pageAlternates(
+  site: Awaited<ReturnType<typeof getCtx>>["site"],
+  locale: string,
+): Promise<NonNullable<Metadata["alternates"]>> {
+  const raw = (await headers()).get(PATH_HEADER) ?? "/";
+  const path = raw.split("?")[0] || "/";
+  const offered = site.locales.filter(isLocale);
+  const fallback = isLocale(site.default_locale) ? site.default_locale : "tr";
+  const languages: Record<string, string> = {};
+  if (offered.length > 1) {
+    for (const l of offered) languages[l] = localizePath(path, l);
+    languages["x-default"] = localizePath(path, fallback);
+  }
+  return {
+    canonical: localizePath(path, isLocale(locale) ? locale : fallback),
+    languages,
   };
 }
 
@@ -69,33 +97,35 @@ export default async function RootLayout({
         className={`${theme.className} ${ctx.embed ? "rt-body rt-body--embed" : "rt-body"}`}
         data-template={theme.id}
       >
-        <a href="#main" className="rt-skip">
-          {ctx.t("nav.skip")}
-        </a>
-        {ctx.site.preview ? (
-          <div role="status" className="rt-preview-banner">
-            <span>{ctx.t("preview.banner")}</span>
-            <form action="/preview/exit" method="get">
-              <button type="submit">{ctx.t("preview.exit")}</button>
-            </form>
-          </div>
-        ) : null}
-        {!ctx.embed ? <theme.Header ctx={ctx} /> : null}
-        <main id="main" className="rt-main" tabIndex={-1}>
-          {children}
-        </main>
-        {!ctx.embed ? <theme.Footer ctx={ctx} /> : null}
-        {ga && !ctx.site.preview && !ctx.embed ? (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${ga}`}
-              strategy="afterInteractive"
-            />
-            <Script id="ga4" strategy="afterInteractive">
-              {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${ga}',{anonymize_ip:true});`}
-            </Script>
-          </>
-        ) : null}
+        <SiteLocaleProvider locale={ctx.locale}>
+          <a href="#main" className="rt-skip">
+            {ctx.t("nav.skip")}
+          </a>
+          {ctx.site.preview ? (
+            <div role="status" className="rt-preview-banner">
+              <span>{ctx.t("preview.banner")}</span>
+              <form action="/preview/exit" method="get">
+                <button type="submit">{ctx.t("preview.exit")}</button>
+              </form>
+            </div>
+          ) : null}
+          {!ctx.embed ? <theme.Header ctx={ctx} /> : null}
+          <main id="main" className="rt-main" tabIndex={-1}>
+            {children}
+          </main>
+          {!ctx.embed ? <theme.Footer ctx={ctx} /> : null}
+          {ga && !ctx.site.preview && !ctx.embed ? (
+            <>
+              <Script
+                src={`https://www.googletagmanager.com/gtag/js?id=${ga}`}
+                strategy="afterInteractive"
+              />
+              <Script id="ga4" strategy="afterInteractive">
+                {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${ga}',{anonymize_ip:true});`}
+              </Script>
+            </>
+          ) : null}
+        </SiteLocaleProvider>
       </body>
     </html>
   );

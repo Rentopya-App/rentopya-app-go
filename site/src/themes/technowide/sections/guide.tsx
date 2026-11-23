@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import {
   EmptyState,

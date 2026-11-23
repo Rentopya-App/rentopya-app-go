@@ -17,7 +17,9 @@ import {
   previewCookieOptions,
   previewToken,
 } from "@/lib/preview";
-import { PATH_HEADER, forwardedForFrom } from "@/lib/request";
+import { LOCALE_COOKIE, isLocale } from "@/lib/i18n";
+import { LOCALE_HEADER, PATH_HEADER, forwardedForFrom } from "@/lib/request";
+import { localizePath, resolvePath } from "@/lib/routes";
 import { resolveSite } from "@/lib/resolve";
 import {
   SESSION_COOKIE,
@@ -33,6 +35,7 @@ import {
 const INTERNAL_HEADERS = [
   SESSION_HEADER,
   PATH_HEADER,
+  LOCALE_HEADER,
   PREVIEW_HEADER,
   EMBED_HEADER,
 ];
@@ -158,9 +161,27 @@ export async function proxy(request: NextRequest) {
     return frame(NextResponse.next({ request: { headers } }));
   }
 
+  // Localized URLs (TEC-1285): "/araclar" renders the "/vehicles" route in
+  // Turkish. A path in a language the site does not offer moves to the same
+  // page in the site's default language.
+  const { path: internalPath, locale: pathLocale } = resolvePath(
+    request.nextUrl.pathname,
+  );
+  if (pathLocale && !site.locales.includes(pathLocale)) {
+    const fallback = isLocale(site.default_locale)
+      ? site.default_locale
+      : (site.locales.find(isLocale) ?? "tr");
+    const url = request.nextUrl.clone();
+    url.pathname = localizePath(internalPath, fallback);
+    if (url.pathname !== request.nextUrl.pathname)
+      return NextResponse.redirect(url, 308);
+  }
+
   const headers = new Headers(request.headers);
   for (const h of INTERNAL_HEADERS) headers.delete(h);
-  headers.set(PATH_HEADER, request.nextUrl.pathname + request.nextUrl.search);
+  headers.set(PATH_HEADER, internalPath + request.nextUrl.search);
+  if (pathLocale && site.locales.includes(pathLocale))
+    headers.set(LOCALE_HEADER, pathLocale);
   if (site.preview && preview) headers.set(PREVIEW_HEADER, preview);
 
   let fresh: ReturnType<typeof decodeSession> = null;
@@ -178,7 +199,26 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.next({ request: { headers } });
+  let response: NextResponse;
+  if (internalPath !== request.nextUrl.pathname) {
+    const url = request.nextUrl.clone();
+    url.pathname = internalPath;
+    response = NextResponse.rewrite(url, { request: { headers } });
+  } else {
+    response = NextResponse.next({ request: { headers } });
+  }
+  // The language of the URL becomes the visitor's choice for neutral pages.
+  if (
+    pathLocale &&
+    headers.get(LOCALE_HEADER) === pathLocale &&
+    request.cookies.get(LOCALE_COOKIE)?.value !== pathLocale
+  ) {
+    response.cookies.set(LOCALE_COOKIE, pathLocale, {
+      path: "/",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
   for (const [k, v] of Object.entries(
     frameHeaders(
       site.preview ? { panelOrigin: site.panel_origin ?? "" } : null,

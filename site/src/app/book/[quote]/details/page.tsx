@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { BookingGrid, QuoteSummary, Steps } from "@/components/site/booking";
 import { PageHeading, PageSection } from "@/components/site/page-heading";

@@ -1,5 +1,5 @@
 import { ArrowRight, Search } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/site/link";
 
 import { EmptyState, PageSection } from "@/components/site/page-heading";
 import { buttonVariants } from "@/components/ui/button";
