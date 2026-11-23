@@ -11954,9 +11954,11 @@ export interface paths {
         /**
          * Request a sign-in code
          * @description No auth. A reservation reference plus the phone number or e-mail address on file (the renter's or a
-         *     driver's of that reservation). When both match, a one-time code (purpose `customer_portal`, subject
-         *     `reservation:<uuid>`) goes out by SMS through the organization's SMS account, or by e-mail through the
-         *     platform mailer. The answer is **the same whether they matched or not** (202); a cooldown, a limit or a
+         *     driver's of that reservation), or the contact alone (TEC-1283): then the renter of the organization with
+         *     that contact and a reservation signs in and sees all of that customer card's reservations (several cards:
+         *     the one with the newest pick-up; drivers sign in with a reference). On a match a one-time code (purpose
+         *     `customer_portal`, subject `reservation:<uuid>`, or `contact:<keyed hash>` without a reference) goes out
+         *     by SMS through the organization's SMS account, or by e-mail through the platform mailer. The answer is **the same whether they matched or not** (202); a cooldown, a limit or a
          *     failed send is not reported either. 503 `CODE_UNAVAILABLE` when the organization cannot send on the
          *     chosen channel at all (checked before any lookup). Rate-limited per IP, per reference and per contact.
          */
@@ -27481,8 +27483,8 @@ export interface components {
             meta: components["schemas"]["ResponseMeta"];
         };
         CustomerAuthStartRequest: {
-            /** @description Reservation reference (case and spaces ignored) */
-            reference: string;
+            /** @description Reservation reference (case and spaces ignored). Empty or absent: sign in by contact alone (the renter's own reservations, TEC-1283). */
+            reference?: string;
             /** @description Phone number or e-mail address on the reservation */
             contact: string;
         };
@@ -27501,7 +27503,8 @@ export interface components {
             meta: components["schemas"]["ResponseMeta"];
         };
         CustomerAuthVerifyRequest: {
-            reference: string;
+            /** @description The reference used to request the code; empty or absent for a sign-in by contact alone */
+            reference?: string;
             contact: string;
             /** @description 6 digits */
             code: string;

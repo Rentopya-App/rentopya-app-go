@@ -1813,6 +1813,13 @@ type Querier interface {
 	// compared through keyed hashes in the use case). Anonymized / deleted
 	// people are left out.
 	ListPortalContacts(ctx context.Context, arg ListPortalContactsParams) ([]ListPortalContactsRow, error)
+	// Sign-in by contact (TEC-1283): renters with this e-mail address and a
+	// reservation, newest pick-up first.
+	ListPortalCustomersByEmail(ctx context.Context, arg ListPortalCustomersByEmailParams) ([]ListPortalCustomersByEmailRow, error)
+	// Sign-in by contact (TEC-1283): renters of the organization whose phone has
+	// these last 10 digits and who have a reservation, newest pick-up first. The
+	// use case compares the keyed hash of the full normalized number.
+	ListPortalCustomersByPhone(ctx context.Context, arg ListPortalCustomersByPhoneParams) ([]ListPortalCustomersByPhoneRow, error)
 	// Issued invoices of a reservation for the customer portal: the invoice of
 	// its rental, or one covering one of its ledger items.
 	ListPortalReservationInvoices(ctx context.Context, arg ListPortalReservationInvoicesParams) ([]ListPortalReservationInvoicesRow, error)
