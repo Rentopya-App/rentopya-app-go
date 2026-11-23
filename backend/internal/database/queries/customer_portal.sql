@@ -231,3 +231,46 @@ SET status = sqlc.arg(status),
 WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND status = 'open';
+
+-- name: ListPortalCustomersByPhone :many
+-- Sign-in by contact (TEC-1283): renters of the organization whose phone has
+-- these last 10 digits and who have a reservation, newest pick-up first. The
+-- use case compares the keyed hash of the full normalized number.
+SELECT c.id AS customer_id, c.phone, c.email, lr.id AS reservation_id, lr.uuid AS reservation_uuid
+FROM customers c
+JOIN LATERAL (
+    SELECT r.id, r.uuid, r.starts_at
+    FROM reservations r
+    WHERE r.organization_id = sqlc.arg(organization_id)
+      AND r.customer_id = c.id
+    ORDER BY r.starts_at DESC, r.id DESC
+    LIMIT 1
+) lr ON true
+WHERE c.organization_id = sqlc.arg(organization_id)
+  AND c.deleted_at IS NULL
+  AND c.anonymized_at IS NULL
+  AND c.phone <> ''
+  AND right(regexp_replace(c.phone, '[^0-9]', '', 'g'), 10) = sqlc.arg(national)::text
+ORDER BY lr.starts_at DESC, lr.id DESC
+LIMIT 20;
+
+-- name: ListPortalCustomersByEmail :many
+-- Sign-in by contact (TEC-1283): renters with this e-mail address and a
+-- reservation, newest pick-up first.
+SELECT c.id AS customer_id, c.phone, c.email, lr.id AS reservation_id, lr.uuid AS reservation_uuid
+FROM customers c
+JOIN LATERAL (
+    SELECT r.id, r.uuid, r.starts_at
+    FROM reservations r
+    WHERE r.organization_id = sqlc.arg(organization_id)
+      AND r.customer_id = c.id
+    ORDER BY r.starts_at DESC, r.id DESC
+    LIMIT 1
+) lr ON true
+WHERE c.organization_id = sqlc.arg(organization_id)
+  AND c.deleted_at IS NULL
+  AND c.anonymized_at IS NULL
+  AND c.email <> ''
+  AND lower(btrim(c.email)) = sqlc.arg(email)::text
+ORDER BY lr.starts_at DESC, lr.id DESC
+LIMIT 20;
