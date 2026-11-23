@@ -43849,8 +43849,8 @@ components:
         verified_at: { type: ["string", "null"], format: date-time }
         last_error: { type: string }
         tls_status: { type: string, enum: [pending, provisioning, active, failed, manual] }
-        tls_checked_at: { type: string, format: date-time, nullable: true, description: Last certificate check (TLS handshake with SNI). }
-        tls_expires_at: { type: string, format: date-time, nullable: true, description: Expiry of the certificate the host served at the last successful check. }
+        tls_checked_at: { type: ["string", "null"], format: date-time, description: Last certificate check (TLS handshake with SNI). }
+        tls_expires_at: { type: ["string", "null"], format: date-time, description: Expiry of the certificate the host served at the last successful check. }
         provisioner: { type: string, enum: [manual, dokploy, traefik_file] }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
