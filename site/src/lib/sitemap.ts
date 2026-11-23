@@ -73,8 +73,15 @@ export function buildSitemapXml(
     // A page in one language (an article) is listed in that language only;
     // other pages once per offered language, each naming the others
     // (localized URLs, TEC-1285).
-    const own: Locale[] =
+    const langs: Locale[] =
       e.locale === "tr" || e.locale === "en" ? [e.locale] : offered;
+    // A path that reads the same in every language ("/") is one URL.
+    const own = langs.filter(
+      (l, i) =>
+        langs.findIndex(
+          (o) => localizePath(path, o) === localizePath(path, l),
+        ) === i,
+    );
     const links =
       own.length > 1
         ? own
