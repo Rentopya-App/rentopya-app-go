@@ -190,7 +190,7 @@ export async function proxy(request: NextRequest) {
     const stored = decodeSession(request.cookies.get(SESSION_COOKIE)?.value);
     if (usableSession(stored, site)) {
       headers.set(SESSION_HEADER, stored.t);
-    } else if (needsBookingSession(request.nextUrl.pathname, request.method)) {
+    } else if (needsBookingSession(internalPath, request.method)) {
       // Only the booking flow mints at render: crawlers and visitors reading
       // content pages never open sessions (TEC-1280).
       try {
