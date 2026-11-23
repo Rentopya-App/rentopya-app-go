@@ -48,6 +48,7 @@ The organization always comes from the credential, never from the URL or the bod
 - 600 / min per IP;
 - the key's `rate_limit_per_minute` per credential (per key for secret keys, per browser session for publishable keys);
 - per route: quotes 120 / min, bookings 20 / 10 min, change / cancellation requests 10 / h, payment links 20 / 10 min;
+- coupon attempts: quotes carrying a `coupon_code`, 30 / h per organization and client IP. A coupon that does not apply answers one code, `coupon_invalid`, whatever the reason (only `coupon_min_amount` stays distinct), so codes cannot be enumerated (TEC-1281). Staff previews keep the detailed reasons;
 - sessions: 30 / min per IP. There is deliberately no window per publishable key: the key is public, so a shared bucket would let anyone switch off a site's booking for every visitor (TEC-1280).
 
 Over the limit the answer is `429 RATE_LIMITED` with `Retry-After`.

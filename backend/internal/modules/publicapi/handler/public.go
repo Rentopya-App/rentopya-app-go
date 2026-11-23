@@ -137,6 +137,10 @@ type route struct {
 
 type limitCheck struct{ action, subject string }
 
+// CouponAttemptsPerHour bounds quotes with a coupon code per organization and
+// client IP: plenty for a customer, far too few to enumerate codes.
+const CouponAttemptsPerHour = 30
+
 // routeLimits are the windows of a route's extra limit: per caller (key, or
 // key:session) and, for a browser booking session, per client IP as well.
 // Sessions are minted freely (POST /v1/public/sessions), so a per-session
@@ -396,6 +400,14 @@ func (h *Public) CreateQuote(w http.ResponseWriter, r *http.Request) {
 	var in model.QuoteInput
 	if !decode(w, r, &in) {
 		return
+	}
+	// Coupon guessing: quotes that carry a code are limited per organization
+	// and client IP on top of the quote window (TEC-1281).
+	if strings.TrimSpace(in.CouponCode) != "" {
+		subject := strconv.FormatInt(credential(r).OrganizationID, 10) + ":" + httpkit.ClientIP(r)
+		if !h.allow(w, r, "pubapi:coupon", subject, CouponAttemptsPerHour, time.Hour) {
+			return
+		}
 	}
 	out, err := h.svc.CreateQuote(r.Context(), credential(r), in)
 	if err != nil {

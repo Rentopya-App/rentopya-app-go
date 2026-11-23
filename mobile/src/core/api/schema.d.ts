@@ -7871,6 +7871,9 @@ export interface paths {
          *     `Idempotent-Replayed: true`; another body → `422 IDEMPOTENCY_KEY_REUSED`). The quote is an immutable price snapshot
          *     valid until `valid_until` (organization setting, default 30 minutes); only quotes made through the public API with
          *     the same channel can be booked here. Extras, a coupon code and delivery / collection details are priced in.
+         *     A coupon that does not apply answers `422` with one code for every reason, `coupon_invalid` on `coupon_code`,
+         *     except `coupon_min_amount` (so codes cannot be enumerated). Quotes that carry a coupon code are limited to 30 per
+         *     hour per organization and client IP (`429 RATE_LIMITED`).
          */
         post: operations["postPublicQuote"];
         delete?: never;
@@ -8700,7 +8703,7 @@ export interface paths {
         put?: never;
         /**
          * Mark manual TLS active
-         * @description platform.site_domains.manage. Only verified domains using manual mode; otherwise DOMAIN_TLS_MODE conflict.
+         * @description platform.site_domains.manage. Only verified domains using manual mode; otherwise DOMAIN_TLS_MODE conflict. The API first dials the host on 443 with SNI and requires a trusted, unexpired certificate for it; otherwise 409 DOMAIN_TLS_UNVERIFIED (the reason is stored in last_error).
          */
         post: operations["postPlatformSiteDomainTLSActive"];
         delete?: never;
@@ -11954,9 +11957,11 @@ export interface paths {
         /**
          * Request a sign-in code
          * @description No auth. A reservation reference plus the phone number or e-mail address on file (the renter's or a
-         *     driver's of that reservation). When both match, a one-time code (purpose `customer_portal`, subject
-         *     `reservation:<uuid>`) goes out by SMS through the organization's SMS account, or by e-mail through the
-         *     platform mailer. The answer is **the same whether they matched or not** (202); a cooldown, a limit or a
+         *     driver's of that reservation), or the contact alone (TEC-1283): then the renter of the organization with
+         *     that contact and a reservation signs in and sees all of that customer card's reservations (several cards:
+         *     the one with the newest pick-up; drivers sign in with a reference). On a match a one-time code (purpose
+         *     `customer_portal`, subject `reservation:<uuid>`, or `contact:<keyed hash>` without a reference) goes out
+         *     by SMS through the organization's SMS account, or by e-mail through the platform mailer. The answer is **the same whether they matched or not** (202); a cooldown, a limit or a
          *     failed send is not reported either. 503 `CODE_UNAVAILABLE` when the organization cannot send on the
          *     chosen channel at all (checked before any lookup). Rate-limited per IP, per reference and per contact.
          */
@@ -27481,8 +27486,8 @@ export interface components {
             meta: components["schemas"]["ResponseMeta"];
         };
         CustomerAuthStartRequest: {
-            /** @description Reservation reference (case and spaces ignored) */
-            reference: string;
+            /** @description Reservation reference (case and spaces ignored). Empty or absent: sign in by contact alone (the renter's own reservations, TEC-1283). */
+            reference?: string;
             /** @description Phone number or e-mail address on the reservation */
             contact: string;
         };
@@ -27501,7 +27506,8 @@ export interface components {
             meta: components["schemas"]["ResponseMeta"];
         };
         CustomerAuthVerifyRequest: {
-            reference: string;
+            /** @description The reference used to request the code; empty or absent for a sign-in by contact alone */
+            reference?: string;
             contact: string;
             /** @description 6 digits */
             code: string;
@@ -32684,6 +32690,16 @@ export interface components {
             last_error: string;
             /** @enum {string} */
             tls_status: "pending" | "provisioning" | "active" | "failed" | "manual";
+            /**
+             * Format: date-time
+             * @description Last certificate check (TLS handshake with SNI).
+             */
+            tls_checked_at: string | null;
+            /**
+             * Format: date-time
+             * @description Expiry of the certificate the host served at the last successful check.
+             */
+            tls_expires_at: string | null;
             /** @enum {string} */
             provisioner: "manual" | "dokploy" | "traefik_file";
             /** Format: date-time */

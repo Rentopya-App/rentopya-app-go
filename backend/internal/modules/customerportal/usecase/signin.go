@@ -98,6 +98,106 @@ func (s *Service) channelAvailable(ctx context.Context, orgID int64, channel str
 
 func subject(reservation uuid.UUID) string { return "reservation:" + reservation.String() }
 
+// contactSubject is the OTP subject of a sign-in by contact alone (TEC-1283):
+// a keyed hash prefix of the contact, stable between start and verify.
+func (s *Service) contactSubject(orgID int64, c Contact) string {
+	return "contact:" + s.ContactKey(orgID, c)
+}
+
+// optionalReference normalizes a reference, or "" when none was typed (a
+// sign-in by contact alone).
+func optionalReference(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+	return NormalizeReference(raw)
+}
+
+// contactRow is a renter that may sign in by contact, with the reservation
+// the session is opened for (the newest pick-up).
+type contactRow struct {
+	customerID      int64
+	phone, email    string
+	reservationID   int64
+	reservationUUID uuid.UUID
+}
+
+// lookupContact finds the renter of the organization with this phone number
+// or e-mail address (TEC-1283). Rows are narrowed by an indexed normalized
+// form and then compared through keyed hashes in constant time, like a
+// reference sign-in. Several customer cards may share a contact: the one
+// with the newest reservation wins, so the session shows that card's
+// reservations. Drivers sign in with a reference. nil = no match.
+func (s *Service) lookupContact(ctx context.Context, orgID int64, c Contact) (*match, error) {
+	var rows []contactRow
+	if c.Channel == model.ChannelEmail {
+		found, err := s.q.ListPortalCustomersByEmail(ctx, db.ListPortalCustomersByEmailParams{
+			OrganizationID: orgID, Email: strings.ToLower(strings.TrimSpace(c.Normalized)),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range found {
+			rows = append(rows, contactRow{r.CustomerID, r.Phone, r.Email, r.ReservationID, r.ReservationUuid})
+		}
+	} else {
+		digits := pii.Digits(c.Normalized)
+		if len(digits) >= 10 {
+			found, err := s.q.ListPortalCustomersByPhone(ctx, db.ListPortalCustomersByPhoneParams{
+				OrganizationID: orgID, National: digits[len(digits)-10:],
+			})
+			if err != nil {
+				return nil, err
+			}
+			for _, r := range found {
+				rows = append(rows, contactRow{r.CustomerID, r.Phone, r.Email, r.ReservationID, r.ReservationUuid})
+			}
+		}
+	}
+	want := []byte(s.contactHash(orgID, c))
+	if len(rows) == 0 {
+		// Spend a comparable amount of work on an unknown contact.
+		_ = s.contactHash(orgID, c)
+		return nil, nil
+	}
+	var found *match
+	for _, row := range rows {
+		value := pii.Phone(row.phone)
+		valid := pii.ValidPhone(value)
+		if c.Channel == model.ChannelEmail {
+			value = pii.Email(row.email)
+			valid = smsusecase.ValidEmail(value)
+		}
+		got := []byte(s.contactHash(orgID, Contact{Channel: c.Channel, Normalized: value}))
+		if !valid || subtle.ConstantTimeCompare(got, want) != 1 || found != nil {
+			continue
+		}
+		found = &match{reservationID: row.reservationID, reservationUUID: row.reservationUUID, role: model.RoleRenter, customerID: row.customerID}
+	}
+	return found, nil
+}
+
+// signInMatch resolves a sign-in attempt: by reference + contact, or by
+// contact alone when no reference was typed. It returns the OTP subject.
+func (s *Service) signInMatch(ctx context.Context, orgID int64, ref string, c Contact) (*match, string, error) {
+	if ref == "" {
+		m, err := s.lookupContact(ctx, orgID, c)
+		return m, s.contactSubject(orgID, c), err
+	}
+	m, err := s.lookup(ctx, orgID, ref, c)
+	if m == nil || err != nil {
+		return nil, "", err
+	}
+	return m, subject(m.reservationUUID), nil
+}
+
+func signInMode(ref string) string {
+	if ref == "" {
+		return "contact"
+	}
+	return "reference"
+}
+
 // match is a reservation reference + contact that matched.
 type match struct {
 	reservationID   int64
@@ -166,7 +266,7 @@ func (s *Service) Start(ctx context.Context, slug string, in model.StartInput, c
 	if err != nil {
 		return model.StartResult{}, err
 	}
-	ref, refErr := NormalizeReference(in.Reference)
+	ref, refErr := optionalReference(in.Reference)
 	contact, contactErr := ParseContact(in.Contact)
 	if ve := joinValidation(refErr, contactErr); ve != nil {
 		return model.StartResult{}, ve
@@ -176,34 +276,34 @@ func (s *Service) Start(ctx context.Context, slug string, in model.StartInput, c
 	}
 	octx := orgContext(ctx, org)
 	out := model.StartResult{Status: "code_sent_if_matched", Channel: contact.Channel, ResendAfterSeconds: codeResendSeconds, CodeTTLSeconds: codeTTLSeconds}
-	m, err := s.lookup(octx, org.ID, ref, contact)
+	m, subj, err := s.signInMatch(octx, org.ID, ref, contact)
 	if err != nil {
 		return model.StartResult{}, err
 	}
 	masked := maskContact(contact)
 	if m == nil {
 		s.audit(octx, "customer_portal.sign_in_unmatched", model.ResourcePortal, nil, map[string]any{
-			"reference": ref, "channel": contact.Channel, "contact": masked, "step": "start",
+			"reference": ref, "channel": contact.Channel, "contact": masked, "step": "start", "mode": signInMode(ref),
 		}, &client)
 		return out, nil
 	}
 	var ch smsusecase.Challenge
 	if contact.Channel == model.ChannelEmail {
-		ch, err = s.otp.IssueEmailOTP(octx, org.ID, model.OTPPurpose, subject(m.reservationUUID), contact.Normalized, smsusecase.EmailOTP{Sender: org.Name})
+		ch, err = s.otp.IssueEmailOTP(octx, org.ID, model.OTPPurpose, subj, contact.Normalized, smsusecase.EmailOTP{Sender: org.Name})
 	} else {
-		ch, err = s.otp.IssueOTP(octx, org.ID, model.OTPPurpose, subject(m.reservationUUID), contact.Normalized)
+		ch, err = s.otp.IssueOTP(octx, org.ID, model.OTPPurpose, subj, contact.Normalized)
 	}
 	if err != nil {
 		// Generic on purpose: a cooldown, a limit or a provider failure
 		// would otherwise tell that the details matched.
 		s.log.Info("customer_portal_code_not_sent", "organization_id", org.ID, "reservation", m.reservationUUID, "error", err)
 		s.audit(octx, "customer_portal.code_not_sent", model.ResourcePortal, &m.reservationUUID, map[string]any{
-			"reference": ref, "channel": contact.Channel, "contact": masked, "role": m.role, "reason": codeErrorReason(err),
+			"reference": ref, "channel": contact.Channel, "contact": masked, "role": m.role, "reason": codeErrorReason(err), "mode": signInMode(ref),
 		}, &client)
 		return out, nil
 	}
 	s.audit(octx, "customer_portal.code_sent", model.ResourcePortal, &m.reservationUUID, map[string]any{
-		"reference": ref, "channel": contact.Channel, "contact": masked, "role": m.role, "challenge_uuid": ch.UUID,
+		"reference": ref, "channel": contact.Channel, "contact": masked, "role": m.role, "challenge_uuid": ch.UUID, "mode": signInMode(ref),
 	}, &client)
 	return out, nil
 }
@@ -249,7 +349,7 @@ func (s *Service) Verify(ctx context.Context, slug string, in model.VerifyInput,
 	if err != nil {
 		return model.SessionIssued{}, err
 	}
-	ref, refErr := NormalizeReference(in.Reference)
+	ref, refErr := optionalReference(in.Reference)
 	contact, contactErr := ParseContact(in.Contact)
 	if ve := joinValidation(refErr, contactErr); ve != nil {
 		return model.SessionIssued{}, ve
@@ -258,11 +358,11 @@ func (s *Service) Verify(ctx context.Context, slug string, in model.VerifyInput,
 	masked := maskContact(contact)
 	fail := func(reservation *uuid.UUID, reason string) error {
 		s.audit(octx, "customer_portal.sign_in_failed", model.ResourcePortal, reservation, map[string]any{
-			"reference": ref, "channel": contact.Channel, "contact": masked, "reason": reason,
+			"reference": ref, "channel": contact.Channel, "contact": masked, "reason": reason, "mode": signInMode(ref),
 		}, &client)
 		return ErrCodeInvalid
 	}
-	m, err := s.lookup(octx, org.ID, ref, contact)
+	m, subj, err := s.signInMatch(octx, org.ID, ref, contact)
 	if err != nil {
 		return model.SessionIssued{}, err
 	}
@@ -272,7 +372,7 @@ func (s *Service) Verify(ctx context.Context, slug string, in model.VerifyInput,
 	// The open code must belong to the contact typed now: another contact
 	// of the same reservation never uses up (or tries) someone else's code.
 	open, err := s.q.GetOpenPortalChallenge(octx, db.GetOpenPortalChallengeParams{
-		OrganizationID: org.ID, Purpose: model.OTPPurpose, SubjectRef: subject(m.reservationUUID),
+		OrganizationID: org.ID, Purpose: model.OTPPurpose, SubjectRef: subj,
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return model.SessionIssued{}, err
@@ -281,7 +381,7 @@ func (s *Service) Verify(ctx context.Context, slug string, in model.VerifyInput,
 		subtle.ConstantTimeCompare([]byte(open.PhoneHash), []byte(s.contactHash(org.ID, contact))) != 1) {
 		return model.SessionIssued{}, fail(&m.reservationUUID, "other_contact")
 	}
-	ver, err := s.otp.VerifyOTP(octx, org.ID, model.OTPPurpose, subject(m.reservationUUID), in.Code)
+	ver, err := s.otp.VerifyOTP(octx, org.ID, model.OTPPurpose, subj, in.Code)
 	if err != nil {
 		var ve *smsusecase.ValidationError
 		switch {
@@ -325,7 +425,7 @@ func (s *Service) Verify(ctx context.Context, slug string, in model.VerifyInput,
 		return model.SessionIssued{}, err
 	}
 	s.audit(octx, "customer_portal.signed_in", model.ResourcePortal, &m.reservationUUID, map[string]any{
-		"reference": ref, "channel": contact.Channel, "contact": masked, "role": m.role, "session_uuid": row.Uuid,
+		"reference": ref, "channel": contact.Channel, "contact": masked, "role": m.role, "session_uuid": row.Uuid, "mode": signInMode(ref),
 		"challenge_uuid": ver.ChallengeUUID, "hard_expires_at": hard.Format(time.RFC3339),
 	}, &client)
 	p, err := s.Authenticate(ctx, slug, token)
