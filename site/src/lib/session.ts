@@ -11,6 +11,20 @@ import type { Site } from "./types";
 export const SESSION_COOKIE = "rtp_bs";
 /** Request header the proxy sets for the current render (never trusted from the client). */
 export const SESSION_HEADER = "x-rtp-session";
+/**
+ * Pages that need a visitor booking session at render (TEC-1280): the
+ * booking flow only. Content pages read the catalog through the site's own
+ * cached session (catalog.ts); server actions mint a session themselves when
+ * a visitor first books or submits a form.
+ */
+const BOOKING_PATHS = /^\/(search|book|reservation)(\/|$)/;
+
+export function needsBookingSession(pathname: string, method: string): boolean {
+  return (
+    (method === "GET" || method === "HEAD") && BOOKING_PATHS.test(pathname)
+  );
+}
+
 /** Re-mint when less than this is left. */
 const REFRESH_MS = 2 * 60_000;
 
