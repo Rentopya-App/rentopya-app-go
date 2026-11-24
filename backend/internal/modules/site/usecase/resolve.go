@@ -239,3 +239,41 @@ func (s *Service) Asset(ctx context.Context, site uuid.UUID, kind, previewToken 
 	}
 	return rc, storage.MIMEFromLogoKey(key.String), nil
 }
+
+// LiveOrigin reports whether origin (scheme://host[:port], nothing else) is
+// the live branded site of the organization: its subdomain or a verified
+// custom domain, enabled, published, in plan and with the organization
+// active. Payments use it before sending a provider's return to a site, so a
+// payment token can never carry the customer to another organization's (or
+// anybody's) host.
+func (s *Service) LiveOrigin(ctx context.Context, orgID int64, origin string) (bool, error) {
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+		return false, nil
+	}
+	host, ok := NormalizeHost(u.Host)
+	if !ok {
+		return false, nil
+	}
+	row, h, err := s.lookup(ctx, host)
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	now := s.now()
+	if row.OrganizationID != orgID || h.Origin != u.Scheme+"://"+u.Host ||
+		row.OrganizationStatus != orgctx.StatusActive || !row.Enabled || !row.PublishedRevision.Valid ||
+		(row.AccessStartsAt.Valid && now.Before(row.AccessStartsAt.Time)) ||
+		(row.AccessEndsAt.Valid && !now.Before(row.AccessEndsAt.Time)) {
+		return false, nil
+	}
+	if err := s.siteInPlan(ctx, orgID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}

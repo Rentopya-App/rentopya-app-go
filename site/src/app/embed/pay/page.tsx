@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { openEmbed } from "@/lib/embed";
 import { embedContext } from "@/lib/embed-server";
 import { paymentHandoff } from "@/lib/payment-handoff";
+import { payLinkToken, safeCheckoutURL } from "@/lib/payment-return";
 import { getCtx } from "@/lib/server";
 
 export default async function EmbedPayPage() {
@@ -13,31 +14,33 @@ export default async function EmbedPayPage() {
   const embed = await embedContext();
   const state = openEmbed(embed?.fields.s || null, site.origin);
   if (!state?.payment || !state.reservation) notFound();
-  const payment = new URL(state.payment);
-  if (
-    payment.protocol !== "https:" &&
-    !(payment.protocol === "http:" && payment.hostname.endsWith("localhost"))
-  )
-    notFound();
-  // The return reference is encrypted and can only be read on this site's origin.
-  const back = new URL(
-    `/reservation/${encodeURIComponent(state.reservation.reference)}`,
-    site.origin,
-  );
-  back.searchParams.set("s", embed!.fields.s);
-  const token = /^\/pay\/([A-Za-z0-9_-]{20,64})$/.exec(payment.pathname)?.[1];
-  if (!token) notFound();
-  payment.pathname += "/widget";
-  payment.search = "";
-  payment.searchParams.set(
-    "handoff",
-    paymentHandoff({
-      token,
-      url: back.toString(),
-      organization: site.organization.uuid,
-      expires: state.expires,
-    }),
-  );
+  const checked = safeCheckoutURL(state.payment);
+  if (!checked) notFound();
+  const payment = new URL(checked);
+  const token = payLinkToken(checked);
+  if (token) {
+    // Fallback: the hosted pay page, which returns to this site with a
+    // signed hand-off. The return reference is encrypted and can only be
+    // read on this site's origin.
+    const back = new URL(
+      `/reservation/${encodeURIComponent(state.reservation.reference)}`,
+      site.origin,
+    );
+    back.searchParams.set("s", embed!.fields.s);
+    payment.pathname += "/widget";
+    payment.search = "";
+    payment.searchParams.set(
+      "handoff",
+      paymentHandoff({
+        token,
+        url: back.toString(),
+        organization: site.organization.uuid,
+        expires: state.expires,
+      }),
+    );
+  }
+  // Otherwise the provider's own page, started by this site: it returns to
+  // /payment/{token}/return here.
   return (
     <>
       <PageHeading ctx={ctx} title={t("res.pay")} />

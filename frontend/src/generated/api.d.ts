@@ -9133,7 +9133,12 @@ export interface paths {
         put?: never;
         /**
          * Start the hosted checkout
-         * @description No auth; rate-limited per IP and token. Opens the provider's hosted 3DS checkout (iyzico Checkout Form) on the organization's active account and returns its URL. No card data reaches Rentopya.
+         * @description No auth; rate-limited per IP and token. Opens the provider's hosted 3DS checkout (iyzico Checkout Form) on the
+         *     organization's active account and returns its URL. No card data reaches Rentopya. The branded site sends
+         *     `return_url` so the customer goes from the site straight to the provider and back to the site: it must be
+         *     `{site origin}/payment/{token}/return` (optionally with the site's sealed `s` query) of the link's own
+         *     organization's live site (subdomain or verified custom domain), else 422 `return_url`. Without it the provider
+         *     returns to the hosted pay page.
          */
         post: operations["postPublicPayCheckout"];
         delete?: never;
@@ -50592,6 +50597,8 @@ export interface operations {
                 "application/json": {
                     /** @enum {string} */
                     locale?: "tr" | "en";
+                    /** Format: uri */
+                    return_url?: string;
                 };
             };
         };

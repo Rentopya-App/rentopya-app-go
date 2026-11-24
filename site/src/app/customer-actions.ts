@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ApiError } from "@/lib/api";
+import { siteCheckout } from "@/lib/checkout";
 import {
   CUSTOMER_COOKIE,
   PENDING_COOKIE,
@@ -193,7 +194,7 @@ export async function payReservation(form: FormData) {
       return signedOut(`/account/${id}`);
     return go(`/account/${id}?error=pay`);
   }
-  redirect(link.url);
+  redirect((await siteCheckout(link.url, `/account/${id}`)) ?? link.url);
 }
 
 /** A change or cancellation request (staff answer it in the panel). */
