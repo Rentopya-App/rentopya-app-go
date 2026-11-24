@@ -10,6 +10,7 @@ import {
   rememberReservation,
   reservationToken,
 } from "@/lib/reservation-tokens";
+import { siteCheckout } from "@/lib/checkout";
 import { bookingPath, embedContext } from "@/lib/embed-server";
 import { openEmbed, sealEmbed } from "@/lib/embed";
 import { bookingApi, getCtx, getSite } from "@/lib/server";
@@ -259,12 +260,17 @@ export async function pay(form: FormData) {
   } catch {
     return go(`/reservation/${encodeURIComponent(reference)}?pay_error=1`);
   }
+  const to = `/reservation/${encodeURIComponent(reference)}`;
   const embed = await embedContext();
   if (embed) {
     const state = openEmbed(embed.fields.s, site.origin);
     if (!state) return go("/");
-    const session = sealEmbed({ ...state, payment: link.url });
+    // The provider page opens in the top window (it cannot be framed).
+    const checkout = await siteCheckout(link.url, to, embed.fields.s);
+    const session = sealEmbed({ ...state, payment: checkout ?? link.url });
     return go(`/pay?s=${encodeURIComponent(session)}`);
   }
-  redirect(link.url);
+  // Straight to the provider and back to this site; the hosted pay page
+  // only when the site cannot start the checkout itself.
+  redirect((await siteCheckout(link.url, to)) ?? link.url);
 }

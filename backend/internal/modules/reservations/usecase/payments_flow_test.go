@@ -93,7 +93,7 @@ func (p *payFx) checkout(link paymodel.Link) string {
 	for _, tk := range p.fake.Tokens() {
 		before[tk] = true
 	}
-	start, err := p.pay.StartCheckout(context.Background(), token, "10.0.0.7", "tr")
+	start, err := p.pay.StartCheckout(context.Background(), token, "10.0.0.7", "tr", "")
 	if err != nil {
 		p.t.Fatalf("checkout: %v", err)
 	}

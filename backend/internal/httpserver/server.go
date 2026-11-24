@@ -784,6 +784,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// encryption key: no separate secret to configure.
 	siteSvc.SetPreviewSecret(cfg.Encryption.Key)
 	siteSvc.SetLogger(log)
+	// A checkout started from the branded site returns to that site.
+	paymentsSvc.SetSiteOrigins(siteSvc)
 	siteDomains, err := sitemodule.ConfigureDomains(deps.Queries, siteSvc, cfg.Site, deps.Queue.EnqueueSiteDomains)
 	if err != nil {
 		return nil, fmt.Errorf("httpserver: site domains: %w", err)

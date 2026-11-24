@@ -129,6 +129,17 @@ export const en: Record<MessageKey, string> = {
   "res.pay": "Pay securely",
   "res.pay_failed":
     "The payment link could not be created. Please try again or contact us.",
+  "res.pay_result.paid": "Your payment was received, thank you.",
+  "res.pay_result.late":
+    "Your payment was received but the reservation had expired. Our team will contact you.",
+  "res.pay_result.processing":
+    "Your payment is being verified with the bank. This page updates by itself, please keep it open.",
+  "res.pay_result.slow":
+    "Your payment is not verified yet. Refresh this page in a few minutes; if the amount was charged, nothing is lost.",
+  "res.pay_result.failed":
+    "The payment was not completed and your card was not charged. You can try again.",
+  "res.pay_secure_note":
+    "Payment is taken on iyzico's secure page with 3D Secure; your card details never reach us.",
   "res.cancellation": "Cancellation terms",
   "res.portal":
     "Sign in to your account for documents, payments and change or cancellation requests.",

@@ -5,6 +5,7 @@ import { pay } from "@/app/actions";
 import { BookingGrid, Steps } from "@/components/site/booking";
 import Link from "@/components/site/link";
 import { PageHeading, PageSection } from "@/components/site/page-heading";
+import { paymentResult } from "@/components/site/payment-result";
 import { Paragraphs } from "@/components/site/text";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Alert, Badge, Card, CardTitle } from "@/components/ui/card";
@@ -36,7 +37,11 @@ export default async function ReservationPage({
   searchParams,
 }: {
   params: Promise<{ reference: string }>;
-  searchParams: Promise<{ new?: string; pay_error?: string }>;
+  searchParams: Promise<{
+    new?: string;
+    pay_error?: string;
+    payment?: string;
+  }>;
 }) {
   const ctx = await getCtx();
   const { t, locale, site } = ctx;
@@ -82,6 +87,7 @@ export default async function ReservationPage({
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
+  const paid = await paymentResult(ctx, sp.payment, r.reference);
   const cur = r.price.currency;
   const statusKey = (
     STATUSES.includes(r.status) ? `res.status.${r.status}` : "res.status.other"
@@ -111,6 +117,7 @@ export default async function ReservationPage({
         {sp.new && r.status === "request" ? (
           <Alert>{t("res.request_sent")}</Alert>
         ) : null}
+        {paid.node}
         {sp.pay_error ? (
           <Alert tone="error">{t("res.pay_failed")}</Alert>
         ) : null}
@@ -225,8 +232,8 @@ export default async function ReservationPage({
                 })}
               </p>
             ) : null}
-            {r.actions.pay ? (
-              <form action={pay}>
+            {r.actions.pay && !paid.pending ? (
+              <form action={pay} className="rt-stack">
                 <input type="hidden" name="reference" value={r.reference} />
                 <Button type="submit" size="lg" className="rt-submit-full">
                   {t("res.pay")}
@@ -234,6 +241,7 @@ export default async function ReservationPage({
                     ? ` · ${money(r.actions.pay_amount, cur, locale)}`
                     : ""}
                 </Button>
+                <p className="rt-muted">{t("res.pay_secure_note")}</p>
               </form>
             ) : null}
           </aside>
