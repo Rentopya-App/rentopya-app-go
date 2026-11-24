@@ -81,6 +81,7 @@ import (
 	reservationusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/reservations/usecase"
 	sitemodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/site"
 	siteusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/site/usecase"
+	siteleadsusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/siteleads/usecase"
 	smsmodule "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/sms"
 	smsusecase "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/sms/usecase"
 	supplieradapters "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/suppliers/adapters"
@@ -593,7 +594,11 @@ func main() {
 	accountPurger.SetLogger(log)
 	accountPurger.SetSearchIndexer(searchIndexer)
 	accountPurger.SetNotifier(notifSvc)
+	// TEC-1287: nightly deletion of site leads past their retention period.
+	siteLeadsSvc := siteleadsusecase.New(queries, cfg.Encryption.Key)
+	siteLeadsSvc.SetActivity(activityRec)
 	worker := queue.NewWorker(cfg, log, notifSvc.Deliver).
+		WithSiteLeadRetention(siteLeadsSvc.PurgeExpired).
 		WithExport(exportSvc.ProcessExport).
 		WithImport(importSvc.ProcessImport).
 		WithBulk(bulkSvc.ProcessBulk).
@@ -713,6 +718,9 @@ func main() {
 	if err := queue.RegisterTollsSchedule(scheduler); err != nil {
 		log.Error("toll_fetch_scheduler_failed", "error", err)
 		exit(1)
+	}
+	if err := queue.RegisterSiteLeadRetentionSchedule(scheduler); err != nil {
+		log.Error("site_lead_retention_scheduler_failed", "error", err)
 	}
 	if err := queue.RegisterExpireHoldsSchedule(scheduler); err != nil {
 		log.Error("hold_expiry_scheduler_failed", "error", err)

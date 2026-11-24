@@ -1179,7 +1179,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	customerportalmodule.RegisterRoutes(mux, portalH, tokens, loader, tenantResolver)
 	siteLeadsSvc := siteleadsusecase.New(deps.Queries, cfg.Encryption.Key)
 	siteLeadsSvc.SetNotifier(notifyEngine)
-	siteleadsmodule.RegisterRoutes(mux, siteleadshandler.New(siteLeadsSvc, activityRec), tokens, loader, tenantResolver)
+	// TEC-1287: marketing requests are confirmed by e-mail (double opt-in).
+	siteLeadsSvc.SetMailer(mailer)
+	siteLeadsSvc.SetActivity(activityRec)
+	siteLeadsHandler := siteleadshandler.New(siteLeadsSvc, activityRec)
+	siteLeadsHandler.SetLimiter(ratelimit.New(deps.Redis, cfg.App.Env))
+	siteleadsmodule.RegisterRoutes(mux, siteLeadsHandler, tokens, loader, tenantResolver)
+	siteleadsmodule.RegisterPublicRoutes(mux, siteLeadsHandler)
 	publicHandler := publicapihandler.NewPublic(publicAPISvc, ratelimit.New(deps.Redis, cfg.App.Env))
 	publicHandler.SetStorefront(deps.Queries, siteLeadsSvc)
 	publicapimodule.RegisterRoutes(mux,

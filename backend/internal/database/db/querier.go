@@ -129,6 +129,9 @@ type Querier interface {
 	ConfirmEquipmentAllocation(ctx context.Context, arg ConfirmEquipmentAllocationParams) (int64, error)
 	// pending → succeeded exactly once (concurrent deliveries: one wins).
 	ConfirmPayment(ctx context.Context, arg ConfirmPaymentParams) (int64, error)
+	// Global lookup by the token hash (the token names one lead of one
+	// organization); single use: the hash is cleared.
+	ConfirmSiteLeadMarketing(ctx context.Context, tokenHash pgtype.Text) (ConfirmSiteLeadMarketingRow, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeCampaignRedemption(ctx context.Context, arg ConsumeCampaignRedemptionParams) (int64, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
@@ -397,6 +400,7 @@ type Querier interface {
 	// ------------------------------------------------------- idempotency
 	// A key may be reused once its record expired.
 	DeleteExpiredPublicIdempotencyKey(ctx context.Context, arg DeleteExpiredPublicIdempotencyKeyParams) error
+	DeleteExpiredSiteLeads(ctx context.Context, arg DeleteExpiredSiteLeadsParams) (int64, error)
 	// Drops rows that would only start at or after from_at (never quoted:
 	// quotes use the row effective at the quote time).
 	DeleteFutureExtraPrices(ctx context.Context, arg DeleteFutureExtraPricesParams) (int64, error)
@@ -1029,6 +1033,7 @@ type Querier interface {
 	// rotation): the site follows it on the next save.
 	GetSiteKeySuccessor(ctx context.Context, arg GetSiteKeySuccessorParams) (uuid.UUID, error)
 	GetSiteLead(ctx context.Context, arg GetSiteLeadParams) (SiteLead, error)
+	GetSiteLeadRetention(ctx context.Context, organizationID int64) (int32, error)
 	GetSiteMedia(ctx context.Context, arg GetSiteMediaParams) (SiteMedium, error)
 	// The internal id of a key the site settings link to.
 	GetSitePublicAPIKeyID(ctx context.Context, arg GetSitePublicAPIKeyIDParams) (int64, error)
@@ -2676,6 +2681,10 @@ type Querier interface {
 	SetSiteDraftImage(ctx context.Context, arg SetSiteDraftImageParams) (SiteSetting, error)
 	// Links another publishable key (renew key); bumps the version.
 	SetSiteKey(ctx context.Context, arg SetSiteKeyParams) (SiteSetting, error)
+	// TEC-1287: the confirmation (single use, expiring) and unsubscribe tokens
+	// of a lead that asked for marketing.
+	SetSiteLeadConsentTokens(ctx context.Context, arg SetSiteLeadConsentTokensParams) error
+	SetSiteLeadRetention(ctx context.Context, arg SetSiteLeadRetentionParams) (int32, error)
 	SetSupplierInvoiceAttachment(ctx context.Context, arg SetSupplierInvoiceAttachmentParams) (int64, error)
 	// paid_amount is the sum of the invoice's live allocations; the status
 	// follows it.
@@ -2703,6 +2712,8 @@ type Querier interface {
 	// The route of a host verified by another organization must survive this organization's cleanup.
 	SiteDomainVerifiedElsewhere(ctx context.Context, arg SiteDomainVerifiedElsewhereParams) (bool, error)
 	SiteLeadRecipients(ctx context.Context, organizationID int64) ([]int64, error)
+	// Organizations with leads older than their retention period.
+	SiteLeadRetention(ctx context.Context) ([]SiteLeadRetentionRow, error)
 	SiteMediaHasPublicArticle(ctx context.Context, arg SiteMediaHasPublicArticleParams) (bool, error)
 	SiteMediaHasPublicCampaign(ctx context.Context, arg SiteMediaHasPublicCampaignParams) (bool, error)
 	// Whether the draft or any snapshot still names an image object (it is
@@ -2787,6 +2798,8 @@ type Querier interface {
 	TransitionReservation(ctx context.Context, arg TransitionReservationParams) (int64, error)
 	UnlockChannelAccount(ctx context.Context, arg UnlockChannelAccountParams) error
 	UnlockRunnerJob(ctx context.Context, arg UnlockRunnerJobParams) error
+	// Global lookup by the token hash; repeating it is harmless.
+	UnsubscribeSiteLead(ctx context.Context, tokenHash pgtype.Text) (UnsubscribeSiteLeadRow, error)
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (int64, error)
 	UpdateAgreement(ctx context.Context, arg UpdateAgreementParams) (int64, error)
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)

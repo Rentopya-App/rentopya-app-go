@@ -2903,29 +2903,34 @@ type SiteDomain struct {
 }
 
 type SiteLead struct {
-	ID               int64              `json:"id"`
-	OrganizationID   int64              `json:"organization_id"`
-	Uuid             uuid.UUID          `json:"uuid"`
-	Kind             string             `json:"kind"`
-	Name             string             `json:"name"`
-	Email            string             `json:"email"`
-	Phone            string             `json:"phone"`
-	Company          string             `json:"company"`
-	City             string             `json:"city"`
-	Message          string             `json:"message"`
-	FleetSize        pgtype.Int4        `json:"fleet_size"`
-	Locale           string             `json:"locale"`
-	ConsentKvkk      bool               `json:"consent_kvkk"`
-	ConsentMarketing bool               `json:"consent_marketing"`
-	SourceHost       string             `json:"source_host"`
-	IpHash           string             `json:"ip_hash"`
-	UserAgent        string             `json:"user_agent"`
-	Status           string             `json:"status"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
-	HandledBy        pgtype.Int8        `json:"handled_by"`
-	HandledAt        pgtype.Timestamptz `json:"handled_at"`
-	Note             string             `json:"note"`
+	ID                   int64              `json:"id"`
+	OrganizationID       int64              `json:"organization_id"`
+	Uuid                 uuid.UUID          `json:"uuid"`
+	Kind                 string             `json:"kind"`
+	Name                 string             `json:"name"`
+	Email                string             `json:"email"`
+	Phone                string             `json:"phone"`
+	Company              string             `json:"company"`
+	City                 string             `json:"city"`
+	Message              string             `json:"message"`
+	FleetSize            pgtype.Int4        `json:"fleet_size"`
+	Locale               string             `json:"locale"`
+	ConsentKvkk          bool               `json:"consent_kvkk"`
+	ConsentMarketing     bool               `json:"consent_marketing"`
+	SourceHost           string             `json:"source_host"`
+	IpHash               string             `json:"ip_hash"`
+	UserAgent            string             `json:"user_agent"`
+	Status               string             `json:"status"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	HandledBy            pgtype.Int8        `json:"handled_by"`
+	HandledAt            pgtype.Timestamptz `json:"handled_at"`
+	Note                 string             `json:"note"`
+	ConfirmTokenHash     pgtype.Text        `json:"confirm_token_hash"`
+	ConfirmExpiresAt     pgtype.Timestamptz `json:"confirm_expires_at"`
+	MarketingConfirmedAt pgtype.Timestamptz `json:"marketing_confirmed_at"`
+	UnsubscribeTokenHash pgtype.Text        `json:"unsubscribe_token_hash"`
+	UnsubscribedAt       pgtype.Timestamptz `json:"unsubscribed_at"`
 }
 
 type SiteMedium struct {
@@ -2945,22 +2950,23 @@ type SiteMedium struct {
 }
 
 type SiteSetting struct {
-	ID                int64              `json:"id"`
-	Uuid              uuid.UUID          `json:"uuid"`
-	OrganizationID    int64              `json:"organization_id"`
-	Enabled           bool               `json:"enabled"`
-	Subdomain         string             `json:"subdomain"`
-	DefaultLocale     string             `json:"default_locale"`
-	Config            []byte             `json:"config"`
-	ApiKeyID          pgtype.Int8        `json:"api_key_id"`
-	LogoObjectKey     pgtype.Text        `json:"logo_object_key"`
-	FaviconObjectKey  pgtype.Text        `json:"favicon_object_key"`
-	CoverObjectKey    pgtype.Text        `json:"cover_object_key"`
-	Version           int32              `json:"version"`
-	UpdatedBy         pgtype.Int8        `json:"updated_by"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
-	PublishedRevision pgtype.Int4        `json:"published_revision"`
+	ID                  int64              `json:"id"`
+	Uuid                uuid.UUID          `json:"uuid"`
+	OrganizationID      int64              `json:"organization_id"`
+	Enabled             bool               `json:"enabled"`
+	Subdomain           string             `json:"subdomain"`
+	DefaultLocale       string             `json:"default_locale"`
+	Config              []byte             `json:"config"`
+	ApiKeyID            pgtype.Int8        `json:"api_key_id"`
+	LogoObjectKey       pgtype.Text        `json:"logo_object_key"`
+	FaviconObjectKey    pgtype.Text        `json:"favicon_object_key"`
+	CoverObjectKey      pgtype.Text        `json:"cover_object_key"`
+	Version             int32              `json:"version"`
+	UpdatedBy           pgtype.Int8        `json:"updated_by"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	PublishedRevision   pgtype.Int4        `json:"published_revision"`
+	LeadRetentionMonths int32              `json:"lead_retention_months"`
 }
 
 type SiteSettingVersion struct {
