@@ -8721,7 +8721,7 @@ export interface paths {
         };
         /**
          * Authorize a verified custom domain
-         * @description Internal certificate authorization. Requires X-Auth-Adapter-Key equal to AUTH_ADAPTER_SECRET; an empty configured secret denies all calls. Only verified custom hosts return 200. Responses are never cached.
+         * @description Internal certificate authorization (a TLS ask hook). Requires X-Site-Domain-Ask-Key equal to SITE_DOMAIN_ASK_SECRET, a secret that grants nothing else (never AUTH_ADAPTER_SECRET); an empty configured secret denies all calls. Limited to 120 calls per minute per client IP (429). Only verified custom hosts return 200. Responses are never cached.
          */
         get: operations["getInternalSiteDomainAllowed"];
         put?: never;
@@ -49897,6 +49897,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     listSiteMedia: {

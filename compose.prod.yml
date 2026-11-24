@@ -70,6 +70,8 @@ x-backend-environment: &backend-environment
   JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
   JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
   AUTH_ADAPTER_SECRET: ${AUTH_ADAPTER_SECRET:?AUTH_ADAPTER_SECRET is required}
+  # TLS "ask" hook (TEC-1288); empty keeps GET /v1/internal/site/domain-allowed closed.
+  SITE_DOMAIN_ASK_SECRET: ${SITE_DOMAIN_ASK_SECRET:-}
   APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?APP_ENCRYPTION_KEY is required}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
   # Public origin for links the API generates (e-mail links, step-up
@@ -385,6 +387,9 @@ services:
     container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-frontend
     environment:
       SITE_EMBED_SECRET: ${SITE_EMBED_SECRET:?SITE_EMBED_SECRET is required}
+      # Only {label}.{host of SITE_BASE_URL} and custom domains reach the
+      # site resolver (TEC-1288).
+      SITE_BASE_URL: ${SITE_BASE_URL:-${AUTH_URL:?AUTH_URL is required}}
       API_URL: http://backend.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}:8080/v1
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
       AUTH_URL: ${AUTH_URL:?AUTH_URL is required}

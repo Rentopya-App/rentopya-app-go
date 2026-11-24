@@ -125,10 +125,18 @@ func (h *Handler) MarkDomainTLSActive(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, out)
 }
 
-// DomainAllowed is an internal certificate authorization endpoint; empty secrets fail closed.
+// DomainAskHeader carries SITE_DOMAIN_ASK_SECRET (TEC-1288).
+const DomainAskHeader = "X-Site-Domain-Ask-Key"
+
+// DomainAllowed is an internal certificate authorization endpoint (a TLS
+// "ask" hook). It accepts only SITE_DOMAIN_ASK_SECRET, which grants nothing
+// else; an empty secret fails closed. Limited per client IP.
 func (h *Handler) DomainAllowed(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	token := r.Header.Get("X-Auth-Adapter-Key")
+	if !h.allow(w, r, "site:domain_allowed:ip", 120) {
+		return
+	}
+	token := r.Header.Get(DomainAskHeader)
 	if h.domainSecret == "" || subtle.ConstantTimeCompare([]byte(token), []byte(h.domainSecret)) != 1 {
 		response.Error(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid internal credential")
 		return
