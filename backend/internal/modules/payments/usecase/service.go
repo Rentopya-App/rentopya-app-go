@@ -153,7 +153,6 @@ func (s *Service) postPayment(ctx context.Context, orgID, paymentID int64) {
 	}
 }
 
-// SetLogger replaces the logger.
 // SiteOrigins tells whether an origin is the live branded site of an
 // organization (the site module).
 type SiteOrigins interface {
@@ -164,6 +163,7 @@ type SiteOrigins interface {
 // instead of the hosted pay page (nil: the pay page only).
 func (s *Service) SetSiteOrigins(o SiteOrigins) { s.sites = o }
 
+// SetLogger replaces the logger.
 func (s *Service) SetLogger(l *slog.Logger) {
 	if l != nil {
 		s.log = l

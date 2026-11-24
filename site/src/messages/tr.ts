@@ -135,7 +135,7 @@ export const tr = {
   "res.pay_result.slow":
     "Ödemeniz henüz doğrulanamadı. Birkaç dakika sonra sayfayı yenileyin; tutar çekildiyse işleminiz kaybolmaz.",
   "res.pay_result.failed":
-    "Ödeme tamamlanamadı, kartınızdan tutar çekilmedi. Tekrar deneyebilirsiniz.",
+    "Ödeme tamamlanamadı. Tekrar deneyebilirsiniz; sorun sürerse bizimle iletişime geçin.",
   "res.pay_secure_note":
     "Ödeme iyzico güvenli ödeme sayfasında 3D Secure ile alınır; kart bilgileriniz bize ulaşmaz.",
   "res.cancellation": "İptal koşulları",

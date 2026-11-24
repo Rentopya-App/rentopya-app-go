@@ -137,7 +137,7 @@ export const en: Record<MessageKey, string> = {
   "res.pay_result.slow":
     "Your payment is not verified yet. Refresh this page in a few minutes; if the amount was charged, nothing is lost.",
   "res.pay_result.failed":
-    "The payment was not completed and your card was not charged. You can try again.",
+    "The payment was not completed. You can try again; if it keeps failing, please contact us.",
   "res.pay_secure_note":
     "Payment is taken on iyzico's secure page with 3D Secure; your card details never reach us.",
   "res.cancellation": "Cancellation terms",
