@@ -789,7 +789,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		return nil, fmt.Errorf("httpserver: site domains: %w", err)
 	}
 	siteHandler := sitehandler.New(siteSvc, activityRec, ratelimit.New(deps.Redis, cfg.App.Env))
-	siteHandler.SetDomains(siteDomains, cfg.Auth.AdapterSecret)
+	siteHandler.SetDomains(siteDomains, cfg.Site.DomainAskSecret)
 	// Rental group membership removals re-plan the commitments that relied
 	// on them (or are refused); moved reservations record plan_moved.
 	vehicleSvc.SetMembershipGuard(availabilitySvc)

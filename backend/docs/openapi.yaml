@@ -13821,7 +13821,7 @@ paths:
       tags: [Branded Site]
       operationId: getInternalSiteDomainAllowed
       summary: Authorize a verified custom domain
-      description: "Internal certificate authorization. Requires X-Auth-Adapter-Key equal to AUTH_ADAPTER_SECRET; an empty configured secret denies all calls. Only verified custom hosts return 200. Responses are never cached."
+      description: "Internal certificate authorization (a TLS ask hook). Requires X-Site-Domain-Ask-Key equal to SITE_DOMAIN_ASK_SECRET, a secret that grants nothing else (never AUTH_ADAPTER_SECRET); an empty configured secret denies all calls. Limited to 120 calls per minute per client IP (429). Only verified custom hosts return 200. Responses are never cached."
       security:
         - siteDomainSecret: []
       parameters:
@@ -13847,6 +13847,7 @@ paths:
                   meta: { $ref: "#/components/schemas/ResponseMeta" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 
   /v1/tenant/site/media:
     get:
@@ -25906,8 +25907,8 @@ components:
     siteDomainSecret:
       type: apiKey
       in: header
-      name: X-Auth-Adapter-Key
-      description: Internal domain authorization secret; empty server configuration fails closed.
+      name: X-Site-Domain-Ask-Key
+      description: SITE_DOMAIN_ASK_SECRET (TEC-1288); empty server configuration fails closed.
     customerSession:
       type: apiKey
       in: header
