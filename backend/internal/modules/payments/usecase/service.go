@@ -105,6 +105,7 @@ type Service struct {
 	recorder  resmodel.PaymentRecorder
 	ledger    Ledger
 	baseURL   string
+	sites     SiteOrigins
 	events    resourceevents.Publisher
 	log       *slog.Logger
 	now       func() time.Time
@@ -151,6 +152,16 @@ func (s *Service) postPayment(ctx context.Context, orgID, paymentID int64) {
 		s.log.Warn("payment_ledger_post_failed", "organization_id", orgID, "payment_id", paymentID, "error", err)
 	}
 }
+
+// SiteOrigins tells whether an origin is the live branded site of an
+// organization (the site module).
+type SiteOrigins interface {
+	LiveOrigin(ctx context.Context, orgID int64, origin string) (bool, error)
+}
+
+// SetSiteOrigins lets a checkout return to the organization's branded site
+// instead of the hosted pay page (nil: the pay page only).
+func (s *Service) SetSiteOrigins(o SiteOrigins) { s.sites = o }
 
 // SetLogger replaces the logger.
 func (s *Service) SetLogger(l *slog.Logger) {

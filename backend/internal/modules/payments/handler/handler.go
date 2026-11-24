@@ -279,12 +279,13 @@ func (h *Handler) StartCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Locale string `json:"locale"`
+		Locale    string `json:"locale"`
+		ReturnURL string `json:"return_url"`
 	}
 	if !httpkit.DecodeJSON(w, r, &in, true) {
 		return
 	}
-	out, err := h.svc.StartCheckout(r.Context(), token, httpkit.ClientIP(r), in.Locale)
+	out, err := h.svc.StartCheckout(r.Context(), token, httpkit.ClientIP(r), in.Locale, in.ReturnURL)
 	if err != nil {
 		writeError(w, r, err)
 		return

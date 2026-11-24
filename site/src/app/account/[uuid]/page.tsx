@@ -5,6 +5,7 @@ import { createRequest, payReservation } from "@/app/customer-actions";
 import { documentLabel, statusLabel } from "@/components/site/account";
 import Link from "@/components/site/link";
 import { PageHeading, PageSection } from "@/components/site/page-heading";
+import { paymentResult } from "@/components/site/payment-result";
 import { Paragraphs } from "@/components/site/text";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Alert, Badge, Card, CardTitle } from "@/components/ui/card";
@@ -152,6 +153,7 @@ export default async function AccountReservationPage({
       );
     throw err;
   }
+  const paid = await paymentResult(ctx, sp.payment, r.reference);
   const cur = r.price.currency;
   const error =
     sp.error && ERRORS.includes(sp.error)
@@ -175,6 +177,7 @@ export default async function AccountReservationPage({
           {sp.request === "cancel" ? (
             <Alert tone="success">{t("acc.request.sent_cancel")}</Alert>
           ) : null}
+          {paid.node}
           {error && !formError ? <Alert tone="error">{error}</Alert> : null}
 
           <Card className="rt-panel">
@@ -247,14 +250,15 @@ export default async function AccountReservationPage({
                 </div>
               ) : null}
             </dl>
-            {r.actions.pay && r.actions.pay_amount ? (
-              <form action={payReservation}>
+            {r.actions.pay && r.actions.pay_amount && !paid.pending ? (
+              <form action={payReservation} className="rt-stack">
                 <input type="hidden" name="reservation" value={r.uuid} />
                 <Button type="submit" size="lg">
                   {t("acc.pay", {
                     amount: money(r.actions.pay_amount, cur, locale),
                   })}
                 </Button>
+                <p className="rt-muted">{t("res.pay_secure_note")}</p>
               </form>
             ) : null}
           </Card>
