@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
@@ -93,10 +94,26 @@ func (s *Service) PublicLink(ctx context.Context, token string, verify bool) (pa
 
 // StartCheckout opens a hosted checkout for an active link on the
 // organization's active payment account and returns the provider page.
-func (s *Service) StartCheckout(ctx context.Context, token, ip, locale string) (paymodel.CheckoutStart, error) {
+//
+// returnURL, when set, is where the provider sends the customer back: the
+// branded site's /payment/{token}/return of the link's own organization
+// (checked with SiteOrigins), so a site customer never passes through the
+// platform's pay page. Empty: the hosted pay page's callback.
+func (s *Service) StartCheckout(ctx context.Context, token, ip, locale, returnURL string) (paymodel.CheckoutStart, error) {
 	octx, orgID, row, err := s.resolveToken(ctx, token)
 	if err != nil {
 		return paymodel.CheckoutStart{}, err
+	}
+	callback := s.LinkURL(row.Token) + "/callback"
+	if returnURL != "" {
+		ok, err := s.siteReturn(octx, orgID, row.Token, returnURL)
+		if err != nil {
+			return paymodel.CheckoutStart{}, err
+		}
+		if !ok {
+			return paymodel.CheckoutStart{}, &ValidationError{Details: []Detail{{Field: "return_url", Code: "invalid", Message: "not a payment return of this organization's site"}}}
+		}
+		callback = returnURL
 	}
 	switch s.effectiveLinkStatus(octx, orgID, row.ID, row.Status, row.ExpiresAt.Time) {
 	case paymodel.LinkPaid:
@@ -141,7 +158,7 @@ func (s *Service) StartCheckout(ctx context.Context, token, ip, locale string) (
 	}
 	co, err := prov.CreateCheckout(octx, acc, payments.CheckoutRequest{
 		ConversationID: id.String(), BasketID: id.String(), Amount: amount, Currency: row.Currency,
-		CallbackURL: s.LinkURL(row.Token) + "/callback", Locale: locale,
+		CallbackURL: callback, Locale: locale,
 		ItemID: row.ReservationReference, ItemName: row.ProductTitle, ItemCategory: "Araç kiralama",
 		Buyer: payments.Buyer{
 			ID: view.CustomerUuid.String(), Name: name, Surname: surname, Email: view.CustomerEmail, Phone: view.CustomerPhone,
@@ -164,6 +181,33 @@ func (s *Service) StartCheckout(ctx context.Context, token, ip, locale string) (
 	}
 	s.publish(octx, paymodel.ResourcePayments, "created", id)
 	return paymodel.CheckoutStart{PaymentPageURL: co.PaymentPageURL}, nil
+}
+
+// siteReturn accepts {site origin}/payment/{token}/return of the link's
+// organization, optionally with the site's sealed state (?s=) and nothing
+// else.
+func (s *Service) siteReturn(ctx context.Context, orgID int64, token, raw string) (bool, error) {
+	if s.sites == nil || len(raw) > 6000 {
+		return false, nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.User != nil || u.Fragment != "" || u.RawPath != "" || u.Path != "/payment/"+token+"/return" {
+		return false, nil
+	}
+	local := u.Hostname() == "localhost" || strings.HasSuffix(u.Hostname(), ".localhost")
+	if u.Scheme != "https" && (u.Scheme != "http" || !local) {
+		return false, nil
+	}
+	q, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return false, nil
+	}
+	for k, v := range q {
+		if k != "s" || len(v) != 1 || v[0] == "" {
+			return false, nil
+		}
+	}
+	return s.sites.LiveOrigin(ctx, orgID, u.Scheme+"://"+u.Host)
 }
 
 func buyerName(v db.GetReservationViewRow) (string, string) {

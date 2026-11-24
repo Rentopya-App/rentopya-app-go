@@ -127,6 +127,17 @@ export const tr = {
   "res.pay": "Güvenli ödeme yap",
   "res.pay_failed":
     "Ödeme bağlantısı oluşturulamadı. Lütfen tekrar deneyin veya bizimle iletişime geçin.",
+  "res.pay_result.paid": "Ödemeniz alındı, teşekkür ederiz.",
+  "res.pay_result.late":
+    "Ödemeniz alındı ancak rezervasyonun süresi dolmuştu. Ekibimiz sizinle iletişime geçecek.",
+  "res.pay_result.processing":
+    "Ödemeniz bankadan doğrulanıyor. Bu sayfa kendiliğinden güncellenecek, lütfen kapatmayın.",
+  "res.pay_result.slow":
+    "Ödemeniz henüz doğrulanamadı. Birkaç dakika sonra sayfayı yenileyin; tutar çekildiyse işleminiz kaybolmaz.",
+  "res.pay_result.failed":
+    "Ödeme tamamlanamadı. Tekrar deneyebilirsiniz; sorun sürerse bizimle iletişime geçin.",
+  "res.pay_secure_note":
+    "Ödeme iyzico güvenli ödeme sayfasında 3D Secure ile alınır; kart bilgileriniz bize ulaşmaz.",
   "res.cancellation": "İptal koşulları",
   "res.portal":
     "Belgeleriniz, ödemeleriniz ve değişiklik / iptal talepleriniz için hesabınıza giriş yapın.",

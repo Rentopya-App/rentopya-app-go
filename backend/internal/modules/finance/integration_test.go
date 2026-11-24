@@ -574,7 +574,7 @@ func TestWebhookPostingIsIdempotent(t *testing.T) {
 	for _, tk := range f.fake.Tokens() {
 		before[tk] = true
 	}
-	if _, err := f.pay.StartCheckout(context.Background(), token, "10.0.0.7", "tr"); err != nil {
+	if _, err := f.pay.StartCheckout(context.Background(), token, "10.0.0.7", "tr", ""); err != nil {
 		t.Fatal(err)
 	}
 	fakeToken := ""

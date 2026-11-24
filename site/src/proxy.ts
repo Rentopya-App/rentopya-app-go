@@ -229,7 +229,11 @@ export async function proxy(request: NextRequest) {
   )) {
     response.headers.set(k, v);
   }
-  if (request.nextUrl.searchParams.has("s")) {
+  // Sealed state and payment tokens never leave in a Referer or a cache.
+  if (
+    request.nextUrl.searchParams.has("s") ||
+    request.nextUrl.searchParams.has("payment")
+  ) {
     response.headers.set("Referrer-Policy", "no-referrer");
     response.headers.set("Cache-Control", "private, no-store");
   }
