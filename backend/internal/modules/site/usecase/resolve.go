@@ -207,6 +207,12 @@ func (s *Service) Asset(ctx context.Context, site uuid.UUID, kind, previewToken 
 	if err != nil {
 		return nil, "", err
 	}
+	// The same gates as Resolve (TEC-1289): a suspended organization, one
+	// outside its access window or without the site in its plan serves no
+	// images either.
+	if err := s.orgServesSite(ctx, row.OrganizationID, row.OrganizationStatus, row.AccessStartsAt, row.AccessEndsAt); err != nil {
+		return nil, "", err
+	}
 	logo, favicon, cover := row.PublishedLogoObjectKey, row.PublishedFaviconObjectKey, row.PublishedCoverObjectKey
 	switch {
 	case previewToken != "":
@@ -276,4 +282,15 @@ func (s *Service) LiveOrigin(ctx context.Context, orgID int64, origin string) (b
 		return false, err
 	}
 	return true, nil
+}
+
+// orgServesSite is the organization gate of every anonymous site read:
+// active, inside its access window and with the site in its plan, else
+// ErrNotFound (the same answer as an unknown site).
+func (s *Service) orgServesSite(ctx context.Context, orgID int64, status string, starts, ends pgtype.Timestamptz) error {
+	now := s.now()
+	if status != orgctx.StatusActive || (starts.Valid && now.Before(starts.Time)) || (ends.Valid && !now.Before(ends.Time)) {
+		return ErrNotFound
+	}
+	return s.siteInPlan(ctx, orgID)
 }

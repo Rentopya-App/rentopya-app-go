@@ -117,7 +117,9 @@ func (h *Handler) PublicMedia(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	if preview == "" {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		// Short and revalidated, not immutable: a suspended organization or
+		// a withdrawn image must stop being served within the hour (TEC-1289).
+		w.Header().Set("Cache-Control", SiteImageCacheControl)
 	} else {
 		w.Header().Set("Cache-Control", "private, no-store")
 	}
