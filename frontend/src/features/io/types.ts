@@ -81,6 +81,8 @@ export type AppSettings = {
   website: string;
   footer_text: string;
   paper_size: string;
+  public_reservations_per_hour: number;
+  public_leads_per_hour: number;
   logo_url?: string | null;
 };
 

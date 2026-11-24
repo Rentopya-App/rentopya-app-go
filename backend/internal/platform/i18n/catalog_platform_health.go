@@ -16,6 +16,11 @@ var trPlatformHealth = map[string]string{
 	"platform_health.failure_status.dead":               "yeniden denemeler tükendi",
 	"platform_health.failure_status.failed":             "başarısız",
 	"platform_health.failure_status.needs_verification": "doğrulama bekliyor",
+	"platform_health.source.public_cap":                 "Public kanal tavanı",
+	"platform_health.public_cap.reservations":           "rezervasyon",
+	"platform_health.public_cap.leads":                  "form başvurusu",
+	"platform_health.cap_alert.title":                   "Saatlik {cap} tavanı doldu: {organization}",
+	"platform_health.cap_alert.body":                    "{organization} firmasının sitesi ve public API'si son bir saatte {limit} {cap} sınırına ulaştı; yeni istekler 429 ile reddediliyor. Gerçek bir kampanya ise tavanı platform ayarlarından yükseltin, değilse bot saldırısı olabilir. Aynı firma için 15 dakika içinde yeni uyarı gönderilmez.",
 }
 
 var enPlatformHealth = map[string]string{
@@ -29,6 +34,11 @@ var enPlatformHealth = map[string]string{
 	"platform_health.failure_status.dead":               "retries exhausted",
 	"platform_health.failure_status.failed":             "failed",
 	"platform_health.failure_status.needs_verification": "needs verification",
+	"platform_health.source.public_cap":                 "Public channel cap",
+	"platform_health.public_cap.reservations":           "reservation",
+	"platform_health.public_cap.leads":                  "form submission",
+	"platform_health.cap_alert.title":                   "Hourly {cap} cap reached: {organization}",
+	"platform_health.cap_alert.body":                    "The site and public API of {organization} reached the limit of {limit} per hour ({cap}); new requests are refused with 429. If this is a real campaign, raise the cap in platform settings; otherwise it may be a bot attack. No new alert is sent for the same organization within 15 minutes.",
 }
 
 func init() {

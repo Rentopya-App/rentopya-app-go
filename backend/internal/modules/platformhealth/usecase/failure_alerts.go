@@ -29,6 +29,10 @@ const (
 	FailureSourceQueue           = "queue"
 	FailureSourceIntegrationJobs = "integration_jobs"
 	FailureStatusDead            = "dead"
+	// An organization reached a platform cap on anonymous public writes
+	// (TEC-1282): kind is "<cap>:<organization slug>".
+	FailureSourcePublicCap  = "public_cap"
+	FailureStatusCapReached = "cap_reached"
 )
 
 // DefaultFailureAlertWindow is the dedupe window per job kind.
@@ -190,6 +194,12 @@ func (s *Service) IntegrationJobChanged(ctx context.Context, orgID int64, job jo
 // FailureText renders the alert title and body in loc.
 func FailureText(loc i18n.Locale, f Failure) (string, string) {
 	tl := func(key string) string { return i18n.Translate(loc, key) }
+	if f.Source == FailureSourcePublicCap {
+		cp, org, _ := strings.Cut(f.Kind, ":")
+		label := tl("platform_health.public_cap." + cp)
+		r := strings.NewReplacer("{cap}", label, "{organization}", org, "{limit}", f.Error)
+		return r.Replace(tl("platform_health.cap_alert.title")), r.Replace(tl("platform_health.cap_alert.body"))
+	}
 	status := tl("platform_health.failure_status." + f.Status)
 	if strings.HasPrefix(status, "platform_health.") {
 		status = f.Status
@@ -224,3 +234,16 @@ func trimText(s string, n int) string {
 }
 
 func utf8RuneStart(b byte) bool { return b&0xC0 != 0x80 }
+
+// PublicCapReached alerts the platform administrators once per organization
+// and cap per window that an organization reached its hourly cap on
+// anonymous public writes (cap: "reservations" or "leads").
+func (s *Service) PublicCapReached(ctx context.Context, orgID int64, orgSlug, cap string, limit int) {
+	f := Failure{
+		Source: FailureSourcePublicCap, Kind: cap + ":" + orgSlug, Status: FailureStatusCapReached,
+		Ref: orgSlug, OrganizationID: orgID, Error: strconv.Itoa(limit),
+	}
+	if _, err := s.AlertFailure(ctx, f); err != nil {
+		s.log.Warn("public_cap_alert_failed", "organization_id", orgID, "cap", cap, "error", err)
+	}
+}

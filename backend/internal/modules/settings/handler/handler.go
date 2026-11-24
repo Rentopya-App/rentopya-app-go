@@ -37,6 +37,10 @@ func (h *Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s, err := h.svc.Patch(r.Context(), in)
+	if errors.Is(err, settingsusecase.ErrInvalidCap) {
+		response.ValidationError(w, r, []response.Detail{{Code: "out_of_range", Message: err.Error()}})
+		return
+	}
 	if err != nil {
 		response.InternalErr(w, r, err, "failed to update settings")
 		return
