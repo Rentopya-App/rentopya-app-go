@@ -194,7 +194,8 @@ func (s *Service) siteReturn(ctx context.Context, orgID int64, token, raw string
 	if err != nil || u.User != nil || u.Fragment != "" || u.RawPath != "" || u.Path != "/payment/"+token+"/return" {
 		return false, nil
 	}
-	if u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || strings.HasSuffix(u.Hostname(), ".localhost"))) {
+	local := u.Hostname() == "localhost" || strings.HasSuffix(u.Hostname(), ".localhost")
+	if u.Scheme != "https" && (u.Scheme != "http" || !local) {
 		return false, nil
 	}
 	q, err := url.ParseQuery(u.RawQuery)
