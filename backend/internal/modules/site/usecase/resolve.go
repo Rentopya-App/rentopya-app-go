@@ -277,3 +277,37 @@ func (s *Service) LiveOrigin(ctx context.Context, orgID int64, origin string) (b
 	}
 	return true, nil
 }
+
+// LiveSite is the live branded site of an organization: its origin
+// (a serving custom domain when there is one, else the subdomain) and the
+// site's default language, or ok=false when the organization has no live
+// site (never saved, off, unpublished, outside the plan, organization not
+// active). The customer portal sends its visitors there (TEC-1284).
+func (s *Service) LiveSite(ctx context.Context, orgID int64) (origin, locale string, ok bool, err error) {
+	row, err := s.q.GetSiteSettings(ctx, orgID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	hosts, err := s.siteHosts(ctx, orgID, row.Subdomain)
+	if err != nil {
+		return "", "", false, err
+	}
+	origin = hosts[0].Origin
+	for _, h := range hosts[1:] {
+		if s.domains == nil {
+			break
+		}
+		if id, err := s.domains.Lookup(ctx, h.Host); err == nil && id == orgID {
+			origin = h.Origin
+			break
+		}
+	}
+	live, err := s.LiveOrigin(ctx, orgID, origin)
+	if err != nil || !live {
+		return "", "", false, err
+	}
+	return origin, row.DefaultLocale, true, nil
+}

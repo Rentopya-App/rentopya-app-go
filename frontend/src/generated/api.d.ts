@@ -27479,6 +27479,13 @@ export interface components {
                 sms: boolean;
                 email: boolean;
             };
+            /** @description The organization's live branded site (TEC-1284): a serving custom domain, else the subdomain, and the site's default language. The customer area lives there, so the panel portal sends visitors to it. Null when the organization has no live site. */
+            site: null | {
+                /** Format: uri */
+                url: string;
+                /** @enum {string} */
+                locale: "tr" | "en";
+            };
         };
         CustomerPortalOrganization: {
             slug: string;

@@ -786,6 +786,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	siteSvc.SetLogger(log)
 	// A checkout started from the branded site returns to that site.
 	paymentsSvc.SetSiteOrigins(siteSvc)
+	// The panel's customer portal sends visitors to the live site (TEC-1284).
+	portalSvc.SetSites(siteSvc)
 	siteDomains, err := sitemodule.ConfigureDomains(deps.Queries, siteSvc, cfg.Site, deps.Queue.EnqueueSiteDomains)
 	if err != nil {
 		return nil, fmt.Errorf("httpserver: site domains: %w", err)
