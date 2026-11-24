@@ -30,10 +30,11 @@
 ## Yolcu360, Obilet, WhatsApp sessions) are per organization, sealed in the
 ## integration vault: never add env keys for them.
 
-@version 15
+@version 16
 
 ## v14 (TEC-1133): images are pulled from GHCR, never built on the server.
 ## v15: IMAGE_TAG defaults to latest (CI moves it after every green main push).
+## v16 (TEC-1288): SITE_DOMAIN_ASK_SECRET, the TLS ask hook's own secret.
 @remove BACKEND_IMAGE 14
 @remove FRONTEND_IMAGE 14
 @remove SITE_IMAGE 14
@@ -85,6 +86,7 @@ APP_ENCRYPTION_KEY | secret:b64:32
 SITE_EMBED_SECRET | secret:hex:32
 CENTRIFUGO_API_KEY | secret:hex:24
 CENTRIFUGO_TOKEN_HMAC_SECRET | secret:hex:32
+SITE_DOMAIN_ASK_SECRET | secret:hex:32
 
 # --- Web Push ---
 VAPID_PUBLIC_KEY | vapid:public

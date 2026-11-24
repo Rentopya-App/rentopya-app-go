@@ -75,6 +75,9 @@ type SiteConfig struct {
 	DokploySiteService string
 	DokploySitePort    int
 	AppNetworkName     string
+	// DomainAskSecret authorizes GET /v1/internal/site/domain-allowed (a TLS
+	// "ask" hook); its own secret, never AUTH_ADAPTER_SECRET (TEC-1288).
+	DomainAskSecret string
 }
 
 // WhatsAppConfig locates the wuzapi WhatsApp gateway (TEC-735). It runs on
@@ -465,6 +468,7 @@ func Load() (Config, error) {
 			DomainTargetHost:   getEnv("SITE_DOMAIN_TARGET_HOST", ""),
 			DomainTargetIPs:    getEnv("SITE_DOMAIN_TARGET_IPS", ""),
 			DomainProvisioner:  getEnv("SITE_DOMAIN_PROVISIONER", "manual"),
+			DomainAskSecret:    getEnv("SITE_DOMAIN_ASK_SECRET", ""),
 			DomainTraefikDir:   getEnv("SITE_DOMAIN_TRAEFIK_DIR", ""),
 			DokployURL:         getEnv("DOKPLOY_URL", ""),
 			DokployAPIKey:      getEnv("DOKPLOY_API_KEY", ""),

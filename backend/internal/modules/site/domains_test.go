@@ -334,12 +334,20 @@ func TestInternalDomainAllowed(t *testing.T) {
 		row.Status = tc.status
 		m.rows[row.Uuid] = row
 		req := httptest.NewRequest(http.MethodGet, "/v1/internal/site/domain-allowed?host="+row.Host, nil).WithContext(ctx)
-		req.Header.Set("X-Auth-Adapter-Key", tc.secret)
+		req.Header.Set(handler.DomainAskHeader, tc.secret)
 		w := httptest.NewRecorder()
 		mux.ServeHTTP(w, req)
 		if w.Code != tc.want {
 			t.Fatalf("%+v: %d %s", tc, w.Code, w.Body.String())
 		}
+	}
+	// The auth adapter's header is not a credential here (TEC-1288).
+	req := httptest.NewRequest(http.MethodGet, "/v1/internal/site/domain-allowed?host="+row.Host, nil).WithContext(ctx)
+	req.Header.Set("X-Auth-Adapter-Key", "shared-key")
+	adapter := httptest.NewRecorder()
+	mux.ServeHTTP(adapter, req)
+	if adapter.Code != http.StatusUnauthorized {
+		t.Fatalf("adapter header accepted: %d", adapter.Code)
 	}
 	h.SetDomains(d, "")
 	w := httptest.NewRecorder()

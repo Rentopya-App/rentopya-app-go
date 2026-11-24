@@ -45,6 +45,7 @@ const (
 	defaultJWTAccessSecret     = "app-dev-access-secret-change-me-32b"
 	defaultJWTRefreshSecret    = "app-dev-refresh-secret-change-me-32b"
 	defaultAdapterSecret       = "app-dev-auth-adapter-secret-change-me"
+	defaultDomainAskSecret     = "app-dev-site-domain-ask-secret-change-me"
 	defaultEncryptionKey       = "app-dev-encryption-key-32bytes!!"
 	defaultCentrifugoAPIKey    = "app-centrifugo-api-key-change-me"
 	defaultCentrifugoTokenHMAC = "app-centrifugo-token-hmac-change-me"
@@ -62,6 +63,9 @@ type managedSecret struct {
 	Defaults []string
 	// Applies limits the check to configs that use the secret (nil = always).
 	Applies func(Config) bool
+	// Optional: empty is allowed (the feature stays closed); a development
+	// value is still refused.
+	Optional bool
 }
 
 var managedSecrets = []managedSecret{
@@ -79,6 +83,12 @@ var managedSecrets = []managedSecret{
 	{Key: "JWT_ACCESS_SECRET", Value: func(c Config) string { return c.JWT.AccessSecret }, Defaults: []string{defaultJWTAccessSecret}},
 	{Key: "JWT_REFRESH_SECRET", Value: func(c Config) string { return c.JWT.RefreshSecret }, Defaults: []string{defaultJWTRefreshSecret}},
 	{Key: "AUTH_ADAPTER_SECRET", Value: func(c Config) string { return c.Auth.AdapterSecret }, Defaults: []string{defaultAdapterSecret}},
+	// Empty keeps the TLS ask hook closed (TEC-1288): installs older than
+	// schema 16 run without it.
+	{
+		Key: "SITE_DOMAIN_ASK_SECRET", Value: func(c Config) string { return c.Site.DomainAskSecret },
+		Defaults: []string{defaultDomainAskSecret}, Optional: true,
+	},
 	// Seals integration credentials, OAuth secrets and personal data at rest:
 	// a public key would expose all of them.
 	{Key: "APP_ENCRYPTION_KEY", Value: func(c Config) string { return c.Encryption.Key }, Defaults: []string{defaultEncryptionKey}},
@@ -127,6 +137,7 @@ func (c Config) secretGuard() error {
 		}
 		v := s.Value(c)
 		switch {
+		case v == "" && s.Optional:
 		case v == "":
 			problems = append(problems, s.Key+" is required")
 		case contains(s.Defaults, v):
