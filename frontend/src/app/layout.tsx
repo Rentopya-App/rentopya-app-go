@@ -5,6 +5,7 @@ import Script from "next/script";
 import { brand } from "@/config/brand";
 import {
   ISSUE_WIDGET_ENVIRONMENT,
+  ISSUE_WIDGET_GUARD,
   ISSUE_WIDGET_RELEASE,
   ISSUE_WIDGET_SRC,
 } from "@/lib/issue-widget";
@@ -49,6 +50,10 @@ export default function RootLayout({
             rest when one fails: a blocked widget must not drop the Sentry
             config. Sentry's instrumentation-client wraps console / fetch /
             XHR earlier; the widget wraps on top and both pass calls through. */}
+        {/* Customer pages never run the widget (see ISSUE_WIDGET_GUARD). */}
+        <Script id="issue-widget-guard" strategy="beforeInteractive">
+          {ISSUE_WIDGET_GUARD}
+        </Script>
         <Script
           src={ISSUE_WIDGET_SRC}
           strategy="beforeInteractive"

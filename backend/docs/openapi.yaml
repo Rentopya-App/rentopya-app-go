@@ -38022,7 +38022,7 @@ components:
 
     CustomerPortalInfo:
       type: object
-      required: [organization, channels]
+      required: [organization, channels, site]
       properties:
         organization: { $ref: "#/components/schemas/CustomerPortalOrganization" }
         channels:
@@ -38031,6 +38031,18 @@ components:
           properties:
             sms: { type: boolean }
             email: { type: boolean }
+        site:
+          description: >-
+            The organization's live branded site (TEC-1284): a serving custom domain, else the subdomain, and the
+            site's default language. The customer area lives there, so the panel portal sends visitors to it. Null when
+            the organization has no live site.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [url, locale]
+              properties:
+                url: { type: string, format: uri }
+                locale: { type: string, enum: [tr, en] }
 
     CustomerPortalOrganization:
       type: object
