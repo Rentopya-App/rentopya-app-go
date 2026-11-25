@@ -2,8 +2,10 @@ package ratelimit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -28,10 +30,14 @@ const (
 	forgotEmailLimit = 10
 )
 
-// Limiter is a Redis INCR + TTL rate limiter. Redis errors fail open.
+// Limiter is a Redis INCR + TTL rate limiter. Without Redis (nil client:
+// development and tests) everything is allowed. When Redis fails, the
+// windows continue in process memory (TEC-1289): limits then hold per
+// process instead of disappearing while Redis is down.
 type Limiter struct {
 	rdb *redis.Client
 	env string
+	mem *memoryWindows
 }
 
 // New creates a limiter. rdb may be nil (all requests allowed).
@@ -40,7 +46,7 @@ func New(rdb *redis.Client, appEnv string) *Limiter {
 	if env == "" {
 		env = "dev"
 	}
-	return &Limiter{rdb: rdb, env: env}
+	return &Limiter{rdb: rdb, env: env, mem: newMemoryWindows(memoryMaxKeys)}
 }
 
 // AllowLogin limits password login attempts per IP + email.
@@ -124,9 +130,15 @@ func (l *Limiter) under(ctx context.Context, action, subject string, limit int) 
 	if l == nil || l.rdb == nil || strings.TrimSpace(subject) == "" {
 		return true, 0
 	}
-	key := fmt.Sprintf("app:%s:rl:%s:%s", l.env, action, subject)
+	key := l.key(action, subject)
 	n, err := l.rdb.Get(ctx, key).Int64()
-	if err != nil || n < int64(limit) {
+	if errors.Is(err, redis.Nil) {
+		return true, 0
+	}
+	if err != nil {
+		return l.mem.under(key, limit, time.Now())
+	}
+	if n < int64(limit) {
 		return true, 0
 	}
 	ttl, ttlErr := l.rdb.TTL(ctx, key).Result()
@@ -140,10 +152,10 @@ func (l *Limiter) allowWindow(ctx context.Context, action, subject string, limit
 	if l == nil || l.rdb == nil || strings.TrimSpace(subject) == "" || strings.TrimSpace(subject) == "|" {
 		return true, 0
 	}
-	key := fmt.Sprintf("app:%s:rl:%s:%s", l.env, action, subject)
+	key := l.key(action, subject)
 	n, err := l.rdb.Incr(ctx, key).Result()
 	if err != nil {
-		return true, 0
+		return l.mem.allow(key, limit, window, time.Now())
 	}
 	if n == 1 {
 		_ = l.rdb.Expire(ctx, key, window).Err()
@@ -156,4 +168,30 @@ func (l *Limiter) allowWindow(ctx context.Context, action, subject string, limit
 		return false, ttl
 	}
 	return true, 0
+}
+
+func (l *Limiter) key(action, subject string) string {
+	return fmt.Sprintf("app:%s:rl:%s:%s", l.env, action, SubjectKey(subject))
+}
+
+// SubjectKey is the bucket of a limit subject. IPv6 addresses (alone or as
+// a part of an "ip|email" subject) count per /64 prefix: one subscriber
+// usually holds a whole /64, so a per-address window would let one client
+// rotate through 2^64 addresses (TEC-1289). IPv4 stays per address.
+func SubjectKey(subject string) string {
+	if !strings.Contains(subject, ":") {
+		return subject
+	}
+	parts := strings.Split(subject, "|")
+	for i, p := range parts {
+		addr, err := netip.ParseAddr(strings.TrimSpace(p))
+		if err != nil || !addr.Is6() || addr.Is4In6() {
+			continue
+		}
+		prefix, err := addr.Prefix(64)
+		if err == nil {
+			parts[i] = prefix.String()
+		}
+	}
+	return strings.Join(parts, "|")
 }

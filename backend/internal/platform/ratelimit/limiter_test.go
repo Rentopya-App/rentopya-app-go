@@ -129,3 +129,57 @@ func TestForgotPasswordLimitPerEmail(t *testing.T) {
 		t.Fatal("expected the per-email forgot limit")
 	}
 }
+
+// TEC-1289: IPv6 clients count per /64; IPv4 per address.
+func TestSubjectKeyIPv6Prefix(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"2001:db8:1:2:3:4:5:6":                 "2001:db8:1:2::/64",
+		"2001:db8:1:2:ffff::1|a@example.com":   "2001:db8:1:2::/64|a@example.com",
+		"198.51.100.7":                         "198.51.100.7",
+		"198.51.100.7|a@example.com":           "198.51.100.7|a@example.com",
+		"::ffff:198.51.100.7":                  "::ffff:198.51.100.7",
+		"key:session":                          "key:session",
+		"7b1e7c2e-0000-4000-8000-000000000001": "7b1e7c2e-0000-4000-8000-000000000001",
+	}
+	for in, want := range cases {
+		if got := ratelimit.SubjectKey(in); got != want {
+			t.Errorf("SubjectKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+	mr := miniredis.RunT(t)
+	lim := ratelimit.New(redis.NewClient(&redis.Options{Addr: mr.Addr()}), "test")
+	ctx := context.Background()
+	for i := range 3 {
+		ip := fmt.Sprintf("2001:db8:1:2::%x", i+1)
+		if ok, _ := lim.Allow(ctx, "v6", ip, 3, time.Minute); !ok {
+			t.Fatalf("hit %d refused", i+1)
+		}
+	}
+	if ok, _ := lim.Allow(ctx, "v6", "2001:db8:1:2::99", 3, time.Minute); ok {
+		t.Fatal("a new address in the same /64 escaped the limit")
+	}
+	if ok, _ := lim.Allow(ctx, "v6", "2001:db8:1:3::1", 3, time.Minute); !ok {
+		t.Fatal("another /64 was limited")
+	}
+}
+
+// TEC-1289: while Redis fails, limits hold in process memory.
+func TestRedisDownFallsBackToMemory(t *testing.T) {
+	t.Parallel()
+	mr := miniredis.RunT(t)
+	lim := ratelimit.New(redis.NewClient(&redis.Options{Addr: mr.Addr(), MaxRetries: -1}), "test")
+	ctx := context.Background()
+	mr.Close()
+	for i := range 2 {
+		if ok, _ := lim.Allow(ctx, "down", "u1", 2, time.Minute); !ok {
+			t.Fatalf("hit %d refused", i+1)
+		}
+	}
+	if ok, retry := lim.Allow(ctx, "down", "u1", 2, time.Minute); ok || retry <= 0 {
+		t.Fatalf("limit lost while Redis is down: ok=%v retry=%v", ok, retry)
+	}
+	if ok, _ := lim.Allow(ctx, "down", "u2", 2, time.Minute); !ok {
+		t.Fatal("another subject was limited")
+	}
+}
