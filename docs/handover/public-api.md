@@ -23,6 +23,8 @@ Organizasyon her zaman kimlik bilgisinden çıkar; URL ya da gövdeden alınmaz.
 | `X-Reservation-Token` | Rezervasyon okuma | `GET /v1/public/reservations/{reference}` için; gizli anahtar kendi yaptığı rezervasyonda gerekmez. Uyuşmazlık 404 |
 | `Idempotency-Key` | Her yazma | Zorunlu (`IDEMPOTENCY_KEY_REQUIRED`); 24 saat saklanır (`public_api_idempotency`). Aynı anahtar + farklı gövde `IDEMPOTENCY_KEY_REUSED`, işlemdeyken `IDEMPOTENCY_IN_PROGRESS` |
 
+**Origin bağlama neyi korur (TEC-1289).** Yayımlanabilir anahtar + oturum yalnızca **tarayıcıları** sınırlar: tarayıcı `Origin` başlığını kendisi yazar, başka bir sitedeki script bu anahtarla oturum açamaz. Tarayıcı dışı bir istemci `Origin`'i istediği gibi gönderebilir. Bu yüzden yayımlanabilir anahtar gizli sayılmaz; onu kötüye kullanmaya karşı koruma origin değil, IP / oturum / firma başına limitlerdir (aşağıda). Markalı sitenin sunucusu (BFF) API'yi ziyaretçi IP'siyle (`X-Forwarded-For`) çağırır. İleride bu BFF'nin bir iç anahtarla kimliğini doğrulaması, site trafiğini doğrudan API çağrılarından ayırmayı sağlar; bugün buna gerek görülmedi.
+
 Her çağrıda: firma aktif ve erişim penceresinde (`ORGANIZATION_UNAVAILABLE`), anahtarın satış kanalı firma ayarlarında açık (`CHANNEL_DISABLED`), rota kapsamı (`INSUFFICIENT_SCOPE`). Kapsamlar: `catalog.read`, `quotes.write`, `reservations.write`, `reservations.read` (yeni anahtar hepsini alır). Anahtar döndürme: eski anahtar varsayılan 24 saat (0–168) çalışır; iptal anında.
 
 ## Uç noktalar

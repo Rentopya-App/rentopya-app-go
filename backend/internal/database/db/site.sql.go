@@ -17,9 +17,10 @@ SELECT s.organization_id, s.enabled, s.published_revision,
     s.logo_object_key, s.favicon_object_key, s.cover_object_key,
     v.logo_object_key AS published_logo_object_key, v.favicon_object_key AS published_favicon_object_key,
     v.cover_object_key AS published_cover_object_key,
-    o.uuid AS organization_uuid, o.logo_object_key AS organization_logo_object_key
+    o.uuid AS organization_uuid, o.logo_object_key AS organization_logo_object_key,
+    o.status AS organization_status, o.access_starts_at, o.access_ends_at
 FROM site_settings s
-JOIN organizations o ON o.id = s.organization_id
+JOIN organizations o ON o.id = s.organization_id AND o.deleted_at IS NULL
 LEFT JOIN site_setting_versions v ON v.organization_id = s.organization_id AND v.revision = s.published_revision
 WHERE s.uuid = $1
   AND s.organization_id = o.id
@@ -27,17 +28,20 @@ WHERE s.uuid = $1
 `
 
 type GetSiteAssetKeysRow struct {
-	OrganizationID            int64       `json:"organization_id"`
-	Enabled                   bool        `json:"enabled"`
-	PublishedRevision         pgtype.Int4 `json:"published_revision"`
-	LogoObjectKey             pgtype.Text `json:"logo_object_key"`
-	FaviconObjectKey          pgtype.Text `json:"favicon_object_key"`
-	CoverObjectKey            pgtype.Text `json:"cover_object_key"`
-	PublishedLogoObjectKey    pgtype.Text `json:"published_logo_object_key"`
-	PublishedFaviconObjectKey pgtype.Text `json:"published_favicon_object_key"`
-	PublishedCoverObjectKey   pgtype.Text `json:"published_cover_object_key"`
-	OrganizationUuid          uuid.UUID   `json:"organization_uuid"`
-	OrganizationLogoObjectKey pgtype.Text `json:"organization_logo_object_key"`
+	OrganizationID            int64              `json:"organization_id"`
+	Enabled                   bool               `json:"enabled"`
+	PublishedRevision         pgtype.Int4        `json:"published_revision"`
+	LogoObjectKey             pgtype.Text        `json:"logo_object_key"`
+	FaviconObjectKey          pgtype.Text        `json:"favicon_object_key"`
+	CoverObjectKey            pgtype.Text        `json:"cover_object_key"`
+	PublishedLogoObjectKey    pgtype.Text        `json:"published_logo_object_key"`
+	PublishedFaviconObjectKey pgtype.Text        `json:"published_favicon_object_key"`
+	PublishedCoverObjectKey   pgtype.Text        `json:"published_cover_object_key"`
+	OrganizationUuid          uuid.UUID          `json:"organization_uuid"`
+	OrganizationLogoObjectKey pgtype.Text        `json:"organization_logo_object_key"`
+	OrganizationStatus        string             `json:"organization_status"`
+	AccessStartsAt            pgtype.Timestamptz `json:"access_starts_at"`
+	AccessEndsAt              pgtype.Timestamptz `json:"access_ends_at"`
 }
 
 // The image keys of a site by its public uuid (asset stream): the draft
@@ -57,6 +61,9 @@ func (q *Queries) GetSiteAssetKeys(ctx context.Context, argUuid uuid.UUID) (GetS
 		&i.PublishedCoverObjectKey,
 		&i.OrganizationUuid,
 		&i.OrganizationLogoObjectKey,
+		&i.OrganizationStatus,
+		&i.AccessStartsAt,
+		&i.AccessEndsAt,
 	)
 	return i, err
 }

@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/site/handler"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/site/model"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/site/usecase"
 	"github.com/google/uuid"
@@ -203,7 +204,7 @@ func TestSiteMediaPublicHTTP(t *testing.T) {
 	response, err = http.Get(e.server.URL + resolved.Media[a.UUID.String()])
 	e.must(err)
 	_ = response.Body.Close()
-	if response.StatusCode != 200 || !strings.Contains(response.Header.Get("Cache-Control"), "immutable") {
+	if response.StatusCode != 200 || response.Header.Get("Cache-Control") != handler.SiteImageCacheControl {
 		t.Fatal(response.Status, response.Header)
 	}
 	response, err = http.Get(e.server.URL + resolved.Media[a.UUID.String()] + "?preview=bad")
@@ -220,6 +221,15 @@ func TestSiteMediaPublicHTTP(t *testing.T) {
 	_ = response.Body.Close()
 	if response.StatusCode != 404 {
 		t.Fatal(response.Status)
+	}
+	// The site's images follow the same gate (TEC-1289).
+	if resolved.Assets.Logo != nil {
+		response, err = http.Get(e.server.URL + *resolved.Assets.Logo)
+		e.must(err)
+		_ = response.Body.Close()
+		if response.StatusCode != 404 {
+			t.Fatal("suspended organization serves its site logo:", response.Status)
+		}
 	}
 }
 

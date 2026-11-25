@@ -233,9 +233,10 @@ SELECT s.organization_id, s.enabled, s.published_revision,
     s.logo_object_key, s.favicon_object_key, s.cover_object_key,
     v.logo_object_key AS published_logo_object_key, v.favicon_object_key AS published_favicon_object_key,
     v.cover_object_key AS published_cover_object_key,
-    o.uuid AS organization_uuid, o.logo_object_key AS organization_logo_object_key
+    o.uuid AS organization_uuid, o.logo_object_key AS organization_logo_object_key,
+    o.status AS organization_status, o.access_starts_at, o.access_ends_at
 FROM site_settings s
-JOIN organizations o ON o.id = s.organization_id
+JOIN organizations o ON o.id = s.organization_id AND o.deleted_at IS NULL
 LEFT JOIN site_setting_versions v ON v.organization_id = s.organization_id AND v.revision = s.published_revision
 WHERE s.uuid = sqlc.arg(uuid)
   AND s.organization_id = o.id

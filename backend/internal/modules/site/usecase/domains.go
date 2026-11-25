@@ -324,6 +324,7 @@ func (d *Domains) Lookup(ctx context.Context, host string) (int64, error) {
 	}
 	return id, err
 }
+
 // ServingHosts lists the custom domains that actually serve the site:
 // verified and with a certificate proven by the TLS check (tls_status
 // active). Links we send customers to use only these (TEC-1284).
