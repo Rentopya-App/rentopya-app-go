@@ -277,3 +277,38 @@ func (s *Service) LiveOrigin(ctx context.Context, orgID int64, origin string) (b
 	}
 	return true, nil
 }
+
+// LiveSite is the live branded site of an organization: its origin
+// (a serving custom domain when there is one, else the subdomain) and the
+// site's default language, or ok=false when the organization has no live
+// site (never saved, off, unpublished, outside the plan, organization not
+// active). The customer portal sends its visitors there (TEC-1284).
+func (s *Service) LiveSite(ctx context.Context, orgID int64) (origin, locale string, ok bool, err error) {
+	row, err := s.q.GetSiteSettings(ctx, orgID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	// A custom domain only once its certificate is proven (a verified
+	// domain with a broken certificate would send customers to a TLS
+	// error); else the subdomain.
+	origin = s.base.Origin(row.Subdomain)
+	if serving, ok := s.domains.(interface {
+		ServingHosts(ctx context.Context, orgID int64) ([]model.Host, error)
+	}); ok {
+		hosts, err := serving.ServingHosts(ctx, orgID)
+		if err != nil {
+			return "", "", false, err
+		}
+		if len(hosts) > 0 {
+			origin = hosts[0].Origin
+		}
+	}
+	live, err := s.LiveOrigin(ctx, orgID, origin)
+	if err != nil || !live {
+		return "", "", false, err
+	}
+	return origin, row.DefaultLocale, true, nil
+}

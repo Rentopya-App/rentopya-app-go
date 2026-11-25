@@ -164,8 +164,18 @@ type Service struct {
 	events       resourceevents.Publisher
 	log          *slog.Logger
 	limits       Limits
+	sites        Sites
 	now          func() time.Time
 }
+
+// Sites finds an organization's live branded site (the site module).
+type Sites interface {
+	LiveSite(ctx context.Context, orgID int64) (origin, locale string, ok bool, err error)
+}
+
+// SetSites lets the portal send its visitors to the organization's live
+// branded site, where the customer area lives (TEC-1284).
+func (s *Service) SetSites(sites Sites) { s.sites = sites }
 
 // New builds the service. payments / accounts / documents may be nil (the
 // matching views and actions are then unavailable).
@@ -264,6 +274,15 @@ type PortalInfo struct {
 		SMS   bool `json:"sms"`
 		Email bool `json:"email"`
 	} `json:"channels"`
+	// Site is the organization's live branded site, or null: the panel
+	// portal then sends visitors to the customer area there.
+	Site *PortalSite `json:"site"`
+}
+
+// PortalSite is the origin and default language of a live branded site.
+type PortalSite struct {
+	URL    string `json:"url"`
+	Locale string `json:"locale"`
 }
 
 // Info answers GET /v1/customer/{orgSlug}: the organization name and the
@@ -276,6 +295,14 @@ func (s *Service) Info(ctx context.Context, slug string) (PortalInfo, error) {
 	out := PortalInfo{Organization: model.Organization{Slug: org.Slug, Name: org.Name}}
 	out.Channels.SMS = s.otp.HasActiveAccount(ctx, org.ID)
 	out.Channels.Email = s.otp.EmailAvailable()
+	if s.sites != nil {
+		origin, locale, ok, err := s.sites.LiveSite(ctx, org.ID)
+		if err != nil {
+			s.log.Warn("portal_site_lookup_failed", "organization_id", org.ID, "error", err)
+		} else if ok {
+			out.Site = &PortalSite{URL: origin, Locale: locale}
+		}
+	}
 	return out, nil
 }
 

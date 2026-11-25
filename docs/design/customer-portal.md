@@ -27,6 +27,7 @@ Code:
 ## 2. URL and organization
 
 - Portal pages are at **`/r/{orgSlug}`** (sign-in, the customer's reservations) and `/r/{orgSlug}/reservations/{uuid}`. `/r` collides with no app route: the panel uses `/t`, `/platform`, the public pages `/pay`, `/d` and `/invite`, and NextAuth's proxy matcher does not cover `/r`. The pages build every link from the slug, so the M5 branded site can serve them under its own domain with a rewrite (`/` → `/r/{slug}`, `/reservations/*` → `/r/{slug}/reservations/*`). The pages need nothing from the staff shell.
+- **Organizations with a live branded site (TEC-1284).** The customer area lives on the site (`/hesabim`, `/account`). `GET /v1/customer/{orgSlug}` returns `site: {url, locale}` (a serving custom domain, else the subdomain; null without a live site), and the panel pages `/r/{orgSlug}` and `/r/{orgSlug}/reservations/{uuid}` redirect server-side to `{url}/hesabim[/{uuid}]` (or `/account` for an English site). Old SMS and e-mail links therefore land on the branded site; the panel portal remains for organizations without one.
 - The API is at **`/v1/customer/{orgSlug}/*`**. The organization always comes from the URL. Unknown, deleted or suspended organizations, and organizations outside their access window, answer 404.
 
 ## 3. Sign-in
