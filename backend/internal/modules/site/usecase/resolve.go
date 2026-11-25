@@ -291,18 +291,19 @@ func (s *Service) LiveSite(ctx context.Context, orgID int64) (origin, locale str
 	if err != nil {
 		return "", "", false, err
 	}
-	hosts, err := s.siteHosts(ctx, orgID, row.Subdomain)
-	if err != nil {
-		return "", "", false, err
-	}
-	origin = hosts[0].Origin
-	for _, h := range hosts[1:] {
-		if s.domains == nil {
-			break
+	// A custom domain only once its certificate is proven (a verified
+	// domain with a broken certificate would send customers to a TLS
+	// error); else the subdomain.
+	origin = s.base.Origin(row.Subdomain)
+	if serving, ok := s.domains.(interface {
+		ServingHosts(ctx context.Context, orgID int64) ([]model.Host, error)
+	}); ok {
+		hosts, err := serving.ServingHosts(ctx, orgID)
+		if err != nil {
+			return "", "", false, err
 		}
-		if id, err := s.domains.Lookup(ctx, h.Host); err == nil && id == orgID {
-			origin = h.Origin
-			break
+		if len(hosts) > 0 {
+			origin = hosts[0].Origin
 		}
 	}
 	live, err := s.LiveOrigin(ctx, orgID, origin)

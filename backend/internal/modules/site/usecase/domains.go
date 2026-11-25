@@ -324,6 +324,23 @@ func (d *Domains) Lookup(ctx context.Context, host string) (int64, error) {
 	}
 	return id, err
 }
+// ServingHosts lists the custom domains that actually serve the site:
+// verified and with a certificate proven by the TLS check (tls_status
+// active). Links we send customers to use only these (TEC-1284).
+func (d *Domains) ServingHosts(ctx context.Context, orgID int64) ([]model.Host, error) {
+	rows, err := d.q.ListSiteDomains(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	out := []model.Host{}
+	for _, r := range rows {
+		if r.Status == "verified" && r.TlsStatus == "active" {
+			out = append(out, model.Host{Host: r.Host, Origin: "https://" + r.Host, Kind: model.HostCustom})
+		}
+	}
+	return out, nil
+}
+
 func (d *Domains) Hosts(ctx context.Context, orgID int64) ([]model.Host, error) {
 	rows, err := d.q.ListSiteDomains(ctx, orgID)
 	if err != nil {
