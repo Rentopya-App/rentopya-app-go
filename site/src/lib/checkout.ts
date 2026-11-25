@@ -17,10 +17,18 @@ export async function siteCheckout(
   to: string,
   embed?: string,
 ): Promise<string | null> {
+  const token = payLinkToken(linkUrl);
+  return token ? startCheckout(token, to, embed) : null;
+}
+
+/** The same for a known pay link token (the site's /payment/{token} page). */
+export async function startCheckout(
+  token: string,
+  to: string,
+  embed?: string,
+): Promise<string | null> {
   const { site, locale } = await getCtx();
   if (site.preview) return null;
-  const token = payLinkToken(linkUrl);
-  if (!token) return null;
   let back: string | null;
   try {
     back = returnURL({ origin: site.origin, token, to, embed });

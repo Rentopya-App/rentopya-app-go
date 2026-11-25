@@ -26696,7 +26696,7 @@ export interface components {
         PaymentLink: {
             /** Format: uuid */
             uuid: string;
-            /** @description Public page (/pay/{token}) on the app origin */
+            /** @description The address to send the customer: {live branded site}/payment/{token} when the organization has a live site (the customer stays on the firm's domain and returns there, TEC-1297), else /pay/{token} on the app origin */
             url: string;
             reservation: components["schemas"]["PaymentReservationRef"];
             /** @enum {string} */
@@ -26996,6 +26996,11 @@ export interface components {
         };
         PublicPayLink: {
             organization_name: string;
+            /**
+             * Format: uuid
+             * @description Lets the branded site check that a link belongs to its organization (TEC-1297).
+             */
+            organization_uuid: string;
             reference: string;
             product_title: string;
             /** Format: date-time */

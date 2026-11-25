@@ -184,7 +184,10 @@ const (
 // only the organization, the reservation reference, the dates, the amount
 // and where the payment stands (from verified records only).
 type PublicLink struct {
-	OrganizationName string      `json:"organization_name"`
+	OrganizationName string `json:"organization_name"`
+	// OrganizationUUID lets the branded site check that a link it shows
+	// belongs to its own organization.
+	OrganizationUUID uuid.UUID   `json:"organization_uuid"`
 	Reference        string      `json:"reference"`
 	ProductTitle     string      `json:"product_title"`
 	StartsAt         time.Time   `json:"starts_at"`

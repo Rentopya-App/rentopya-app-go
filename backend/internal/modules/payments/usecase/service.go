@@ -265,6 +265,29 @@ func newToken() (string, error) {
 // LinkURL is the public page of a link token.
 func (s *Service) LinkURL(token string) string { return s.baseURL + "/pay/" + token }
 
+// CustomerLinkURL is the address staff send a customer: the pay page on
+// the organization's live branded site ({site}/payment/{token}), so the
+// customer goes from the firm's own domain straight to the provider and
+// back; the platform's /pay/{token} only without a live site.
+func (s *Service) CustomerLinkURL(ctx context.Context, orgID int64, token string) string {
+	return s.customerLinkBase(ctx, orgID)(token)
+}
+
+// customerLinkBase resolves the site once (lists build many links).
+func (s *Service) customerLinkBase(ctx context.Context, orgID int64) func(string) string {
+	if live, ok := s.sites.(interface {
+		LiveSite(ctx context.Context, orgID int64) (origin, locale string, ok bool, err error)
+	}); ok {
+		origin, _, ok, err := live.LiveSite(ctx, orgID)
+		if err != nil {
+			s.log.Warn("pay_link_site_lookup_failed", "organization_id", orgID, "error", err)
+		} else if ok {
+			return func(token string) string { return origin + "/payment/" + token }
+		}
+	}
+	return s.LinkURL
+}
+
 func (s *Service) provider(code string) (payments.Provider, error) {
 	p, ok := s.providers[code]
 	if !ok {

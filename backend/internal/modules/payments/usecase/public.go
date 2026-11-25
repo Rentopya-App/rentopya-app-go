@@ -60,7 +60,7 @@ func (s *Service) PublicLink(ctx context.Context, token string, verify bool) (pa
 		}
 	}
 	out := paymodel.PublicLink{
-		OrganizationName: row.OrganizationName, Reference: row.ReservationReference, ProductTitle: row.ProductTitle,
+		OrganizationName: row.OrganizationName, OrganizationUUID: row.OrganizationUuid, Reference: row.ReservationReference, ProductTitle: row.ProductTitle,
 		StartsAt: row.ReservationStartsAt.Time.UTC(), EndsAt: row.ReservationEndsAt.Time.UTC(), Amount: m(row.Amount),
 		Currency: row.Currency, ExpiresAt: row.ExpiresAt.Time.UTC(),
 	}
