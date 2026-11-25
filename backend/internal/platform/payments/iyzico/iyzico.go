@@ -26,6 +26,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -361,6 +362,10 @@ func (a *Adapter) initialize(ctx context.Context, account integrations.Account, 
 }
 
 // Retrieve implements payments.Provider (Checkout Form result).
+// errNoPaymentForToken is iyzico's "Gönderilen tokena ait ödeme bilgisi
+// bulunamadı": the checkout form was never paid.
+const errNoPaymentForToken = "5122"
+
 func (a *Adapter) Retrieve(ctx context.Context, account integrations.Account, in payments.RetrieveRequest) (payments.Result, error) {
 	locale := in.Locale
 	if locale == "" {
@@ -369,6 +374,10 @@ func (a *Adapter) Retrieve(ctx context.Context, account integrations.Account, in
 	out, err := a.post(ctx, account, pathRetrieve, map[string]any{
 		"locale": locale, "conversationId": in.ConversationID, "token": in.Token,
 	})
+	var pe *payments.ProviderError
+	if errors.As(err, &pe) && pe.Code == errNoPaymentForToken {
+		return payments.Result{}, fmt.Errorf("%w: %w", payments.ErrCheckoutNotFound, err)
+	}
 	if err != nil {
 		return payments.Result{}, err
 	}

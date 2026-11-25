@@ -208,3 +208,25 @@ func TestRefundState(t *testing.T) {
 		t.Fatalf("provider down: %v", err)
 	}
 }
+
+// A checkout form never paid (iyzico 5122) is ErrCheckoutNotFound, so the
+// payments service can fail it once the hosted page has expired.
+func TestRetrieveAbandonedCheckout(t *testing.T) {
+	f, a, acc := setup(t)
+	ctx := context.Background()
+	conv := "6f1c2d3e-0000-4000-8000-000000000002"
+	co, err := a.CreateCheckout(ctx, acc, payments.CheckoutRequest{
+		ConversationID: conv, BasketID: conv, Amount: money.MustParse("100"), Currency: "TRY",
+		CallbackURL: "https://app.test/pay/x/callback", ItemID: "R2", ItemName: "Rezervasyon", ItemCategory: "Araç kiralama",
+		Buyer: payments.Buyer{ID: "c1", Name: "Ada", Surname: "Yılmaz", Email: "ada@example.test", IdentityNumber: "11111111111",
+			Address: "Adres", City: "Istanbul", Country: "Turkey", IP: "10.0.0.1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Abandon(co.Token)
+	_, err = a.Retrieve(ctx, acc, payments.RetrieveRequest{Token: co.Token, ConversationID: conv})
+	if !errors.Is(err, payments.ErrCheckoutNotFound) {
+		t.Fatalf("abandoned checkout: %v", err)
+	}
+}

@@ -332,10 +332,23 @@ func (s *Service) verify(ctx context.Context, orgID, paymentID int64, via string
 	rctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	res, err := prov.Retrieve(rctx, acc, payments.RetrieveRequest{Token: p.ProviderToken.String, ConversationID: p.ConversationID})
+	now := s.clock()
+	// A checkout the customer left: the provider has no payment for it and
+	// its hosted page has expired. It fails, so the link can be paid again
+	// instead of showing "verifying" forever.
+	if errors.Is(err, payments.ErrCheckoutNotFound) && p.CreatedAt.Valid && now.Sub(p.CreatedAt.Time) >= CheckoutAbandonAfter {
+		if _, ferr := s.q.FailPayment(ctx, db.FailPaymentParams{
+			OrganizationID: orgID, ID: p.ID, ProviderStatus: "", FailureReason: "checkout_abandoned",
+			VerifiedVia: via, VerifiedAt: ts(now),
+		}); ferr != nil {
+			return "", ferr
+		}
+		s.publishPayment(ctx, orgID, p)
+		return paymodel.StatusFailed, nil
+	}
 	if err != nil {
 		return p.Status, err
 	}
-	now := s.clock()
 	switch res.Status {
 	case payments.StatusPending:
 		return p.Status, nil
@@ -481,6 +494,10 @@ func (s *Service) reservationUUID(ctx context.Context, orgID, id int64) (uuid.UU
 	}
 	return r.Uuid, nil
 }
+
+// CheckoutAbandonAfter: a checkout without a provider payment this long
+// after it was opened is failed (iyzico's hosted page lives 30 minutes).
+const CheckoutAbandonAfter = time.Hour
 
 // ReconcilePending is the sweep (worker, every minute with the hold
 // expiry): checkouts pending for more than two minutes and less than two
