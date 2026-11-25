@@ -1182,8 +1182,15 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	siteLeadsSvc := siteleadsusecase.New(deps.Queries, cfg.Encryption.Key)
 	siteLeadsSvc.SetNotifier(notifyEngine)
 	siteleadsmodule.RegisterRoutes(mux, siteleadshandler.New(siteLeadsSvc, activityRec), tokens, loader, tenantResolver)
-	publicHandler := publicapihandler.NewPublic(publicAPISvc, ratelimit.New(deps.Redis, cfg.App.Env))
+	publicLimiter := ratelimit.New(deps.Redis, cfg.App.Env)
+	publicHandler := publicapihandler.NewPublic(publicAPISvc, publicLimiter)
 	publicHandler.SetStorefront(deps.Queries, siteLeadsSvc)
+	// Hourly caps per organization on public reservations and site leads
+	// (TEC-1282), set in platform settings; reaching one alerts the platform.
+	publicHandler.SetOrgCaps(publicLimiter, func(ctx context.Context) (int, int, error) {
+		row, err := deps.Queries.GetPublicOrgCaps(ctx)
+		return int(row.PublicReservationsPerHour), int(row.PublicLeadsPerHour), err
+	}, platformHealthSvc)
 	publicapimodule.RegisterRoutes(mux,
 		publicHandler,
 		publicapihandler.NewPanel(publicAPISvc, activityRec), tokens, loader, tenantResolver)

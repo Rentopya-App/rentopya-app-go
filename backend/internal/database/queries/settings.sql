@@ -12,7 +12,9 @@ SET primary_color = COALESCE(sqlc.narg(primary_color), primary_color),
     website = COALESCE(sqlc.narg(website), website),
     footer_text = COALESCE(sqlc.narg(footer_text), footer_text),
     paper_size = COALESCE(sqlc.narg(paper_size), paper_size),
-    logo_object_key = COALESCE(sqlc.narg(logo_object_key), logo_object_key)
+    logo_object_key = COALESCE(sqlc.narg(logo_object_key), logo_object_key),
+    public_reservations_per_hour = COALESCE(sqlc.narg(public_reservations_per_hour), public_reservations_per_hour),
+    public_leads_per_hour = COALESCE(sqlc.narg(public_leads_per_hour), public_leads_per_hour)
 WHERE id = 1
 RETURNING *;
 
@@ -27,3 +29,6 @@ UPDATE app_settings
 SET logo_object_key = NULL
 WHERE id = 1
 RETURNING *;
+
+-- name: GetPublicOrgCaps :one
+SELECT public_reservations_per_hour, public_leads_per_hour FROM app_settings WHERE id = 1;

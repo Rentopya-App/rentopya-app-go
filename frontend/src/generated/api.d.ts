@@ -440,7 +440,7 @@ export interface paths {
         head?: never;
         /**
          * Partially update app branding / letterhead settings
-         * @description Requires `platform.settings.write`. Omitted fields are left unchanged.
+         * @description Requires `platform.settings.write`. Omitted fields are left unchanged. Public caps outside 1 – 100000 answer 422 (`out_of_range`).
          */
         patch: operations["patchPlatformSettings"];
         trace?: never;
@@ -7918,6 +7918,8 @@ export interface paths {
          *     checked against the subgroup's conditions (`422 DRIVER_NOT_ELIGIBLE`), capacity is reserved
          *     (`409 CAPACITY_UNAVAILABLE` with alternatives). The organization's approval protocol of the channel decides the status
          *     (`confirmed`, `awaiting_payment`, or `request` for staff review). The renter becomes a new customer card.
+         *     Successful reservations are also capped per organization per hour (platform setting
+         *     `public_reservations_per_hour`, TEC-1282): above it `429` with detail code `organization_cap`.
          *
          *     The answer carries `access_token` **once**: the status, request and payment-link routes need it in
          *     `X-Reservation-Token` (a secret key may omit it for reservations it made). `external_reference` is for server
@@ -16502,7 +16504,7 @@ export interface paths {
         put?: never;
         /**
          * Submit site form
-         * @description Web storefront session with catalog.read belonging to the live site key. Published leads flags apply. KVKK consent required. Honeypot silently drops. Newsletter duplicates are accepted. No Idempotency-Key required. Limits are 10 per IP per organization per hour and 5 per session per hour; standard public API limits also apply.
+         * @description Web storefront session with catalog.read belonging to the live site key. Published leads flags apply. KVKK consent required. Honeypot silently drops. Newsletter duplicates are accepted. No Idempotency-Key required. Limits are 10 per IP per organization per hour and 5 per session per hour; standard public API limits also apply. Successful submissions are also capped per organization per hour (platform setting public_leads_per_hour, TEC-1282): above it 429 with detail code organization_cap.
          */
         post: operations["submitSiteLead"];
         delete?: never;
@@ -22147,6 +22149,10 @@ export interface components {
             website: string;
             footer_text: string;
             paper_size: string;
+            /** @description TEC-1282: successful public reservations (site and public API) per organization per hour; above it 429 (detail code organization_cap) and a platform alert. */
+            public_reservations_per_hour: number;
+            /** @description TEC-1282: successful site form submissions per organization per hour. */
+            public_leads_per_hour: number;
             /** @description Same-origin API path to stream the logo; omitted when no logo is set. */
             logo_url?: string;
         };
@@ -22160,6 +22166,8 @@ export interface components {
             website?: string;
             footer_text?: string;
             paper_size?: string;
+            public_reservations_per_hour?: number;
+            public_leads_per_hour?: number;
         };
         EnvelopeAppSettings: {
             /** @enum {boolean} */
@@ -34689,6 +34697,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["UnprocessableEntity"];
             500: components["responses"]["InternalError"];
         };
     };

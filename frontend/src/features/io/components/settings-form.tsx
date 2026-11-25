@@ -1,6 +1,6 @@
 "use client";
 
-import { Contact, Palette } from "lucide-react";
+import { Contact, Palette, ShieldAlert } from "lucide-react";
 import { useMemo } from "react";
 import {
   Controller,
@@ -25,7 +25,7 @@ import { brand } from "@/config/brand";
 import { apiConfig } from "@/config/api";
 import {
   PAPER_SIZES,
-  settingsFormSchema,
+  createSettingsFormSchema,
   toPatchPayload,
   toSettingsFormValues,
   type SettingsFormValues,
@@ -82,6 +82,12 @@ function SettingsFormFields({
           label: t("settings.form.section_contact"),
           description: t("settings.contact_hint"),
           icon: Contact,
+        },
+        {
+          key: "public_caps",
+          label: t("settings.form.section_public_caps"),
+          description: t("settings.public_caps_hint"),
+          icon: ShieldAlert,
         },
       ]),
     [t],
@@ -224,6 +230,32 @@ function SettingsFormFields({
         />
       </FormSection>
 
+      <FormSection
+        id={sections.id("public_caps")}
+        title={t("settings.form.section_public_caps")}
+        description={t("settings.public_caps_hint")}
+        columns={2}
+      >
+        <AppInput
+          name="public_reservations_per_hour"
+          label={t("settings.public_reservations_per_hour")}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={100000}
+          disabled={!canWrite}
+        />
+        <AppInput
+          name="public_leads_per_hour"
+          label={t("settings.public_leads_per_hour")}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={100000}
+          disabled={!canWrite}
+        />
+      </FormSection>
+
       {canWrite ? (
         <FormActions>
           <Button type="button" variant="outline" onClick={onCancel}>
@@ -302,6 +334,11 @@ export function SettingsForm({
   onUploadLogo,
   onRemoveLogo,
 }: SettingsFormProps) {
+  const { t } = useLocale();
+  const schema = useMemo(
+    () => createSettingsFormSchema(t("settings.public_cap_range")),
+    [t],
+  );
   const defaultValues = useMemo(
     () => toSettingsFormValues(settings, brand.colors.primary),
     [settings],
@@ -309,7 +346,7 @@ export function SettingsForm({
 
   return (
     <AppForm
-      schema={settingsFormSchema}
+      schema={schema}
       defaultValues={defaultValues}
       onSubmit={async (values) => {
         await onSubmit(toPatchPayload(values));

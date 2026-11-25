@@ -708,7 +708,7 @@ paths:
       tags: [Platform]
       operationId: patchPlatformSettings
       summary: Partially update app branding / letterhead settings
-      description: Requires `platform.settings.write`. Omitted fields are left unchanged.
+      description: Requires `platform.settings.write`. Omitted fields are left unchanged. Public caps outside 1 – 100000 answer 422 (`out_of_range`).
       security:
         - bearerAuth: []
       requestBody:
@@ -726,6 +726,8 @@ paths:
                 $ref: "#/components/schemas/EnvelopeAppSettings"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -12574,6 +12576,8 @@ paths:
         checked against the subgroup's conditions (`422 DRIVER_NOT_ELIGIBLE`), capacity is reserved
         (`409 CAPACITY_UNAVAILABLE` with alternatives). The organization's approval protocol of the channel decides the status
         (`confirmed`, `awaiting_payment`, or `request` for staff review). The renter becomes a new customer card.
+        Successful reservations are also capped per organization per hour (platform setting
+        `public_reservations_per_hour`, TEC-1282): above it `429` with detail code `organization_cap`.
 
         The answer carries `access_token` **once**: the status, request and payment-link routes need it in
         `X-Reservation-Token` (a secret key may omit it for reservations it made). `external_reference` is for server
@@ -24640,7 +24644,7 @@ paths:
       tags: [Public Booking]
       operationId: submitSiteLead
       summary: Submit site form
-      description: "Web storefront session with catalog.read belonging to the live site key. Published leads flags apply. KVKK consent required. Honeypot silently drops. Newsletter duplicates are accepted. No Idempotency-Key required. Limits are 10 per IP per organization per hour and 5 per session per hour; standard public API limits also apply."
+      description: "Web storefront session with catalog.read belonging to the live site key. Published leads flags apply. KVKK consent required. Honeypot silently drops. Newsletter duplicates are accepted. No Idempotency-Key required. Limits are 10 per IP per organization per hour and 5 per session per hour; standard public API limits also apply. Successful submissions are also capped per organization per hour (platform setting public_leads_per_hour, TEC-1282): above it 429 with detail code organization_cap."
       security:
         - publicBearer: []
       requestBody:
@@ -31718,7 +31722,7 @@ components:
 
     AppSettings:
       type: object
-      required: [company_name, tagline, primary_color, address, phone, email, website, footer_text, paper_size]
+      required: [company_name, tagline, primary_color, address, phone, email, website, footer_text, paper_size, public_reservations_per_hour, public_leads_per_hour]
       properties:
         company_name: { type: string }
         tagline: { type: string }
@@ -31729,6 +31733,16 @@ components:
         website: { type: string }
         footer_text: { type: string }
         paper_size: { type: string }
+        public_reservations_per_hour:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          description: "TEC-1282: successful public reservations (site and public API) per organization per hour; above it 429 (detail code organization_cap) and a platform alert."
+        public_leads_per_hour:
+          type: integer
+          minimum: 1
+          maximum: 100000
+          description: "TEC-1282: successful site form submissions per organization per hour."
         logo_url:
           type: string
           description: Same-origin API path to stream the logo; omitted when no logo is set.
@@ -31745,6 +31759,8 @@ components:
         website: { type: string }
         footer_text: { type: string }
         paper_size: { type: string }
+        public_reservations_per_hour: { type: integer, minimum: 1, maximum: 100000 }
+        public_leads_per_hour: { type: integer, minimum: 1, maximum: 100000 }
 
     EnvelopeAppSettings:
       type: object

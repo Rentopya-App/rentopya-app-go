@@ -79,8 +79,9 @@ Mevcut anahtarlar silinmez; özellik yeniden açılınca çalışır (test: `pub
 | Kimlik başına | Anahtarın `rate_limit_per_minute` değeri (gizli anahtar: anahtar başına; yayımlanabilir: tarayıcı oturumu başına) |
 | Rota | Teklif 120 / dk, rezervasyon 20 / 10 dk, değişiklik / iptal talebi 10 / sa, ödeme linki 20 / 10 dk |
 | Oturum açma | 30 / dk / IP |
+| Firma başına (TEC-1282) | Başarılı rezervasyon `public_reservations_per_hour` (varsayılan 60 / sa), başarılı site formu `public_leads_per_hour` (varsayılan 120 / sa). İkisi de platform ayarlarından (Platform → Ayarlar → Public kanal tavanları) değiştirilir. |
 
-Aşımda `429 RATE_LIMITED` + `Retry-After`.
+Aşımda `429 RATE_LIMITED` + `Retry-After`. Firma tavanında detay kodu `organization_cap` olur ve platform yöneticilerine uyarı gider (aynı firma ve tavan için 15 dakikada bir). Firma tavanı yalnızca başarılı yazmaları sayar: geçersiz istek seli gerçek bir firmanın tavanını dolduramaz. Dağıtık bir saldırı yine de geçerli rezervasyonlarla tavanı doldurabilir; o durumda tavan, filonun tamamen tutulmasını ve SMS/push selini sınırlar. Turnstile kısmı Cloudflare hesabını bekliyor.
 
 ## Belgeler (Scalar)
 
