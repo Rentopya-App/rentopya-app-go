@@ -165,6 +165,9 @@ func TestManagedSecretsReadTheirEnvKey(t *testing.T) {
 func TestSecretGuardRefusesDefaultsOutsideDevelopment(t *testing.T) {
 	for _, s := range managedSecrets {
 		cases := map[string]string{"empty": ""}
+		if s.Optional {
+			delete(cases, "empty")
+		}
 		for _, d := range s.Defaults {
 			cases["default "+d] = d
 		}
@@ -178,6 +181,22 @@ func TestSecretGuardRefusesDefaultsOutsideDevelopment(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// An optional secret may be empty (its feature stays closed).
+func TestOptionalSecretMayBeEmpty(t *testing.T) {
+	for _, s := range managedSecrets {
+		if !s.Optional {
+			continue
+		}
+		t.Run(s.Key, func(t *testing.T) {
+			strongEnv(t)
+			t.Setenv(s.Key, "")
+			if _, err := Load(); err != nil {
+				t.Fatalf("empty optional %s refused: %v", s.Key, err)
+			}
+		})
 	}
 }
 

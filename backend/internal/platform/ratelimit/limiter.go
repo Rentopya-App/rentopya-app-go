@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/netip"
 	"strings"
 	"time"
@@ -98,6 +99,25 @@ func (l *Limiter) Allow(ctx context.Context, action, subject string, limit int, 
 		return true, 0
 	}
 	return l.allowWindow(ctx, action, subject, limit, window)
+}
+
+// Under reports whether the window of (action, subject) holds fewer than
+// limit hits, without counting this call. With Record it builds a cap that
+// counts only what succeeded (TEC-1282). Fails open like Allow.
+func (l *Limiter) Under(ctx context.Context, action, subject string, limit int) (bool, time.Duration) {
+	if limit <= 0 {
+		return true, 0
+	}
+	return l.under(ctx, action, subject, limit)
+}
+
+// Record counts one hit of (action, subject); the window starts with the
+// first hit.
+func (l *Limiter) Record(ctx context.Context, action, subject string, window time.Duration) {
+	if window <= 0 {
+		return
+	}
+	l.allowWindow(ctx, action, subject, math.MaxInt32, window)
 }
 
 func (l *Limiter) allow(ctx context.Context, action, subject string, limit int) (bool, time.Duration) {

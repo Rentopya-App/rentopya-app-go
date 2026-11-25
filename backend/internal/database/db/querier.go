@@ -925,6 +925,7 @@ type Querier interface {
 	// verified token).
 	GetPublicAPIKeyByID(ctx context.Context, arg GetPublicAPIKeyByIDParams) (GetPublicAPIKeyByIDRow, error)
 	GetPublicIdempotency(ctx context.Context, arg GetPublicIdempotencyParams) (GetPublicIdempotencyRow, error)
+	GetPublicOrgCaps(ctx context.Context) (GetPublicOrgCapsRow, error)
 	GetPublicQuote(ctx context.Context, arg GetPublicQuoteParams) (GetPublicQuoteRow, error)
 	// Public media stream: the organization is named by its uuid in the URL.
 	GetPublicRentalProductImage(ctx context.Context, arg GetPublicRentalProductImageParams) (GetPublicRentalProductImageRow, error)

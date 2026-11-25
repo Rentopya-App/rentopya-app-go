@@ -15,7 +15,7 @@ const clearAppSettingsLogo = `-- name: ClearAppSettingsLogo :one
 UPDATE app_settings
 SET logo_object_key = NULL
 WHERE id = 1
-RETURNING id, logo_object_key, primary_color, company_name, tagline, address, phone, email, website, footer_text, paper_size, created_at, updated_at
+RETURNING id, logo_object_key, primary_color, company_name, tagline, address, phone, email, website, footer_text, paper_size, created_at, updated_at, public_reservations_per_hour, public_leads_per_hour
 `
 
 func (q *Queries) ClearAppSettingsLogo(ctx context.Context) (AppSetting, error) {
@@ -35,12 +35,14 @@ func (q *Queries) ClearAppSettingsLogo(ctx context.Context) (AppSetting, error) 
 		&i.PaperSize,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PublicReservationsPerHour,
+		&i.PublicLeadsPerHour,
 	)
 	return i, err
 }
 
 const getAppSettings = `-- name: GetAppSettings :one
-SELECT id, logo_object_key, primary_color, company_name, tagline, address, phone, email, website, footer_text, paper_size, created_at, updated_at FROM app_settings WHERE id = 1
+SELECT id, logo_object_key, primary_color, company_name, tagline, address, phone, email, website, footer_text, paper_size, created_at, updated_at, public_reservations_per_hour, public_leads_per_hour FROM app_settings WHERE id = 1
 `
 
 func (q *Queries) GetAppSettings(ctx context.Context) (AppSetting, error) {
@@ -60,7 +62,25 @@ func (q *Queries) GetAppSettings(ctx context.Context) (AppSetting, error) {
 		&i.PaperSize,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PublicReservationsPerHour,
+		&i.PublicLeadsPerHour,
 	)
+	return i, err
+}
+
+const getPublicOrgCaps = `-- name: GetPublicOrgCaps :one
+SELECT public_reservations_per_hour, public_leads_per_hour FROM app_settings WHERE id = 1
+`
+
+type GetPublicOrgCapsRow struct {
+	PublicReservationsPerHour int32 `json:"public_reservations_per_hour"`
+	PublicLeadsPerHour        int32 `json:"public_leads_per_hour"`
+}
+
+func (q *Queries) GetPublicOrgCaps(ctx context.Context) (GetPublicOrgCapsRow, error) {
+	row := q.db.QueryRow(ctx, getPublicOrgCaps)
+	var i GetPublicOrgCapsRow
+	err := row.Scan(&i.PublicReservationsPerHour, &i.PublicLeadsPerHour)
 	return i, err
 }
 
@@ -68,7 +88,7 @@ const setAppSettingsLogo = `-- name: SetAppSettingsLogo :one
 UPDATE app_settings
 SET logo_object_key = $1
 WHERE id = 1
-RETURNING id, logo_object_key, primary_color, company_name, tagline, address, phone, email, website, footer_text, paper_size, created_at, updated_at
+RETURNING id, logo_object_key, primary_color, company_name, tagline, address, phone, email, website, footer_text, paper_size, created_at, updated_at, public_reservations_per_hour, public_leads_per_hour
 `
 
 func (q *Queries) SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error) {
@@ -88,6 +108,8 @@ func (q *Queries) SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.T
 		&i.PaperSize,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PublicReservationsPerHour,
+		&i.PublicLeadsPerHour,
 	)
 	return i, err
 }
@@ -103,22 +125,26 @@ SET primary_color = COALESCE($1, primary_color),
     website = COALESCE($7, website),
     footer_text = COALESCE($8, footer_text),
     paper_size = COALESCE($9, paper_size),
-    logo_object_key = COALESCE($10, logo_object_key)
+    logo_object_key = COALESCE($10, logo_object_key),
+    public_reservations_per_hour = COALESCE($11, public_reservations_per_hour),
+    public_leads_per_hour = COALESCE($12, public_leads_per_hour)
 WHERE id = 1
-RETURNING id, logo_object_key, primary_color, company_name, tagline, address, phone, email, website, footer_text, paper_size, created_at, updated_at
+RETURNING id, logo_object_key, primary_color, company_name, tagline, address, phone, email, website, footer_text, paper_size, created_at, updated_at, public_reservations_per_hour, public_leads_per_hour
 `
 
 type UpdateAppSettingsParams struct {
-	PrimaryColor  pgtype.Text `json:"primary_color"`
-	CompanyName   pgtype.Text `json:"company_name"`
-	Tagline       pgtype.Text `json:"tagline"`
-	Address       pgtype.Text `json:"address"`
-	Phone         pgtype.Text `json:"phone"`
-	Email         pgtype.Text `json:"email"`
-	Website       pgtype.Text `json:"website"`
-	FooterText    pgtype.Text `json:"footer_text"`
-	PaperSize     pgtype.Text `json:"paper_size"`
-	LogoObjectKey pgtype.Text `json:"logo_object_key"`
+	PrimaryColor              pgtype.Text `json:"primary_color"`
+	CompanyName               pgtype.Text `json:"company_name"`
+	Tagline                   pgtype.Text `json:"tagline"`
+	Address                   pgtype.Text `json:"address"`
+	Phone                     pgtype.Text `json:"phone"`
+	Email                     pgtype.Text `json:"email"`
+	Website                   pgtype.Text `json:"website"`
+	FooterText                pgtype.Text `json:"footer_text"`
+	PaperSize                 pgtype.Text `json:"paper_size"`
+	LogoObjectKey             pgtype.Text `json:"logo_object_key"`
+	PublicReservationsPerHour pgtype.Int4 `json:"public_reservations_per_hour"`
+	PublicLeadsPerHour        pgtype.Int4 `json:"public_leads_per_hour"`
 }
 
 func (q *Queries) UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error) {
@@ -133,6 +159,8 @@ func (q *Queries) UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsPa
 		arg.FooterText,
 		arg.PaperSize,
 		arg.LogoObjectKey,
+		arg.PublicReservationsPerHour,
+		arg.PublicLeadsPerHour,
 	)
 	var i AppSetting
 	err := row.Scan(
@@ -149,6 +177,8 @@ func (q *Queries) UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsPa
 		&i.PaperSize,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PublicReservationsPerHour,
+		&i.PublicLeadsPerHour,
 	)
 	return i, err
 }

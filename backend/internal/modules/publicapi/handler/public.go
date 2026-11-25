@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
@@ -49,6 +50,7 @@ type Public struct {
 	leads       *leadsusecase.Service
 	svc         *usecase.Service
 	limiter     RateLimiter
+	caps        *orgCaps
 }
 
 // NewPublic builds the public handler. limiter may be nil.
@@ -124,6 +126,127 @@ func (h *Public) allow(w http.ResponseWriter, r *http.Request, action, subject s
 	return false
 }
 
+// CapCounter is a window that counts only what succeeded
+// (ratelimit.Limiter's Under and Record).
+type CapCounter interface {
+	Under(ctx context.Context, action, subject string, limit int) (bool, time.Duration)
+	Record(ctx context.Context, action, subject string, window time.Duration)
+}
+
+// CapAlerter tells the platform administrators that an organization reached
+// a cap (platformhealth).
+type CapAlerter interface {
+	PublicCapReached(ctx context.Context, orgID int64, orgSlug, cap string, limit int)
+}
+
+// CapLimits reads the platform's hourly caps per organization: public
+// reservations and site leads (app_settings).
+type CapLimits func(ctx context.Context) (reservations, leads int, err error)
+
+// Public caps (TEC-1282).
+const (
+	CapReservations = "reservations"
+	CapLeads        = "leads"
+	// Defaults when the settings cannot be read (the migration defaults).
+	DefaultReservationsPerHour = 60
+	DefaultLeadsPerHour        = 120
+	capWindow                  = time.Hour
+	capSettingsTTL             = time.Minute
+)
+
+// orgCaps caps the successful anonymous public writes per organization per
+// hour: a distributed flood under every per-IP and per-session limit still
+// cannot open more reservations or leads than the platform allows. Only
+// successful writes count, so invalid requests cannot use up a real
+// organization's cap.
+type orgCaps struct {
+	counter CapCounter
+	limits  CapLimits
+	alert   CapAlerter
+	now     func() time.Time
+
+	mu           sync.Mutex
+	reservations int
+	leads        int
+	expires      time.Time
+}
+
+// SetOrgCaps enables the per-organization caps. alert may be nil.
+func (h *Public) SetOrgCaps(counter CapCounter, limits CapLimits, alert CapAlerter) {
+	if counter == nil || limits == nil {
+		h.caps = nil
+		return
+	}
+	h.caps = &orgCaps{counter: counter, limits: limits, alert: alert, now: time.Now}
+}
+
+func (o *orgCaps) limit(ctx context.Context, cap string) int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if now := o.now(); now.After(o.expires) {
+		res, leads, err := o.limits(ctx)
+		if err != nil || res <= 0 || leads <= 0 {
+			res, leads = DefaultReservationsPerHour, DefaultLeadsPerHour
+		}
+		o.reservations, o.leads, o.expires = res, leads, now.Add(capSettingsTTL)
+	}
+	if cap == CapLeads {
+		return o.leads
+	}
+	return o.reservations
+}
+
+// statusWriter remembers the status code of a response.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusWriter) WriteHeader(code int) {
+	if s.status == 0 {
+		s.status = code
+	}
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusWriter) Write(b []byte) (int, error) {
+	if s.status == 0 {
+		s.status = http.StatusOK
+	}
+	return s.ResponseWriter.Write(b)
+}
+
+// capped refuses the request with 429 once the organization reached the cap
+// (alerting the platform) and counts the request when it succeeds.
+func (h *Public) capped(cap string, c model.Credential, fn http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		o := h.caps
+		if o == nil || c.OrganizationID == 0 {
+			fn(w, r)
+			return
+		}
+		action, subject := "pubapi:org_cap:"+cap, strconv.FormatInt(c.OrganizationID, 10)
+		limit := o.limit(r.Context(), cap)
+		if ok, retry := o.counter.Under(r.Context(), action, subject, limit); !ok {
+			if o.alert != nil {
+				o.alert.PublicCapReached(context.WithoutCancel(r.Context()), c.OrganizationID, c.OrganizationSlug, cap, limit)
+			}
+			if retry <= 0 {
+				retry = capWindow
+			}
+			w.Header().Set("Retry-After", strconv.Itoa(max(1, int(retry.Seconds()))))
+			response.ErrorWithDetails(w, r, http.StatusTooManyRequests, CodeRateLimited, "Too many requests; try again later",
+				[]response.Detail{{Code: "organization_cap", Message: "This organization is not taking more online requests right now; try again later"}})
+			return
+		}
+		sw := &statusWriter{ResponseWriter: w}
+		fn(sw, r)
+		if sw.status >= 200 && sw.status < 300 {
+			o.counter.Record(context.WithoutCancel(r.Context()), action, subject, capWindow)
+		}
+	}
+}
+
 // route options of a public endpoint.
 type route struct {
 	scope string
@@ -133,6 +256,8 @@ type route struct {
 	limit  int
 	window time.Duration
 	action string
+	// cap: the per-organization hourly cap of the route ("" = none).
+	cap string
 }
 
 type limitCheck struct{ action, subject string }
@@ -220,6 +345,9 @@ func (h *Public) guard(opt route, fn http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		r = r.WithContext(context.WithValue(r.Context(), ctxKey{}, c))
+		if opt.cap != "" {
+			fn = h.capped(opt.cap, c, fn)
+		}
 		if !opt.write {
 			fn(w, r)
 			return
@@ -516,15 +644,16 @@ func (h *Public) Mount(mux httpkit.Mux) {
 	mux.HandleFunc("POST /v1/public/sessions", h.Session)
 	mux.HandleFunc("GET /v1/public/campaigns", h.guard(read(model.ScopeCatalogRead), h.Campaigns))
 	mux.HandleFunc("GET /v1/public/campaigns/{uuid}", h.guard(read(model.ScopeCatalogRead), h.Campaign))
-	mux.HandleFunc("POST /v1/public/site/leads", h.guard(route{scope: model.ScopeCatalogRead}, h.SubmitLead))
+	mux.HandleFunc("POST /v1/public/site/leads", h.guard(route{scope: model.ScopeCatalogRead, cap: CapLeads}, h.SubmitLead))
 	mux.HandleFunc("GET /v1/public/locations", h.guard(read(model.ScopeCatalogRead), h.Locations))
 	mux.HandleFunc("GET /v1/public/vehicle-subgroups", h.guard(read(model.ScopeCatalogRead), h.Subgroups))
 	mux.HandleFunc("GET /v1/public/extras", h.guard(read(model.ScopeCatalogRead), h.Extras))
 	mux.HandleFunc("GET /v1/public/availability", h.guard(read(model.ScopeCatalogRead), h.Availability))
 	mux.HandleFunc("POST /v1/public/quotes", h.guard(write(model.ScopeQuotesWrite, 120, time.Minute, "quotes"), h.CreateQuote))
 	mux.HandleFunc("GET /v1/public/quotes/{uuid}", h.guard(read(model.ScopeQuotesWrite), h.GetQuote))
-	mux.HandleFunc("POST /v1/public/reservations",
-		h.guard(write(model.ScopeReservationsWrite, 20, 10*time.Minute, "reservations"), h.CreateReservation))
+	reservations := write(model.ScopeReservationsWrite, 20, 10*time.Minute, "reservations")
+	reservations.cap = CapReservations
+	mux.HandleFunc("POST /v1/public/reservations", h.guard(reservations, h.CreateReservation))
 	mux.HandleFunc("GET /v1/public/reservations/{reference}", h.guard(read(model.ScopeReservationsRead), h.Reservation))
 	mux.HandleFunc("POST /v1/public/reservations/{reference}/change-requests",
 		h.guard(write(model.ScopeReservationsWrite, 10, time.Hour, "requests"), h.ChangeRequest))
