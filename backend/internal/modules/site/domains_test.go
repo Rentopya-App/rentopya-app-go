@@ -956,3 +956,25 @@ func TestDomainSweepAggregatesRowErrors(t *testing.T) {
 		}
 	}
 }
+
+// Customer links use a custom domain only once its certificate is proven.
+func TestServingHostsRequireActiveTLS(t *testing.T) {
+	ctx := context.Background()
+	row := pendingDomain(time.Now())
+	m := &domainMemory{rows: map[uuid.UUID]db.SiteDomain{row.Uuid: row}}
+	d := domainService(m, usecase.DomainOptions{})
+	for _, tc := range []struct {
+		status, tls string
+		want        int
+	}{
+		{"verified", "failed", 0}, {"verified", "pending", 0}, {"verified", "provisioning", 0},
+		{"pending", "active", 0}, {"verified", "active", 1},
+	} {
+		row.Status, row.TlsStatus = tc.status, tc.tls
+		m.rows[row.Uuid] = row
+		hosts, err := d.ServingHosts(ctx, row.OrganizationID)
+		if err != nil || len(hosts) != tc.want {
+			t.Fatalf("%s/%s: %v %v", tc.status, tc.tls, hosts, err)
+		}
+	}
+}
