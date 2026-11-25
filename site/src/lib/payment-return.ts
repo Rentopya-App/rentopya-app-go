@@ -19,7 +19,7 @@ export type PaymentReturn = {
   origin: string;
   /** The payment link token the state belongs to. */
   token: string;
-  /** Internal path to open after the return (/reservation/… or /account/…). */
+  /** Internal path to open after the return (/reservation/…, /account/… or /payment/{token}). */
   to: string;
   /** The embedded booking's sealed state, kept for the reservation page. */
   embed?: string;
@@ -30,7 +30,8 @@ export type PaymentReturn = {
 /** The provider's checkout lives 30 minutes; 3DS and slow banks need slack. */
 export const RETURN_TTL = 3 * 60 * 60;
 
-const TO = /^\/(reservation\/[A-Za-z0-9-]{1,40}|account\/[0-9a-f-]{36})$/;
+const TO =
+  /^\/(reservation\/[A-Za-z0-9-]{1,40}|account\/[0-9a-f-]{36}|payment\/[A-Za-z0-9_-]{20,64})$/;
 const TOKEN = /^[A-Za-z0-9_-]{20,64}$/;
 
 function key(secret = process.env.SITE_EMBED_SECRET): Buffer {
@@ -44,7 +45,11 @@ function key(secret = process.env.SITE_EMBED_SECRET): Buffer {
 /** The token of a hosted pay link URL (…/pay/{token}), or null. */
 export function payLinkToken(url: string): string | null {
   try {
-    const m = /^\/pay\/([A-Za-z0-9_-]{20,64})$/.exec(new URL(url).pathname);
+    // The platform's /pay/{token} or a site's /payment/{token} (staff links
+    // of an organization with a live site).
+    const m = /^\/(?:pay|payment)\/([A-Za-z0-9_-]{20,64})$/.exec(
+      new URL(url).pathname,
+    );
     return m?.[1] ?? null;
   } catch {
     return null;

@@ -58,6 +58,16 @@ test("only reservation and account pages are destinations", () => {
   assert.equal(openReturn(forged, ORIGIN, TOKEN, SECRET), null);
 });
 
+test("a site pay page is a destination", () => {
+  const url = returnURL(
+    { origin: ORIGIN, token: TOKEN, to: `/payment/${TOKEN}` },
+    SECRET,
+  );
+  assert.ok(url);
+  const s = new URL(url).searchParams.get("s");
+  assert.equal(openReturn(s, ORIGIN, TOKEN, SECRET)?.to, `/payment/${TOKEN}`);
+});
+
 test("landing carries the payment token and the embed state", () => {
   const state = {
     origin: ORIGIN,
@@ -72,6 +82,10 @@ test("landing carries the payment token and the embed state", () => {
 test("pay link token and provider URL checks", () => {
   assert.equal(payLinkToken(`https://rentopya.app/pay/${TOKEN}`), TOKEN);
   assert.equal(payLinkToken(`https://rentopya.app/pay/${TOKEN}/widget`), null);
+  assert.equal(
+    payLinkToken(`https://ides.rentopya.app/payment/${TOKEN}`),
+    TOKEN,
+  );
   assert.equal(payLinkToken("nope"), null);
   assert.equal(
     safeCheckoutURL("https://sandbox-cpp.iyzipay.com?token=1&lang=tr"),

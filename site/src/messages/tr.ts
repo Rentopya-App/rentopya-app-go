@@ -152,6 +152,16 @@ export const tr = {
     "Bu bağlantı geçersiz ya da süresi dolmuş. Yeniden abone olmak için sitedeki bülten formunu kullanabilirsiniz.",
   "sub.result.busy":
     "Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.",
+  "paylink.title": "Rezervasyon ödemesi",
+  "paylink.reference": "Rezervasyon",
+  "paylink.vehicle": "Araç",
+  "paylink.dates": "Tarihler",
+  "paylink.amount": "Ödenecek tutar",
+  "paylink.valid_until": "Bu ödeme bağlantısı {date} tarihine kadar geçerli.",
+  "paylink.expired":
+    "Bu ödeme bağlantısının süresi doldu. Yeni bir bağlantı için bizimle iletişime geçin.",
+  "paylink.cancelled": "Bu ödeme bağlantısı artık geçerli değil.",
+  "paylink.checkout_failed": "Ödeme başlatılamadı. Lütfen tekrar deneyin.",
   "res.cancellation": "İptal koşulları",
   "res.portal":
     "Belgeleriniz, ödemeleriniz ve değişiklik / iptal talepleriniz için hesabınıza giriş yapın.",

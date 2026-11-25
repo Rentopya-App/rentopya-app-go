@@ -37187,7 +37187,7 @@ components:
       required: [uuid, url, reservation, purpose, amount, currency, status, expires_at, paid_at, cancelled_at, created_by, created_at]
       properties:
         uuid: { type: string, format: uuid }
-        url: { type: string, description: "Public page (/pay/{token}) on the app origin" }
+        url: { type: string, description: "The address to send the customer: {live branded site}/payment/{token} when the organization has a live site (the customer stays on the firm's domain and returns there, TEC-1297), else /pay/{token} on the app origin" }
         reservation: { $ref: "#/components/schemas/PaymentReservationRef" }
         purpose: { type: string, enum: [prepayment, balance, custom] }
         amount: { type: string }
@@ -37523,9 +37523,10 @@ components:
 
     PublicPayLink:
       type: object
-      required: [organization_name, reference, product_title, starts_at, ends_at, amount, currency, expires_at, state, result]
+      required: [organization_name, organization_uuid, reference, product_title, starts_at, ends_at, amount, currency, expires_at, state, result]
       properties:
         organization_name: { type: string }
+        organization_uuid: { type: string, format: uuid, description: "Lets the branded site check that a link belongs to its organization (TEC-1297)." }
         reference: { type: string }
         product_title: { type: string }
         starts_at: { type: string, format: date-time }

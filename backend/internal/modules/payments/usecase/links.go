@@ -155,7 +155,7 @@ func (s *Service) GetLink(ctx context.Context, orgID int64, id uuid.UUID) (paymo
 		return paymodel.Link{}, ErrLinkNotFound
 	}
 	return paymodel.Link{
-		UUID: r.Uuid, URL: s.LinkURL(r.Token), Reservation: paymodel.ReservationRef{UUID: r.ReservationUuid, Reference: r.ReservationReference},
+		UUID: r.Uuid, URL: s.CustomerLinkURL(ctx, orgID, r.Token), Reservation: paymodel.ReservationRef{UUID: r.ReservationUuid, Reference: r.ReservationReference},
 		Purpose: r.Purpose, Amount: m(r.Amount), Currency: r.Currency,
 		Status:    s.effectiveLinkStatus(ctx, orgID, r.ID, r.Status, r.ExpiresAt.Time),
 		ExpiresAt: r.ExpiresAt.Time.UTC(), PaidAt: timePtr(r.PaidAt), CancelledAt: timePtr(r.CancelledAt),
@@ -199,6 +199,7 @@ func (s *Service) ListLinks(ctx context.Context, orgID int64, f paymodel.LinkFil
 		return nil, 0, err
 	}
 	out := make([]paymodel.Link, 0, len(rows))
+	linkURL := s.customerLinkBase(ctx, orgID)
 	var total int64
 	for _, r := range rows {
 		total = r.Total
@@ -207,7 +208,7 @@ func (s *Service) ListLinks(ctx context.Context, orgID int64, f paymodel.LinkFil
 			status = paymodel.LinkExpired
 		}
 		out = append(out, paymodel.Link{
-			UUID: r.Uuid, URL: s.LinkURL(r.Token), Reservation: paymodel.ReservationRef{UUID: r.ReservationUuid, Reference: r.ReservationReference},
+			UUID: r.Uuid, URL: linkURL(r.Token), Reservation: paymodel.ReservationRef{UUID: r.ReservationUuid, Reference: r.ReservationReference},
 			Purpose: r.Purpose, Amount: m(r.Amount), Currency: r.Currency, Status: status, ExpiresAt: r.ExpiresAt.Time.UTC(),
 			PaidAt: timePtr(r.PaidAt), CancelledAt: timePtr(r.CancelledAt),
 			CreatedBy: actorOf(r.CreatedByUuid, r.CreatedByName, r.CreatedBySurname, r.CreatedByEmail), CreatedAt: r.CreatedAt.Time.UTC(),

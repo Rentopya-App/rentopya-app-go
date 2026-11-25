@@ -153,6 +153,17 @@ export const en: Record<MessageKey, string> = {
   "sub.result.invalid":
     "This link is invalid or has expired. You can subscribe again with the newsletter form on the site.",
   "sub.result.busy": "Too many attempts. Please try again in a few minutes.",
+  "paylink.title": "Reservation payment",
+  "paylink.reference": "Reservation",
+  "paylink.vehicle": "Vehicle",
+  "paylink.dates": "Dates",
+  "paylink.amount": "Amount due",
+  "paylink.valid_until": "This payment link is valid until {date}.",
+  "paylink.expired":
+    "This payment link has expired. Please contact us for a new one.",
+  "paylink.cancelled": "This payment link is no longer valid.",
+  "paylink.checkout_failed":
+    "The payment could not be started. Please try again.",
   "res.cancellation": "Cancellation terms",
   "res.portal":
     "Sign in to your account for documents, payments and change or cancellation requests.",

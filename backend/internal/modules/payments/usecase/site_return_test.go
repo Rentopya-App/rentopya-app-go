@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"testing"
 )
 
@@ -50,5 +52,39 @@ func TestSiteReturn(t *testing.T) {
 	}
 	if ok, _ := (&Service{}).siteReturn(context.Background(), 7, token, "https://ides.rentopya.app/payment/"+token+"/return"); ok {
 		t.Error("without a site resolver a site return is refused")
+	}
+}
+
+type fakeLiveSite struct {
+	fakeSites
+	origin string
+	err    error
+}
+
+func (f *fakeLiveSite) LiveSite(_ context.Context, orgID int64) (string, string, bool, error) {
+	if f.err != nil {
+		return "", "", false, f.err
+	}
+	return f.origin, "tr", f.origin != "" && orgID == f.org, nil
+}
+
+// Staff links point at the firm's live site, else the platform pay page.
+func TestCustomerLinkURL(t *testing.T) {
+	t.Parallel()
+	const token = "AbCdEfGhIjKlMnOpQrStUv"
+	site := &fakeLiveSite{fakeSites: fakeSites{org: 7}, origin: "https://ides.rentopya.app"}
+	s := &Service{baseURL: "https://rentopya.app", sites: site, log: slog.Default()}
+	if got := s.CustomerLinkURL(context.Background(), 7, token); got != "https://ides.rentopya.app/payment/"+token {
+		t.Fatalf("live site: %s", got)
+	}
+	if got := s.CustomerLinkURL(context.Background(), 8, token); got != "https://rentopya.app/pay/"+token {
+		t.Fatalf("no site: %s", got)
+	}
+	site.err = errors.New("db down")
+	if got := s.CustomerLinkURL(context.Background(), 7, token); got != "https://rentopya.app/pay/"+token {
+		t.Fatalf("lookup failure: %s", got)
+	}
+	if got := (&Service{baseURL: "https://rentopya.app"}).CustomerLinkURL(context.Background(), 7, token); got != "https://rentopya.app/pay/"+token {
+		t.Fatalf("without sites: %s", got)
 	}
 }
