@@ -284,6 +284,38 @@ func TestReconcilePendingRecoversLostWebhook(t *testing.T) {
 	}
 }
 
+// A checkout the customer left unpaid stays pending while the hosted page
+// may be open, then fails, so the link shows "pay" again instead of
+// "verifying" forever.
+func TestAbandonedCheckoutFailsAfterAnHour(t *testing.T) {
+	p := newPayFx(t)
+	p.prepaymentSettings(nil)
+	prod := p.product("EKO", 21)
+	p.vehicle(p.mrk)
+	c, d := p.customer(30, 5)
+	r := p.reserve(prod, c, d, p.at(0), p.at(24))
+	link, err := p.pay.CreateLink(p.pctx, p.org, r.UUID, paymodel.CreateLinkInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.fake.Abandon(p.checkout(link))
+	p.advance(10 * time.Minute)
+	if n, err := p.pay.ReconcilePending(context.Background()); err != nil || n != 0 {
+		t.Fatalf("failed while the page may be open: %d %v", n, err)
+	}
+	p.advance(time.Hour)
+	if n, err := p.pay.ReconcilePending(context.Background()); err != nil || n != 1 {
+		t.Fatalf("abandoned checkout not failed: %d %v", n, err)
+	}
+	if n := p.count("SELECT count(*) FROM payments WHERE organization_id=$1 AND failure_reason='checkout_abandoned'", p.org); n != 1 {
+		t.Fatalf("failure reason: %d", n)
+	}
+	token := link.URL[strings.LastIndex(link.URL, "/")+1:]
+	if pl, err := p.pay.PublicLink(context.Background(), token, false); err != nil || pl.State == "processing" {
+		t.Fatalf("link still processing: %+v %v", pl, err)
+	}
+}
+
 // A provider answer that does not match the payment (amount) is never
 // recorded as a success.
 func TestVerificationMismatchIsRefused(t *testing.T) {

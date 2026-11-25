@@ -149,6 +149,19 @@ func (f *Fake) AddAccount(apiKey, secretKey string) {
 }
 
 // Checkout returns a copy of a checkout by token.
+// StateAbandoned is a checkout the customer left unpaid (retrieve answers
+// error 5122 like the live API).
+const StateAbandoned = "abandoned"
+
+// Abandon marks a checkout as left unpaid.
+func (f *Fake) Abandon(token string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if c, ok := f.checkouts[token]; ok {
+		c.State = StateAbandoned
+	}
+}
+
 func (f *Fake) Checkout(token string) (Checkout, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -356,6 +369,11 @@ func (f *Fake) serve(w http.ResponseWriter, r *http.Request) {
 		f.mu.Unlock()
 		if !ok || cp.APIKey != apiKey {
 			failure(w, "5032", "Token bulunamadı")
+			return
+		}
+		if cp.State == StateAbandoned {
+			// What the live API answers for a checkout form never paid.
+			failure(w, "5122", "Gönderilen tokena ait ödeme bilgisi bulunamadı")
 			return
 		}
 		f.writeResult(w, secret, cp)

@@ -208,6 +208,10 @@ var (
 	ErrInvalidSignature = errors.New("payments: invalid signature")
 	// ErrMalformed: the provider body could not be read.
 	ErrMalformed = errors.New("payments: malformed provider message")
+	// ErrCheckoutNotFound: the provider has no payment for this checkout
+	// (the customer never paid and the hosted page expired, or the token is
+	// unknown). Not a failure by itself while the page may still be open.
+	ErrCheckoutNotFound = errors.New("payments: no payment for this checkout")
 )
 
 // ProviderError is a provider refusal (error code + message, never card
