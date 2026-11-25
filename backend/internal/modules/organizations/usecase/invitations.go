@@ -867,6 +867,19 @@ func (m *Management) LogoObjectKey(ctx context.Context, orgUUID uuid.UUID) (stri
 	return row.LogoObjectKey.String, nil
 }
 
+// PublicLogoObjectKey is LogoObjectKey for the customer-facing pages (pay
+// link, customer portal): only an active organization's logo is served.
+func (m *Management) PublicLogoObjectKey(ctx context.Context, orgUUID uuid.UUID) (string, error) {
+	row, err := m.orgs.repo.GetOrganizationByUUID(ctx, orgUUID)
+	if err != nil {
+		return "", mapRepoNotFound(err, ErrNotFound)
+	}
+	if row.Status != "active" {
+		return "", ErrNotFound
+	}
+	return m.LogoObjectKey(ctx, orgUUID)
+}
+
 // ListActivity returns the platform operations on an organization plus the
 // activity recorded inside it.
 func (m *Management) ListActivity(ctx context.Context, orgUUID uuid.UUID, limit, offset int32) ([]orgmodel.ActivityEntry, int64, error) {

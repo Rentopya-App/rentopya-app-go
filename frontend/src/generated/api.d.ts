@@ -1331,6 +1331,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/organizations/{uuid}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Organization logo for customer-facing pages
+         * @description No auth. The logo of an active organization for its pay link and customer portal pages (TEC-1284). 404 without a logo or for an inactive organization. Cached publicly for an hour.
+         */
+        get: operations["getPublicOrganizationLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/invitations/{token}": {
         parameters: {
             query?: never;
@@ -27001,6 +27021,8 @@ export interface components {
              * @description Lets the branded site check that a link belongs to its organization (TEC-1297).
              */
             organization_uuid: string;
+            /** @description The organization's logo for the pay page (GET /v1/public/organizations/{uuid}/logo); null without one. */
+            organization_logo_url?: string | null;
             reference: string;
             product_title: string;
             /** Format: date-time */
@@ -27585,6 +27607,8 @@ export interface components {
         CustomerPortalOrganization: {
             slug: string;
             name: string;
+            /** @description The organization's logo for the portal header (GET /v1/public/organizations/{uuid}/logo); null without one. */
+            logo_url?: string | null;
         };
         EnvelopeCustomerPortalInfo: {
             /** @enum {boolean} */
@@ -36396,6 +36420,33 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicOrganizationLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Logo image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/webp": string;
+                    "image/svg+xml": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
         };
     };

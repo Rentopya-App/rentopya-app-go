@@ -187,15 +187,18 @@ type PublicLink struct {
 	OrganizationName string `json:"organization_name"`
 	// OrganizationUUID lets the branded site check that a link it shows
 	// belongs to its own organization.
-	OrganizationUUID uuid.UUID   `json:"organization_uuid"`
-	Reference        string      `json:"reference"`
-	ProductTitle     string      `json:"product_title"`
-	StartsAt         time.Time   `json:"starts_at"`
-	EndsAt           time.Time   `json:"ends_at"`
-	Amount           money.Money `json:"amount"`
-	Currency         string      `json:"currency"`
-	ExpiresAt        time.Time   `json:"expires_at"`
-	State            string      `json:"state"`
+	OrganizationUUID uuid.UUID `json:"organization_uuid"`
+	// OrganizationLogoURL is the organization's logo for the pay page
+	// (GET /v1/public/organizations/{uuid}/logo), or null.
+	OrganizationLogoURL *string     `json:"organization_logo_url"`
+	Reference           string      `json:"reference"`
+	ProductTitle        string      `json:"product_title"`
+	StartsAt            time.Time   `json:"starts_at"`
+	EndsAt              time.Time   `json:"ends_at"`
+	Amount              money.Money `json:"amount"`
+	Currency            string      `json:"currency"`
+	ExpiresAt           time.Time   `json:"expires_at"`
+	State               string      `json:"state"`
 	// Result is the reservation outcome of a verified payment: confirmed,
 	// reinstated, late_payment_task, recorded ("" until verified).
 	Result        string `json:"result"`

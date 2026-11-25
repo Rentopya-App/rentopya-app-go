@@ -10,3 +10,4 @@ export {
   RentopyaWordSvg,
 } from "./brand-svg";
 export { RENTOPYA_PATHS } from "./rentopya-paths";
+export { OrganizationMark } from "./organization-mark";
