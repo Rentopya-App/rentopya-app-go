@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { newNonce, sentryReportUri, sitePolicy } from "./csp.ts";
+import { newNonce, sentryReportUri, sitePolicy, withNonce } from "./csp.ts";
 
 test("script policy: nonce + strict-dynamic, no inline script, no objects", () => {
   const p = sitePolicy({ nonce: "abc" });
@@ -46,4 +46,18 @@ test("nonces are fresh and base64", () => {
   const a = newNonce();
   assert.match(a, /^[A-Za-z0-9+/]{22}==$/);
   assert.notEqual(a, newNonce());
+});
+
+test("the enforced framing policy carries the nonce where Next reads it", () => {
+  const p = withNonce("frame-ancestors 'none'; base-uri 'self';", "abc");
+  assert.equal(
+    p,
+    "frame-ancestors 'none'; base-uri 'self'; script-src-attr 'nonce-abc'",
+  );
+  // Next takes the first directive starting with script-src.
+  const directive = p
+    .split(";")
+    .map((d) => d.trim())
+    .find((d) => d.startsWith("script-src"));
+  assert.equal(directive, "script-src-attr 'nonce-abc'");
 });
