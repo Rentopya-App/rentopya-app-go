@@ -8,6 +8,9 @@ export type SiteLeadPage = Schemas["EnvelopeSiteLeads"]["data"];
 export type SiteLeadPatch = Schemas["SiteLeadPatch"];
 export type SiteLeadKind = SiteLead["kind"];
 export type SiteLeadStatus = SiteLead["status"];
+/** TEC-1287 double opt-in: only confirmed is marketing permission. */
+export type SiteLeadMarketingStatus = SiteLead["marketing_status"];
+export type SiteLeadSettings = Schemas["SiteLeadSettings"];
 
 /** List query of `GET /v1/tenant/site/leads`. */
 export type ListSiteLeadsParams = {

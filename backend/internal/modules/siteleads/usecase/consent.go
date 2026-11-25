@@ -211,7 +211,7 @@ func (s *Service) PurgeExpired(ctx context.Context) (int, error) {
 	}
 	total := 0
 	for _, o := range orgs {
-		n, err := s.q.DeleteExpiredSiteLeads(ctx, db.DeleteExpiredSiteLeadsParams{OrganizationID: o.OrganizationID, RetentionMonths: o.RetentionMonths})
+		n, err := s.q.DeleteExpiredSiteLeads(ctx, db.DeleteExpiredSiteLeadsParams(o))
 		if err != nil {
 			return total, err
 		}

@@ -121,9 +121,19 @@ export function SiteLeadDrawer({
               label={t(STATUS_LABEL_KEYS[lead.status])}
               tone={STATUS_TONES[lead.status]}
             />
-            {lead.consent_marketing ? (
+            {lead.marketing_status === "confirmed" ? (
               <Badge variant="secondary">
                 {t("site_leads.detail.marketing_badge")}
+              </Badge>
+            ) : null}
+            {lead.marketing_status === "pending" ? (
+              <Badge variant="outline">
+                {t("site_leads.detail.marketing_pending_badge")}
+              </Badge>
+            ) : null}
+            {lead.marketing_status === "unsubscribed" ? (
+              <Badge variant="outline">
+                {t("site_leads.detail.marketing_unsubscribed_badge")}
               </Badge>
             ) : null}
           </div>

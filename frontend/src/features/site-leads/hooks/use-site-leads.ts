@@ -7,6 +7,7 @@ import { siteLeadsService } from "@/features/site-leads/services/site-leads.serv
 import type {
   ListSiteLeadsParams,
   SiteLeadPatch,
+  SiteLeadSettings,
 } from "@/features/site-leads/types";
 import { useTenant } from "@/features/tenant/components/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -21,7 +22,32 @@ export const siteLeadKeys = {
   detail: (slug: string, uuid: string) =>
     [...siteLeadKeys.all(slug), "detail", uuid] as const,
   newCount: (slug: string) => [...siteLeadKeys.all(slug), "new-count"] as const,
+  settings: (slug: string) => [...siteLeadKeys.all(slug), "settings"] as const,
 };
+
+/** Retention period of the organization's leads (TEC-1287). */
+export function useSiteLeadSettings(enabled = true) {
+  const { slug } = useTenant();
+  return useQuery({
+    queryKey: siteLeadKeys.settings(slug),
+    queryFn: () => siteLeadsService.settings(slug),
+    enabled: Boolean(slug) && enabled,
+  });
+}
+
+export function useSaveSiteLeadSettings() {
+  const { slug } = useTenant();
+  const { t } = useLocale();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SiteLeadSettings) =>
+      siteLeadsService.saveSettings(slug, body),
+    onSuccess: (settings) => {
+      queryClient.setQueryData(siteLeadKeys.settings(slug), settings);
+      appToast.success(t("site_leads.retention.saved"));
+    },
+  });
+}
 
 export function useSiteLeadsList(params: ListSiteLeadsParams) {
   const { slug } = useTenant();
