@@ -58,5 +58,20 @@
   "statuses.spam": "Spam",
   "title": "Site applications",
   "toast.updated": "Application updated.",
-  "validation.note_max": "The note can be at most {{max}} characters."
+  "validation.note_max": "The note can be at most {{max}} characters.",
+  "actions.retention": "Retention",
+  "marketing.none": "—",
+  "marketing.pending": "Awaiting confirmation",
+  "marketing.confirmed": "Confirmed",
+  "marketing.unsubscribed": "Unsubscribed",
+  "detail.marketing_pending_badge": "Marketing consent awaiting e-mail confirmation",
+  "detail.marketing_unsubscribed_badge": "Unsubscribed",
+  "retention.title": "Lead retention period",
+  "retention.description": "Site leads older than this are deleted every night; the deletion is recorded in the activity log (KVKK).",
+  "retention.months": "Retention period (months)",
+  "retention.hint": "Between 1 and 120 months; 24 by default.",
+  "retention.range": "Enter a number of months between 1 and 120.",
+  "retention.save": "Save",
+  "retention.saved": "Retention period saved.",
+  "retention.failed": "The retention period could not be saved."
 }

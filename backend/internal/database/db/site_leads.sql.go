@@ -12,6 +12,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const confirmSiteLeadMarketing = `-- name: ConfirmSiteLeadMarketing :one
+UPDATE site_leads SET marketing_confirmed_at = now(), confirm_token_hash = NULL, confirm_expires_at = NULL
+WHERE confirm_token_hash = $1 AND confirm_expires_at > now() AND unsubscribed_at IS NULL
+RETURNING organization_id, uuid, kind
+`
+
+type ConfirmSiteLeadMarketingRow struct {
+	OrganizationID int64     `json:"organization_id"`
+	Uuid           uuid.UUID `json:"uuid"`
+	Kind           string    `json:"kind"`
+}
+
+// Global lookup by the token hash (the token names one lead of one
+// organization); single use: the hash is cleared.
+func (q *Queries) ConfirmSiteLeadMarketing(ctx context.Context, tokenHash pgtype.Text) (ConfirmSiteLeadMarketingRow, error) {
+	row := q.db.QueryRow(ctx, confirmSiteLeadMarketing, tokenHash)
+	var i ConfirmSiteLeadMarketingRow
+	err := row.Scan(&i.OrganizationID, &i.Uuid, &i.Kind)
+	return i, err
+}
+
 const countSiteLeads = `-- name: CountSiteLeads :one
 SELECT count(*) FROM site_leads WHERE organization_id = $1
  AND ($2::text IS NULL OR kind = $2)
@@ -44,8 +65,27 @@ func (q *Queries) CountSiteLeads(ctx context.Context, arg CountSiteLeadsParams) 
 	return count, err
 }
 
+const deleteExpiredSiteLeads = `-- name: DeleteExpiredSiteLeads :execrows
+DELETE FROM site_leads
+WHERE organization_id = $1
+  AND created_at < now() - make_interval(months => $2::int)
+`
+
+type DeleteExpiredSiteLeadsParams struct {
+	OrganizationID  int64 `json:"organization_id"`
+	RetentionMonths int32 `json:"retention_months"`
+}
+
+func (q *Queries) DeleteExpiredSiteLeads(ctx context.Context, arg DeleteExpiredSiteLeadsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredSiteLeads, arg.OrganizationID, arg.RetentionMonths)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getSiteLead = `-- name: GetSiteLead :one
-SELECT id, organization_id, uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent, status, created_at, updated_at, handled_by, handled_at, note FROM site_leads WHERE organization_id = $1 AND uuid = $2
+SELECT id, organization_id, uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent, status, created_at, updated_at, handled_by, handled_at, note, confirm_token_hash, confirm_expires_at, marketing_confirmed_at, unsubscribe_token_hash, unsubscribed_at FROM site_leads WHERE organization_id = $1 AND uuid = $2
 `
 
 type GetSiteLeadParams struct {
@@ -80,8 +120,24 @@ func (q *Queries) GetSiteLead(ctx context.Context, arg GetSiteLeadParams) (SiteL
 		&i.HandledBy,
 		&i.HandledAt,
 		&i.Note,
+		&i.ConfirmTokenHash,
+		&i.ConfirmExpiresAt,
+		&i.MarketingConfirmedAt,
+		&i.UnsubscribeTokenHash,
+		&i.UnsubscribedAt,
 	)
 	return i, err
+}
+
+const getSiteLeadRetention = `-- name: GetSiteLeadRetention :one
+SELECT lead_retention_months FROM site_settings WHERE organization_id = $1
+`
+
+func (q *Queries) GetSiteLeadRetention(ctx context.Context, organizationID int64) (int32, error) {
+	row := q.db.QueryRow(ctx, getSiteLeadRetention, organizationID)
+	var lead_retention_months int32
+	err := row.Scan(&lead_retention_months)
+	return lead_retention_months, err
 }
 
 const insertSiteLead = `-- name: InsertSiteLead :one
@@ -89,7 +145,7 @@ INSERT INTO site_leads (organization_id, kind, name, email, phone, company, city
  locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent)
 VALUES ($1,$2,$3,$4,$5,$6,$7,
  $8,$9,$10,$11,$12,$13,$14,$15)
-ON CONFLICT (organization_id, lower(email)) WHERE kind = 'newsletter' DO NOTHING RETURNING id, organization_id, uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent, status, created_at, updated_at, handled_by, handled_at, note
+ON CONFLICT (organization_id, lower(email)) WHERE kind = 'newsletter' DO NOTHING RETURNING id, organization_id, uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent, status, created_at, updated_at, handled_by, handled_at, note, confirm_token_hash, confirm_expires_at, marketing_confirmed_at, unsubscribe_token_hash, unsubscribed_at
 `
 
 type InsertSiteLeadParams struct {
@@ -153,12 +209,17 @@ func (q *Queries) InsertSiteLead(ctx context.Context, arg InsertSiteLeadParams) 
 		&i.HandledBy,
 		&i.HandledAt,
 		&i.Note,
+		&i.ConfirmTokenHash,
+		&i.ConfirmExpiresAt,
+		&i.MarketingConfirmedAt,
+		&i.UnsubscribeTokenHash,
+		&i.UnsubscribedAt,
 	)
 	return i, err
 }
 
 const listSiteLeads = `-- name: ListSiteLeads :many
-SELECT id, organization_id, uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent, status, created_at, updated_at, handled_by, handled_at, note FROM site_leads WHERE organization_id = $1
+SELECT id, organization_id, uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent, status, created_at, updated_at, handled_by, handled_at, note, confirm_token_hash, confirm_expires_at, marketing_confirmed_at, unsubscribe_token_hash, unsubscribed_at FROM site_leads WHERE organization_id = $1
  AND ($2::text IS NULL OR kind = $2)
  AND ($3::text IS NULL OR status = $3)
  AND ($4::timestamptz IS NULL OR created_at >= $4)
@@ -225,6 +286,11 @@ func (q *Queries) ListSiteLeads(ctx context.Context, arg ListSiteLeadsParams) ([
 			&i.HandledBy,
 			&i.HandledAt,
 			&i.Note,
+			&i.ConfirmTokenHash,
+			&i.ConfirmExpiresAt,
+			&i.MarketingConfirmedAt,
+			&i.UnsubscribeTokenHash,
+			&i.UnsubscribedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -239,7 +305,7 @@ func (q *Queries) ListSiteLeads(ctx context.Context, arg ListSiteLeadsParams) ([
 const patchSiteLead = `-- name: PatchSiteLead :one
 UPDATE site_leads SET status = COALESCE($1::text,status), note = COALESCE($2::text,note),
  handled_by = $3, handled_at = now()
-WHERE organization_id = $4 AND uuid = $5 RETURNING id, organization_id, uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent, status, created_at, updated_at, handled_by, handled_at, note
+WHERE organization_id = $4 AND uuid = $5 RETURNING id, organization_id, uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, ip_hash, user_agent, status, created_at, updated_at, handled_by, handled_at, note, confirm_token_hash, confirm_expires_at, marketing_confirmed_at, unsubscribe_token_hash, unsubscribed_at
 `
 
 type PatchSiteLeadParams struct {
@@ -283,8 +349,58 @@ func (q *Queries) PatchSiteLead(ctx context.Context, arg PatchSiteLeadParams) (S
 		&i.HandledBy,
 		&i.HandledAt,
 		&i.Note,
+		&i.ConfirmTokenHash,
+		&i.ConfirmExpiresAt,
+		&i.MarketingConfirmedAt,
+		&i.UnsubscribeTokenHash,
+		&i.UnsubscribedAt,
 	)
 	return i, err
+}
+
+const setSiteLeadConsentTokens = `-- name: SetSiteLeadConsentTokens :exec
+UPDATE site_leads SET confirm_token_hash = $1, confirm_expires_at = $2,
+    unsubscribe_token_hash = $3
+WHERE organization_id = $4 AND id = $5
+`
+
+type SetSiteLeadConsentTokensParams struct {
+	ConfirmTokenHash     pgtype.Text        `json:"confirm_token_hash"`
+	ConfirmExpiresAt     pgtype.Timestamptz `json:"confirm_expires_at"`
+	UnsubscribeTokenHash pgtype.Text        `json:"unsubscribe_token_hash"`
+	OrganizationID       int64              `json:"organization_id"`
+	ID                   int64              `json:"id"`
+}
+
+// TEC-1287: the confirmation (single use, expiring) and unsubscribe tokens
+// of a lead that asked for marketing.
+func (q *Queries) SetSiteLeadConsentTokens(ctx context.Context, arg SetSiteLeadConsentTokensParams) error {
+	_, err := q.db.Exec(ctx, setSiteLeadConsentTokens,
+		arg.ConfirmTokenHash,
+		arg.ConfirmExpiresAt,
+		arg.UnsubscribeTokenHash,
+		arg.OrganizationID,
+		arg.ID,
+	)
+	return err
+}
+
+const setSiteLeadRetention = `-- name: SetSiteLeadRetention :one
+UPDATE site_settings SET lead_retention_months = $1
+WHERE organization_id = $2
+RETURNING lead_retention_months
+`
+
+type SetSiteLeadRetentionParams struct {
+	LeadRetentionMonths int32 `json:"lead_retention_months"`
+	OrganizationID      int64 `json:"organization_id"`
+}
+
+func (q *Queries) SetSiteLeadRetention(ctx context.Context, arg SetSiteLeadRetentionParams) (int32, error) {
+	row := q.db.QueryRow(ctx, setSiteLeadRetention, arg.LeadRetentionMonths, arg.OrganizationID)
+	var lead_retention_months int32
+	err := row.Scan(&lead_retention_months)
+	return lead_retention_months, err
 }
 
 const siteLeadRecipients = `-- name: SiteLeadRecipients :many
@@ -314,4 +430,58 @@ func (q *Queries) SiteLeadRecipients(ctx context.Context, organizationID int64) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const siteLeadRetention = `-- name: SiteLeadRetention :many
+SELECT DISTINCT l.organization_id, COALESCE(s.lead_retention_months, 24)::int AS retention_months
+FROM site_leads l
+LEFT JOIN site_settings s ON s.organization_id = l.organization_id
+WHERE l.created_at < now() - make_interval(months => COALESCE(s.lead_retention_months, 24))
+`
+
+type SiteLeadRetentionRow struct {
+	OrganizationID  int64 `json:"organization_id"`
+	RetentionMonths int32 `json:"retention_months"`
+}
+
+// Organizations with leads older than their retention period.
+func (q *Queries) SiteLeadRetention(ctx context.Context) ([]SiteLeadRetentionRow, error) {
+	rows, err := q.db.Query(ctx, siteLeadRetention)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SiteLeadRetentionRow{}
+	for rows.Next() {
+		var i SiteLeadRetentionRow
+		if err := rows.Scan(&i.OrganizationID, &i.RetentionMonths); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const unsubscribeSiteLead = `-- name: UnsubscribeSiteLead :one
+UPDATE site_leads SET unsubscribed_at = COALESCE(unsubscribed_at, now()), consent_marketing = false,
+    confirm_token_hash = NULL, confirm_expires_at = NULL
+WHERE unsubscribe_token_hash = $1
+RETURNING organization_id, uuid, kind
+`
+
+type UnsubscribeSiteLeadRow struct {
+	OrganizationID int64     `json:"organization_id"`
+	Uuid           uuid.UUID `json:"uuid"`
+	Kind           string    `json:"kind"`
+}
+
+// Global lookup by the token hash; repeating it is harmless.
+func (q *Queries) UnsubscribeSiteLead(ctx context.Context, tokenHash pgtype.Text) (UnsubscribeSiteLeadRow, error) {
+	row := q.db.QueryRow(ctx, unsubscribeSiteLead, tokenHash)
+	var i UnsubscribeSiteLeadRow
+	err := row.Scan(&i.OrganizationID, &i.Uuid, &i.Kind)
+	return i, err
 }

@@ -3,6 +3,7 @@ import type {
   SiteLead,
   SiteLeadPage,
   SiteLeadPatch,
+  SiteLeadSettings,
 } from "@/features/site-leads/types";
 import { tenantRequest } from "@/lib/api/tenant-request";
 
@@ -27,5 +28,14 @@ export const siteLeadsService = {
       `${LEADS}/${encodeURIComponent(uuid)}`,
       { body },
     );
+  },
+  /** Retention period of the organization's leads (TEC-1287). */
+  settings(slug: string) {
+    return tenantRequest<SiteLeadSettings>(slug, "GET", `${LEADS}/settings`);
+  },
+  saveSettings(slug: string, body: SiteLeadSettings) {
+    return tenantRequest<SiteLeadSettings>(slug, "PUT", `${LEADS}/settings`, {
+      body,
+    });
   },
 };

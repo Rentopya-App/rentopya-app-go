@@ -58,5 +58,20 @@
   "statuses.spam": "Spam",
   "title": "Site başvuruları",
   "toast.updated": "Başvuru güncellendi.",
-  "validation.note_max": "Not en fazla {{max}} karakter olabilir."
+  "validation.note_max": "Not en fazla {{max}} karakter olabilir.",
+  "actions.retention": "Saklama süresi",
+  "marketing.none": "—",
+  "marketing.pending": "Onay bekliyor",
+  "marketing.confirmed": "Onaylı",
+  "marketing.unsubscribed": "Abonelikten çıktı",
+  "detail.marketing_pending_badge": "Pazarlama onayı bekliyor (e-posta)",
+  "detail.marketing_unsubscribed_badge": "Abonelikten çıktı",
+  "retention.title": "Başvuruların saklama süresi",
+  "retention.description": "Bu süreden eski site başvuruları her gece silinir; silme işlemi etkinlik kaydına yazılır (KVKK).",
+  "retention.months": "Saklama süresi (ay)",
+  "retention.hint": "1 ile 120 ay arası; varsayılan 24 ay.",
+  "retention.range": "1 ile 120 arasında bir ay sayısı girin.",
+  "retention.save": "Kaydet",
+  "retention.saved": "Saklama süresi kaydedildi.",
+  "retention.failed": "Saklama süresi kaydedilemedi."
 }

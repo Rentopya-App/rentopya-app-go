@@ -40,3 +40,44 @@ JOIN role_permissions rp ON rp.role_id = mr.role_id
 JOIN permissions p ON p.id = rp.permission_id AND p.slug = 'tenant.site_leads.read'
 JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL
 WHERE m.organization_id = sqlc.arg(organization_id);
+
+-- name: SetSiteLeadConsentTokens :exec
+-- TEC-1287: the confirmation (single use, expiring) and unsubscribe tokens
+-- of a lead that asked for marketing.
+UPDATE site_leads SET confirm_token_hash = sqlc.arg(confirm_token_hash), confirm_expires_at = sqlc.arg(confirm_expires_at),
+    unsubscribe_token_hash = sqlc.arg(unsubscribe_token_hash)
+WHERE organization_id = sqlc.arg(organization_id) AND id = sqlc.arg(id);
+
+-- name: ConfirmSiteLeadMarketing :one
+-- Global lookup by the token hash (the token names one lead of one
+-- organization); single use: the hash is cleared.
+UPDATE site_leads SET marketing_confirmed_at = now(), confirm_token_hash = NULL, confirm_expires_at = NULL
+WHERE confirm_token_hash = sqlc.arg(token_hash) AND confirm_expires_at > now() AND unsubscribed_at IS NULL
+RETURNING organization_id, uuid, kind;
+
+-- name: UnsubscribeSiteLead :one
+-- Global lookup by the token hash; repeating it is harmless.
+UPDATE site_leads SET unsubscribed_at = COALESCE(unsubscribed_at, now()), consent_marketing = false,
+    confirm_token_hash = NULL, confirm_expires_at = NULL
+WHERE unsubscribe_token_hash = sqlc.arg(token_hash)
+RETURNING organization_id, uuid, kind;
+
+-- name: SiteLeadRetention :many
+-- Organizations with leads older than their retention period.
+SELECT DISTINCT l.organization_id, COALESCE(s.lead_retention_months, 24)::int AS retention_months
+FROM site_leads l
+LEFT JOIN site_settings s ON s.organization_id = l.organization_id
+WHERE l.created_at < now() - make_interval(months => COALESCE(s.lead_retention_months, 24));
+
+-- name: DeleteExpiredSiteLeads :execrows
+DELETE FROM site_leads
+WHERE organization_id = sqlc.arg(organization_id)
+  AND created_at < now() - make_interval(months => sqlc.arg(retention_months)::int);
+
+-- name: GetSiteLeadRetention :one
+SELECT lead_retention_months FROM site_settings WHERE organization_id = sqlc.arg(organization_id);
+
+-- name: SetSiteLeadRetention :one
+UPDATE site_settings SET lead_retention_months = sqlc.arg(lead_retention_months)
+WHERE organization_id = sqlc.arg(organization_id)
+RETURNING lead_retention_months;

@@ -140,6 +140,19 @@ export const en: Record<MessageKey, string> = {
     "The payment was not completed. You can try again; if it keeps failing, please contact us.",
   "res.pay_secure_note":
     "Payment is taken on iyzico's secure page with 3D Secure; your card details never reach us.",
+  "sub.title": "E-mail subscription",
+  "sub.confirm_intro":
+    "Confirm your subscription to receive news and offers from {site} by e-mail.",
+  "sub.confirm_button": "Confirm subscription",
+  "sub.unsubscribe_intro":
+    "Confirm that you want to leave the {site} mailing list. You will not receive any more offers.",
+  "sub.unsubscribe_button": "Unsubscribe",
+  "sub.result.confirmed": "Thank you, your subscription is confirmed.",
+  "sub.result.unsubscribed":
+    "You have unsubscribed; you will not receive any more offers.",
+  "sub.result.invalid":
+    "This link is invalid or has expired. You can subscribe again with the newsletter form on the site.",
+  "sub.result.busy": "Too many attempts. Please try again in a few minutes.",
   "res.cancellation": "Cancellation terms",
   "res.portal":
     "Sign in to your account for documents, payments and change or cancellation requests.",

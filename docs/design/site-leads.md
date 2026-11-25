@@ -55,3 +55,16 @@ are logged without failing a saved lead. Export is deferred to the panel task.
 The site forms and the panel's "Site başvuruları" page are described in
 [branded-site.md §12.2](./branded-site.md#122-lead-forms-site-and-panel). The panel
 has no export yet.
+
+## Marketing double opt-in (TEC-1287, KVKK / İYS)
+
+- A lead that asks for marketing (every newsletter subscription, and any form sent with `consent_marketing: true`) is **pending** until the person confirms it. Its `marketing_status` is `none`, `pending`, `confirmed` or `unsubscribed`; the API's `consent_marketing` is true only when the status is `confirmed`, and only such leads may receive marketing (or be exported as having permission).
+- On submit the API stores two SHA-256-hashed tokens and e-mails the address (plain text, the lead's language) a **confirmation link** (single use, 7 days) and an **unsubscribe link** (no expiry, repeatable): `{site origin}/abonelik?confirm=…` / `?unsubscribe=…` (`/subscription` in English). The site page asks for a button press and only then calls `POST /v1/public/site/leads/confirm` or `/unsubscribe` with `{token}`, so mail scanners that open links cannot act for the person. Those routes need no credential (the 32-byte token is it) and allow 30 calls per minute per IP; unknown, used or expired links answer 404.
+- Without SMTP (`SMTP_HOST` empty) no e-mail goes out and the request stays pending: never treat it as consent.
+- A duplicate newsletter subscription sends no second e-mail (no mail bombing through the form).
+- Confirmation and unsubscribe are recorded in the organization's activity (`site_lead.marketing_confirmed`, `site_lead.unsubscribed`).
+
+## Retention (TEC-1287)
+
+- `site_settings.lead_retention_months` (1 – 120, default 24) is the storage period of an organization's leads, set in the panel (Site başvuruları → Saklama süresi; `GET/PUT /v1/tenant/site/leads/settings`, `tenant.site_leads.manage` to change).
+- The worker's nightly task `app:site-leads:retention` (03:40 Istanbul) deletes leads older than that and records `site_lead.retention_deleted` with the count in the organization's activity.

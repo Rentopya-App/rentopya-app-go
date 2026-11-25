@@ -2,12 +2,16 @@
 package usecase
 
 import (
+	"time"
+
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/activity"
+	platformmail "github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/mail"
 	"log/slog"
 	"net/mail"
 	"net/url"
@@ -36,10 +40,23 @@ type Service struct {
 	q        *db.Queries
 	salt     []byte
 	notifier *notify.Engine
+	mailer   platformmail.Sender
+	activity *activity.Recorder
+	log      *slog.Logger
+	now      func() time.Time
 }
 
+// SetMailer enables the marketing confirmation e-mail (TEC-1287). Without
+// it a marketing request stays pending.
+func (s *Service) SetMailer(m platformmail.Sender) { s.mailer = m }
+
+// SetActivity records retention deletions (TEC-1287).
+func (s *Service) SetActivity(r *activity.Recorder) { s.activity = r }
+
 // New uses the application's existing private encryption key as the IP hash salt.
-func New(q *db.Queries, salt string) *Service   { return &Service{q: q, salt: []byte(salt)} }
+func New(q *db.Queries, salt string) *Service {
+	return &Service{q: q, salt: []byte(salt), log: slog.Default(), now: time.Now}
+}
 func (s *Service) SetNotifier(n *notify.Engine) { s.notifier = n }
 func (s *Service) IPHash(org int64, ip string) string {
 	h := hmac.New(sha256.New, s.salt)
@@ -134,6 +151,9 @@ func (s *Service) Submit(ctx context.Context, org int64, in model.Input, origin,
 	if err != nil {
 		return err
 	}
+	if row.Kind == "newsletter" || row.ConsentMarketing {
+		s.askConsent(ctx, org, row, u.Scheme+"://"+u.Host)
+	}
 	s.notify(ctx, org, row)
 	return nil
 }
@@ -166,7 +186,10 @@ func truncate(value string, n int) string {
 func record(r db.SiteLead) model.Lead {
 	out := model.Lead{UUID: r.Uuid, Kind: r.Kind, Name: r.Name, Email: r.Email, Phone: r.Phone, Company: r.Company, City: r.City,
 		Message: r.Message, Locale: r.Locale, ConsentKVKK: r.ConsentKvkk, ConsentMarketing: r.ConsentMarketing,
-		SourceHost: r.SourceHost, Status: r.Status, CreatedAt: r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time, Note: r.Note}
+		SourceHost: r.SourceHost, Status: r.Status, CreatedAt: r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time, Note: r.Note,
+		MarketingStatus: MarketingStatus(r)}
+	// Only a confirmed, not withdrawn request is marketing permission.
+	out.ConsentMarketing = out.MarketingStatus == model.MarketingConfirmed
 	if r.FleetSize.Valid {
 		out.FleetSize = &r.FleetSize.Int32
 	}

@@ -26,6 +26,7 @@ import (
 type Handler struct {
 	svc      *usecase.Service
 	activity *activity.Recorder
+	limiter  Limiter
 }
 
 func New(s *usecase.Service, a *activity.Recorder) *Handler { return &Handler{svc: s, activity: a} }

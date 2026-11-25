@@ -138,6 +138,20 @@ export const tr = {
     "Ödeme tamamlanamadı. Tekrar deneyebilirsiniz; sorun sürerse bizimle iletişime geçin.",
   "res.pay_secure_note":
     "Ödeme iyzico güvenli ödeme sayfasında 3D Secure ile alınır; kart bilgileriniz bize ulaşmaz.",
+  "sub.title": "E-posta aboneliği",
+  "sub.confirm_intro":
+    "{site} kampanya ve duyurularını e-postayla almak için aboneliğinizi onaylayın.",
+  "sub.confirm_button": "Aboneliği onayla",
+  "sub.unsubscribe_intro":
+    "{site} e-posta listesinden çıkmak istediğinizi onaylayın. Size bir daha kampanya iletisi gönderilmez.",
+  "sub.unsubscribe_button": "Abonelikten çık",
+  "sub.result.confirmed": "Teşekkürler, aboneliğiniz onaylandı.",
+  "sub.result.unsubscribed":
+    "Abonelikten çıktınız; size bir daha kampanya iletisi gönderilmeyecek.",
+  "sub.result.invalid":
+    "Bu bağlantı geçersiz ya da süresi dolmuş. Yeniden abone olmak için sitedeki bülten formunu kullanabilirsiniz.",
+  "sub.result.busy":
+    "Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.",
   "res.cancellation": "İptal koşulları",
   "res.portal":
     "Belgeleriniz, ödemeleriniz ve değişiklik / iptal talepleriniz için hesabınıza giriş yapın.",

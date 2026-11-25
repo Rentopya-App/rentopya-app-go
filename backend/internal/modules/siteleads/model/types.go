@@ -51,4 +51,27 @@ type Lead struct {
 	HandledBy        *int64     `json:"handled_by"`
 	HandledAt        *time.Time `json:"handled_at"`
 	Note             string     `json:"note"`
+	// MarketingStatus (TEC-1287): none (no marketing asked), pending (the
+	// e-mail confirmation is outstanding: no permission yet), confirmed or
+	// unsubscribed. Only confirmed is marketing permission.
+	MarketingStatus string `json:"marketing_status"`
+}
+
+// Marketing statuses (TEC-1287).
+const (
+	MarketingNone         = "none"
+	MarketingPending      = "pending"
+	MarketingConfirmed    = "confirmed"
+	MarketingUnsubscribed = "unsubscribed"
+)
+
+// Settings are an organization's lead settings (TEC-1287).
+type Settings struct {
+	// RetentionMonths: leads older than this are deleted by a daily job.
+	RetentionMonths int `json:"retention_months"`
+}
+
+// TokenInput confirms a subscription or unsubscribes (the e-mail links).
+type TokenInput struct {
+	Token string `json:"token"`
 }

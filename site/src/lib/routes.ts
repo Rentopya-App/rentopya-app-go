@@ -29,6 +29,7 @@ export const ROUTES = {
   contact: { en: "contact", tr: "iletisim" },
   terms: { en: "terms", tr: "kiralama-kosullari" },
   privacy: { en: "privacy", tr: "kvkk" },
+  subscription: { en: "subscription", tr: "abonelik" },
 } as const satisfies Record<string, Record<Locale, string>>;
 
 type Segment = { en: string; tr: string };

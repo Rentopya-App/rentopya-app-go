@@ -24685,6 +24685,85 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /v1/tenant/site/leads/settings:
+    get:
+      tags: [Tenant]
+      operationId: getSiteLeadSettings
+      summary: Site lead settings (retention)
+      description: "Requires tenant.site_leads.read. TEC-1287: leads older than retention_months are deleted nightly (recorded in activity)."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XOrganization"
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSiteLeadSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+    put:
+      tags: [Tenant]
+      operationId: putSiteLeadSettings
+      summary: Change the lead retention period
+      description: "Requires tenant.site_leads.manage and the site feature. 422 out_of_range outside 1 – 120 months, site_required before the site exists."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XOrganization"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SiteLeadSettings" }
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSiteLeadSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "422": { $ref: "#/components/responses/UnprocessableEntity" }
+
+  /v1/public/site/leads/confirm:
+    post:
+      tags: [Public Booking]
+      operationId: confirmSiteLeadMarketing
+      summary: Confirm a marketing subscription (e-mail link)
+      description: "No auth: the 43-character token from the e-mail is the credential (single use, 7 days). 30 calls per minute per IP. 404 for an unknown, used or expired link. TEC-1287."
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SiteLeadTokenRequest" }
+      responses:
+        "204": { description: Confirmed }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /v1/public/site/leads/unsubscribe:
+    post:
+      tags: [Public Booking]
+      operationId: unsubscribeSiteLead
+      summary: Withdraw marketing permission (e-mail link)
+      description: "No auth: the unsubscribe token from the e-mail is the credential (does not expire; repeating is harmless). 30 calls per minute per IP. TEC-1287."
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SiteLeadTokenRequest" }
+      responses:
+        "204": { description: Unsubscribed }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
   /v1/tenant/site/leads:
     get:
       tags: [Tenant]
@@ -26558,7 +26637,7 @@ components:
         note: { type: string, maxLength: 5000 }
     SiteLead:
       type: object
-      required: [uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, status, created_at, updated_at, handled_by, handled_at, note]
+      required: [uuid, kind, name, email, phone, company, city, message, fleet_size, locale, consent_kvkk, consent_marketing, source_host, status, created_at, updated_at, handled_by, handled_at, note, marketing_status]
       properties:
         uuid: { type: string, format: uuid }
         kind: { type: string, enum: [newsletter, contact, corporate, franchise] }
@@ -26579,6 +26658,32 @@ components:
         handled_by: { type: [integer, "null"], format: int64 }
         handled_at: { type: [string, "null"], format: date-time }
         note: { type: string }
+        marketing_status:
+          type: string
+          enum: [none, pending, confirmed, unsubscribed]
+          description: "TEC-1287 double opt-in: pending until the e-mailed link is clicked; only confirmed is marketing permission (consent_marketing is true only then)."
+    SiteLeadSettings:
+      type: object
+      required: [retention_months]
+      properties:
+        retention_months:
+          type: integer
+          minimum: 1
+          maximum: 120
+          description: Leads older than this are deleted by a nightly job (default 24).
+    EnvelopeSiteLeadSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/SiteLeadSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    SiteLeadTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token: { type: string, minLength: 43, maxLength: 43 }
     SiteLeadFlags:
       type: object
       required: [contact, corporate, franchise, newsletter]

@@ -16533,6 +16533,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/site/leads/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Site lead settings (retention)
+         * @description Requires tenant.site_leads.read. TEC-1287: leads older than retention_months are deleted nightly (recorded in activity).
+         */
+        get: operations["getSiteLeadSettings"];
+        /**
+         * Change the lead retention period
+         * @description Requires tenant.site_leads.manage and the site feature. 422 out_of_range outside 1 – 120 months, site_required before the site exists.
+         */
+        put: operations["putSiteLeadSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/site/leads/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a marketing subscription (e-mail link)
+         * @description No auth: the 43-character token from the e-mail is the credential (single use, 7 days). 30 calls per minute per IP. 404 for an unknown, used or expired link. TEC-1287.
+         */
+        post: operations["confirmSiteLeadMarketing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/site/leads/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw marketing permission (e-mail link)
+         * @description No auth: the unsubscribe token from the e-mail is the credential (does not expire; repeating is harmless). 30 calls per minute per IP. TEC-1287.
+         */
+        post: operations["unsubscribeSiteLead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/site/leads": {
         parameters: {
             query?: never;
@@ -17732,6 +17796,24 @@ export interface components {
             /** Format: date-time */
             handled_at: string | null;
             note: string;
+            /**
+             * @description TEC-1287 double opt-in: pending until the e-mailed link is clicked; only confirmed is marketing permission (consent_marketing is true only then).
+             * @enum {string}
+             */
+            marketing_status: "none" | "pending" | "confirmed" | "unsubscribed";
+        };
+        SiteLeadSettings: {
+            /** @description Leads older than this are deleted by a nightly job (default 24). */
+            retention_months: number;
+        };
+        EnvelopeSiteLeadSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["SiteLeadSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        SiteLeadTokenRequest: {
+            token: string;
         };
         SiteLeadFlags: {
             /** @default true */
@@ -64420,6 +64502,118 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getSiteLeadSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSiteLeadSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+        };
+    };
+    putSiteLeadSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteLeadSettings"];
+            };
+        };
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSiteLeadSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            422: components["responses"]["UnprocessableEntity"];
+        };
+    };
+    confirmSiteLeadMarketing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteLeadTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Confirmed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    unsubscribeSiteLead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteLeadTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Unsubscribed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     listSiteLeads: {

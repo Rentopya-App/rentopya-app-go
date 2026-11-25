@@ -116,7 +116,7 @@ func (q *Queries) GetSitePublicAPIKeyID(ctx context.Context, arg GetSitePublicAP
 
 const getSiteSettings = `-- name: GetSiteSettings :one
 
-SELECT s.id, s.uuid, s.organization_id, s.enabled, s.subdomain, s.default_locale, s.config, s.api_key_id, s.logo_object_key, s.favicon_object_key, s.cover_object_key, s.version, s.updated_by, s.created_at, s.updated_at, s.published_revision, k.uuid AS api_key_uuid,
+SELECT s.id, s.uuid, s.organization_id, s.enabled, s.subdomain, s.default_locale, s.config, s.api_key_id, s.logo_object_key, s.favicon_object_key, s.cover_object_key, s.version, s.updated_by, s.created_at, s.updated_at, s.published_revision, s.lead_retention_months, k.uuid AS api_key_uuid,
     v.uuid AS published_uuid, v.config AS published_config,
     v.logo_object_key AS published_logo_object_key, v.favicon_object_key AS published_favicon_object_key,
     v.cover_object_key AS published_cover_object_key, v.published_at
@@ -143,6 +143,7 @@ type GetSiteSettingsRow struct {
 	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 	PublishedRevision         pgtype.Int4        `json:"published_revision"`
+	LeadRetentionMonths       int32              `json:"lead_retention_months"`
 	ApiKeyUuid                pgtype.UUID        `json:"api_key_uuid"`
 	PublishedUuid             pgtype.UUID        `json:"published_uuid"`
 	PublishedConfig           []byte             `json:"published_config"`
@@ -179,6 +180,7 @@ func (q *Queries) GetSiteSettings(ctx context.Context, organizationID int64) (Ge
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedRevision,
+		&i.LeadRetentionMonths,
 		&i.ApiKeyUuid,
 		&i.PublishedUuid,
 		&i.PublishedConfig,
@@ -231,7 +233,7 @@ INSERT INTO site_settings (
     $5, $6, $7
 )
 ON CONFLICT (organization_id) DO NOTHING
-RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision
+RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months
 `
 
 type InsertSiteSettingsParams struct {
@@ -274,6 +276,7 @@ func (q *Queries) InsertSiteSettings(ctx context.Context, arg InsertSiteSettings
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedRevision,
+		&i.LeadRetentionMonths,
 	)
 	return i, err
 }
@@ -876,7 +879,7 @@ SET logo_object_key = CASE WHEN $1::text = 'logo' THEN $2::text ELSE logo_object
     version = version + 1
 WHERE organization_id = $4
   AND version = $5
-RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision
+RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months
 `
 
 type SetSiteDraftImageParams struct {
@@ -914,6 +917,7 @@ func (q *Queries) SetSiteDraftImage(ctx context.Context, arg SetSiteDraftImagePa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedRevision,
+		&i.LeadRetentionMonths,
 	)
 	return i, err
 }
@@ -925,7 +929,7 @@ SET api_key_id = $1,
     version = version + 1
 WHERE organization_id = $3
   AND version = $4
-RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision
+RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months
 `
 
 type SetSiteKeyParams struct {
@@ -961,6 +965,7 @@ func (q *Queries) SetSiteKey(ctx context.Context, arg SetSiteKeyParams) (SiteSet
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedRevision,
+		&i.LeadRetentionMonths,
 	)
 	return i, err
 }
@@ -1029,7 +1034,7 @@ SET enabled = $1,
     version = version + 1
 WHERE organization_id = $7
   AND version = $8
-RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision
+RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months
 `
 
 type UpdateSiteSettingsParams struct {
@@ -1074,6 +1079,7 @@ func (q *Queries) UpdateSiteSettings(ctx context.Context, arg UpdateSiteSettings
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedRevision,
+		&i.LeadRetentionMonths,
 	)
 	return i, err
 }

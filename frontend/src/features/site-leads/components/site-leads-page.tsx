@@ -5,7 +5,7 @@ import type {
   ColumnFiltersState,
   OnChangeFn,
 } from "@tanstack/react-table";
-import { Eye, Globe } from "lucide-react";
+import { Clock, Eye, Globe } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -29,6 +29,7 @@ import {
   joinFilter,
 } from "@/features/fleet/components/shared/list-utils";
 import { SiteLeadDrawer } from "@/features/site-leads/components/site-lead-drawer";
+import { SiteLeadRetentionDialog } from "@/features/site-leads/components/site-lead-retention-dialog";
 import {
   KIND_LABEL_KEYS,
   LEAD_KINDS,
@@ -92,6 +93,7 @@ export function SiteLeadsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [selected, setSelected] = useState<SiteLead | null>(null);
+  const [retentionOpen, setRetentionOpen] = useState(false);
 
   const params = useMemo<ListSiteLeadsParams>(() => {
     const column = (id: string) => filterValues(listState.columnFilters, id);
@@ -211,10 +213,9 @@ export function SiteLeadsPage() {
           labelKey: "site_leads.columns.consent_marketing",
           enableSorting: false,
           defaultHidden: true,
+          // TEC-1287: only a confirmed (double opt-in) request is consent.
           cell: ({ row }) =>
-            row.original.consent_marketing
-              ? t("site_leads.detail.yes")
-              : t("site_leads.detail.no"),
+            t(`site_leads.marketing.${row.original.marketing_status}`),
         }),
         createColumn<SiteLead>({
           accessorKey: "source_host",
@@ -271,16 +272,31 @@ export function SiteLeadsPage() {
         { label: t("site_leads.title") },
       ]}
       actions={
-        can(permissions.tenant.site.read) ? (
-          <Button asChild size="sm" variant="outline">
-            <Link href={routes.tenant.settings.site(slug)}>
-              <Globe className="size-4" />
-              {t("site_leads.actions.site_settings")}
-            </Link>
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setRetentionOpen(true)}
+          >
+            <Clock className="size-4" />
+            {t("site_leads.actions.retention")}
           </Button>
-        ) : null
+          {can(permissions.tenant.site.read) ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={routes.tenant.settings.site(slug)}>
+                <Globe className="size-4" />
+                {t("site_leads.actions.site_settings")}
+              </Link>
+            </Button>
+          ) : null}
+        </>
       }
     >
+      <SiteLeadRetentionDialog
+        open={retentionOpen}
+        onOpenChange={setRetentionOpen}
+        canManage={can(permissions.tenant.siteLeads.manage)}
+      />
       <EntityTable
         columns={columns}
         data={query.data?.items ?? []}
