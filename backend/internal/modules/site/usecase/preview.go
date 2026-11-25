@@ -18,8 +18,9 @@ import (
 // PreviewTTL is how long a preview link works.
 const PreviewTTL = 30 * time.Minute
 
-// previewPrefix versions the token format.
-const previewPrefix = "sp1"
+// previewPrefix versions the token format: sp2 adds the site's preview
+// epoch (TEC-1289), so raising it revokes every link issued before.
+const previewPrefix = "sp2"
 
 // SetPreviewSecret derives the preview signing key from an existing server
 // secret (APP_ENCRYPTION_KEY): no new configuration. Without it preview
@@ -40,24 +41,25 @@ func (s *Service) previewMAC(payload string) []byte {
 	return mac.Sum(nil)
 }
 
-// signPreview builds sp1.{site uuid}.{expiry unix}.{mac}: bound to one site
-// (so to one organization) and short-lived.
-func (s *Service) signPreview(site uuid.UUID, exp time.Time) string {
-	payload := previewPrefix + "." + site.String() + "." + strconv.FormatInt(exp.Unix(), 10)
+// signPreview builds sp2.{site uuid}.{expiry unix}.{epoch}.{mac}: bound to
+// one site (so to one organization), short-lived and revocable.
+func (s *Service) signPreview(site uuid.UUID, exp time.Time, epoch int32) string {
+	payload := previewPrefix + "." + site.String() + "." + strconv.FormatInt(exp.Unix(), 10) + "." + strconv.Itoa(int(epoch))
 	return payload + "." + base64.RawURLEncoding.EncodeToString(s.previewMAC(payload))
 }
 
-// verifyPreview checks a token for a site: signature, site and expiry.
-func (s *Service) verifyPreview(token string, site uuid.UUID) bool {
+// verifyPreview checks a token for a site: signature, site, expiry and the
+// site's current preview epoch.
+func (s *Service) verifyPreview(token string, site uuid.UUID, epoch int32) bool {
 	if len(s.previewKey) == 0 || len(token) > 200 {
 		return false
 	}
 	parts := strings.Split(token, ".")
-	if len(parts) != 4 || parts[0] != previewPrefix {
+	if len(parts) != 5 || parts[0] != previewPrefix {
 		return false
 	}
-	payload := strings.Join(parts[:3], ".")
-	sig, err := base64.RawURLEncoding.DecodeString(parts[3])
+	payload := strings.Join(parts[:4], ".")
+	sig, err := base64.RawURLEncoding.DecodeString(parts[4])
 	if err != nil || !hmac.Equal(sig, s.previewMAC(payload)) {
 		return false
 	}
@@ -65,8 +67,21 @@ func (s *Service) verifyPreview(token string, site uuid.UUID) bool {
 	if err != nil || id != site {
 		return false
 	}
+	if parts[3] != strconv.Itoa(int(epoch)) {
+		return false
+	}
 	exp, err := strconv.ParseInt(parts[2], 10, 64)
 	return err == nil && s.now().Before(time.Unix(exp, 0))
+}
+
+// RevokePreviews invalidates every preview link of the organization's site
+// issued so far (TEC-1289). Without a site there is nothing to revoke.
+func (s *Service) RevokePreviews(ctx context.Context, orgID int64) error {
+	_, err := s.q.RevokeSitePreviews(ctx, orgID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
 }
 
 // IssuePreview returns a preview link for the organization's draft. A site
@@ -88,7 +103,7 @@ func (s *Service) IssuePreview(ctx context.Context, orgID int64, orgSlug string,
 		return model.PreviewToken{}, err
 	}
 	exp := s.now().Add(PreviewTTL).Truncate(time.Second)
-	token := s.signPreview(row.Uuid, exp)
+	token := s.signPreview(row.Uuid, exp, row.PreviewEpoch)
 	out := model.PreviewToken{
 		Token: token, URL: s.base.Origin(row.Subdomain) + "/?preview=" + token, ExpiresAt: exp.UTC(),
 	}

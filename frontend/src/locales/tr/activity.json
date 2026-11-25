@@ -425,6 +425,7 @@
   "actions.site.updated": "Markalı site ayarları kaydedildi",
   "actions.site.published": "Markalı site yayınlandı",
   "actions.site.restored": "Markalı site sürümü taslağa geri yüklendi",
+  "actions.site.previews_revoked": "Markalı site önizleme linkleri iptal edildi",
   "actions.site.key_renewed": "Markalı site anahtarı yenilendi",
   "actions.site.image_updated": "Markalı site görseli yüklendi",
   "actions.site.image_removed": "Markalı site görseli kaldırıldı",

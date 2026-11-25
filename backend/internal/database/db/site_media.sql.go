@@ -40,7 +40,7 @@ func (q *Queries) DeleteSiteMedia(ctx context.Context, arg DeleteSiteMediaParams
 }
 
 const getPublicSiteMedia = `-- name: GetPublicSiteMedia :one
-SELECT m.id, m.uuid, m.organization_id, m.kind, m.mime, m.size, m.width, m.height, m.alt, m.object_key, m.created_by, m.created_at, m.updated_at, s.config AS draft_config, v.config AS published_config, s.enabled, s.published_revision,
+SELECT m.id, m.uuid, m.organization_id, m.kind, m.mime, m.size, m.width, m.height, m.alt, m.object_key, m.created_by, m.created_at, m.updated_at, s.config AS draft_config, v.config AS published_config, s.enabled, s.published_revision, s.preview_epoch,
  o.status AS organization_status, o.access_starts_at, o.access_ends_at
 FROM site_settings s
 JOIN organizations o ON o.id = s.organization_id AND o.deleted_at IS NULL
@@ -72,6 +72,7 @@ type GetPublicSiteMediaRow struct {
 	PublishedConfig    []byte             `json:"published_config"`
 	Enabled            bool               `json:"enabled"`
 	PublishedRevision  pgtype.Int4        `json:"published_revision"`
+	PreviewEpoch       int32              `json:"preview_epoch"`
 	OrganizationStatus string             `json:"organization_status"`
 	AccessStartsAt     pgtype.Timestamptz `json:"access_starts_at"`
 	AccessEndsAt       pgtype.Timestamptz `json:"access_ends_at"`
@@ -100,6 +101,7 @@ func (q *Queries) GetPublicSiteMedia(ctx context.Context, arg GetPublicSiteMedia
 		&i.PublishedConfig,
 		&i.Enabled,
 		&i.PublishedRevision,
+		&i.PreviewEpoch,
 		&i.OrganizationStatus,
 		&i.AccessStartsAt,
 		&i.AccessEndsAt,

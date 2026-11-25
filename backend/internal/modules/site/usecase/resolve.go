@@ -107,7 +107,7 @@ func (s *Service) Resolve(ctx context.Context, rawHost, previewToken string) (mo
 		return model.Resolved{}, ErrNotFound
 	}
 	preview := previewToken != ""
-	if preview && !s.verifyPreview(previewToken, row.Uuid) {
+	if preview && !s.verifyPreview(previewToken, row.Uuid, row.PreviewEpoch) {
 		return model.Resolved{}, ErrPreviewInvalid
 	}
 	if !preview && (!row.Enabled || !row.PublishedRevision.Valid) {
@@ -216,7 +216,7 @@ func (s *Service) Asset(ctx context.Context, site uuid.UUID, kind, previewToken 
 	logo, favicon, cover := row.PublishedLogoObjectKey, row.PublishedFaviconObjectKey, row.PublishedCoverObjectKey
 	switch {
 	case previewToken != "":
-		if !s.verifyPreview(previewToken, site) {
+		if !s.verifyPreview(previewToken, site, row.PreviewEpoch) {
 			return nil, "", ErrNotFound
 		}
 		logo, favicon, cover = row.LogoObjectKey, row.FaviconObjectKey, row.CoverObjectKey

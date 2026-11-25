@@ -22,7 +22,7 @@ DELETE FROM site_media WHERE organization_id = sqlc.arg(organization_id) AND uui
 -- name: GetPublicSiteMedia :one
 -- Global public UUID lookup: the site, organization and published/draft
 -- reference jointly authorize the bytes. The service validates the token.
-SELECT m.*, s.config AS draft_config, v.config AS published_config, s.enabled, s.published_revision,
+SELECT m.*, s.config AS draft_config, v.config AS published_config, s.enabled, s.published_revision, s.preview_epoch,
  o.status AS organization_status, o.access_starts_at, o.access_ends_at
 FROM site_settings s
 JOIN organizations o ON o.id = s.organization_id AND o.deleted_at IS NULL
