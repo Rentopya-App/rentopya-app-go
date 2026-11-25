@@ -110,6 +110,26 @@ export async function proxy(request: NextRequest) {
     );
   }
 
+  // A preview link opened as a page moves its token into the cookie and
+  // drops it from the URL, so it stays out of the history, logs and
+  // Referer (TEC-1289). Framed previews (the panel) keep the query: a
+  // partitioned cookie is not guaranteed there, and no-referrer applies.
+  if (
+    site.preview &&
+    fromQuery &&
+    !embed &&
+    request.method === "GET" &&
+    request.headers.get("sec-fetch-dest") === "document"
+  ) {
+    const url = request.nextUrl.clone();
+    url.searchParams.delete(PREVIEW_PARAM);
+    const res = NextResponse.redirect(url, 303);
+    res.cookies.set(PREVIEW_COOKIE, fromQuery, previewCookieOptions(fromQuery));
+    res.headers.set("Referrer-Policy", "no-referrer");
+    res.headers.set("Cache-Control", "private, no-store");
+    return res;
+  }
+
   // TEC-1286: a nonce per request; Next reads it from the request's CSP
   // header and stamps its own scripts. Report-only until violations are
   // reviewed in Sentry.
@@ -275,6 +295,7 @@ export async function proxy(request: NextRequest) {
   if (site.preview) {
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("X-Robots-Tag", "noindex");
+    response.headers.set("Referrer-Policy", "no-referrer");
     if (fromQuery) {
       response.cookies.set(
         PREVIEW_COOKIE,

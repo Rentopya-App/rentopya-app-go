@@ -320,6 +320,10 @@ func (h *Handler) allow(w http.ResponseWriter, r *http.Request, action string, l
 	return false
 }
 
+// SiteImageCacheControl caches public site images for an hour, then
+// revalidates (TEC-1289): visibility follows the organization's status.
+const SiteImageCacheControl = "public, max-age=3600, stale-while-revalidate=600"
+
 // Resolve serves GET /v1/public/site/resolve?host=[&preview=]: the site of
 // a request host (the published snapshot, or the draft for a valid
 // preview token). Unknown hosts answer 404 SITE_NOT_FOUND.
@@ -370,7 +374,7 @@ func (h *Handler) Asset(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// The URL carries the published revision (?v=), which changes on
 		// every publish.
-		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Header().Set("Cache-Control", SiteImageCacheControl)
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, rc)

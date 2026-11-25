@@ -15,7 +15,6 @@ import (
 
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/database/db"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/modules/site/model"
-	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/orgctx"
 	"github.com/furkanmeclis/nextjs-go-boilerplate/backend/internal/platform/storage"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -186,9 +185,8 @@ func (s *Service) PublicMedia(ctx context.Context, site, id uuid.UUID, preview s
 	if err != nil {
 		return nil, "", mediaDBError(err)
 	}
-	now := s.now()
-	if row.OrganizationStatus != orgctx.StatusActive || (row.AccessStartsAt.Valid && now.Before(row.AccessStartsAt.Time)) || (row.AccessEndsAt.Valid && !now.Before(row.AccessEndsAt.Time)) {
-		return nil, "", ErrNotFound
+	if err := s.orgServesSite(ctx, row.OrganizationID, row.OrganizationStatus, row.AccessStartsAt, row.AccessEndsAt); err != nil {
+		return nil, "", err
 	}
 	config := row.PublishedConfig
 	if preview != "" {
