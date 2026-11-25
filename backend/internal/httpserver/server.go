@@ -1184,12 +1184,19 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// TEC-1287: marketing requests are confirmed by e-mail (double opt-in).
 	siteLeadsSvc.SetMailer(mailer)
 	siteLeadsSvc.SetActivity(activityRec)
+	publicLimiter := ratelimit.New(deps.Redis, cfg.App.Env)
 	siteLeadsHandler := siteleadshandler.New(siteLeadsSvc, activityRec)
-	siteLeadsHandler.SetLimiter(ratelimit.New(deps.Redis, cfg.App.Env))
+	siteLeadsHandler.SetLimiter(publicLimiter)
 	siteleadsmodule.RegisterRoutes(mux, siteLeadsHandler, tokens, loader, tenantResolver)
 	siteleadsmodule.RegisterPublicRoutes(mux, siteLeadsHandler)
-	publicHandler := publicapihandler.NewPublic(publicAPISvc, ratelimit.New(deps.Redis, cfg.App.Env))
+	publicHandler := publicapihandler.NewPublic(publicAPISvc, publicLimiter)
 	publicHandler.SetStorefront(deps.Queries, siteLeadsSvc)
+	// Hourly caps per organization on public reservations and site leads
+	// (TEC-1282), set in platform settings; reaching one alerts the platform.
+	publicHandler.SetOrgCaps(publicLimiter, func(ctx context.Context) (int, int, error) {
+		row, err := deps.Queries.GetPublicOrgCaps(ctx)
+		return int(row.PublicReservationsPerHour), int(row.PublicLeadsPerHour), err
+	}, platformHealthSvc)
 	publicapimodule.RegisterRoutes(mux,
 		publicHandler,
 		publicapihandler.NewPanel(publicAPISvc, activityRec), tokens, loader, tenantResolver)

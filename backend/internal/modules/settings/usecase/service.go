@@ -40,6 +40,9 @@ type Settings struct {
 	FooterText   string  `json:"footer_text"`
 	PaperSize    string  `json:"paper_size"`
 	LogoURL      *string `json:"logo_url,omitempty"`
+	// Hourly caps per organization on anonymous public writes (TEC-1282).
+	PublicReservationsPerHour int `json:"public_reservations_per_hour"`
+	PublicLeadsPerHour        int `json:"public_leads_per_hour"`
 }
 
 func mapSettings(row db.AppSetting) Settings {
@@ -52,6 +55,7 @@ func mapSettings(row db.AppSetting) Settings {
 		CompanyName: row.CompanyName, Tagline: row.Tagline, PrimaryColor: row.PrimaryColor,
 		Address: row.Address, Phone: row.Phone, Email: row.Email, Website: row.Website,
 		FooterText: row.FooterText, PaperSize: row.PaperSize, LogoURL: logo,
+		PublicReservationsPerHour: int(row.PublicReservationsPerHour), PublicLeadsPerHour: int(row.PublicLeadsPerHour),
 	}
 }
 
@@ -92,11 +96,39 @@ type PatchInput struct {
 	Website      *string `json:"website"`
 	FooterText   *string `json:"footer_text"`
 	PaperSize    *string `json:"paper_size"`
+	// 1 – 100000 per organization per hour.
+	PublicReservationsPerHour *int `json:"public_reservations_per_hour"`
+	PublicLeadsPerHour        *int `json:"public_leads_per_hour"`
+}
+
+// MaxPublicCap bounds the hourly public caps.
+const MaxPublicCap = 100000
+
+// ErrInvalidCap: a public cap outside 1 – MaxPublicCap.
+var ErrInvalidCap = errors.New("public caps must be between 1 and 100000")
+
+func capNarg(v *int) (pgtype.Int4, error) {
+	if v == nil {
+		return pgtype.Int4{}, nil
+	}
+	if *v < 1 || *v > MaxPublicCap {
+		return pgtype.Int4{}, ErrInvalidCap
+	}
+	return pgtype.Int4{Int32: int32(*v), Valid: true}, nil
 }
 
 // Patch updates settings.
 func (s *Service) Patch(ctx context.Context, in PatchInput) (Settings, error) {
+	reservations, err := capNarg(in.PublicReservationsPerHour)
+	if err != nil {
+		return Settings{}, err
+	}
+	leads, err := capNarg(in.PublicLeadsPerHour)
+	if err != nil {
+		return Settings{}, err
+	}
 	row, err := s.q.UpdateAppSettings(ctx, db.UpdateAppSettingsParams{
+		PublicReservationsPerHour: reservations, PublicLeadsPerHour: leads,
 		CompanyName: textNarg(in.CompanyName), Tagline: textNarg(in.Tagline),
 		PrimaryColor: textNarg(in.PrimaryColor), Address: textNarg(in.Address),
 		Phone: textNarg(in.Phone), Email: textNarg(in.Email), Website: textNarg(in.Website),
