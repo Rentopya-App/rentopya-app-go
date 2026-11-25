@@ -81,6 +81,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const ctx = await getCtx();
+  // The request's CSP nonce (proxy, TEC-1286) for the scripts rendered here.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const ga = safeGa4Id(ctx.site.config.analytics?.ga4_measurement_id);
   // The template renderer (src/themes); unknown templates render Technowide.
   const theme = themeFor(ctx.site);
@@ -121,8 +123,9 @@ export default async function RootLayout({
               <Script
                 src={`https://www.googletagmanager.com/gtag/js?id=${ga}`}
                 strategy="afterInteractive"
+                nonce={nonce}
               />
-              <Script id="ga4" strategy="afterInteractive">
+              <Script id="ga4" strategy="afterInteractive" nonce={nonce}>
                 {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${ga}',{anonymize_ip:true});`}
               </Script>
             </>

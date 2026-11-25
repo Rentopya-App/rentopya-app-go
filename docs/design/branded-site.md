@@ -1138,3 +1138,16 @@ above. Visual check against the scratch mock API at 1280 px and 360 px (no
 horizontal scroll): home, `/vehicles` with a segment. Not checked: real
 devices / Safari, the booking pages with a live API, dark mode with real
 brand colors.
+
+## 17. Content Security Policy (TEC-1286)
+
+Every page response (embed included) carries, besides the enforced framing policy (`frame-ancestors`, `base-uri`, `form-action`; §8, §9), a **`Content-Security-Policy-Report-Only`** script policy built per request in `site/src/lib/csp.ts`:
+
+`default-src 'self'; script-src 'self' 'nonce-…' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; worker-src 'self' blob:; manifest-src 'self'; report-uri <Sentry>`
+
+- The proxy makes a fresh nonce per request and puts the policy on the **request** too: Next reads the nonce from it and stamps its own scripts; the layout passes `x-nonce` to its `<Script>`s. Scripts those load are allowed by `'strict-dynamic'`; an injected inline `<script>` is not.
+- GA4 (when the site sets a measurement id, not in previews or the embed) adds `https://www.googletagmanager.com` to `script-src` and Google's collect hosts to `connect-src` / `img-src`. Turnstile adds its own host when it arrives (TEC-1282).
+- Styles allow `'unsafe-inline'`: React renders `style` attributes, which a nonce cannot cover, and the theme's `<style>` carries validated tokens only (`lib/theme.ts`).
+- Violations go to Sentry's security endpoint of `SENTRY_DSN` (`report-uri`); without a DSN nothing is reported.
+- **Rollout:** report-only first. After a week without real violations across the four themes, rename the header to `Content-Security-Policy` in `src/proxy.ts` (one line) to enforce it.
+- **HSTS:** site responses send `Strict-Transport-Security: max-age=31536000` (no `includeSubDomains`, no `preload`): an organization's custom domain must not have its other hosts pinned to HTTPS by us. The platform domain's subdomains are covered by the panel's `includeSubDomains` header.

@@ -9,6 +9,8 @@ import {
 } from "@/lib/embed";
 
 import { ApiError } from "@/lib/api";
+import { sentryConfig } from "@/lib/app-env";
+import { newNonce, sentryReportUri, sitePolicy } from "@/lib/csp";
 import {
   PREVIEW_COOKIE,
   PREVIEW_HEADER,
@@ -21,6 +23,7 @@ import { LOCALE_COOKIE, isLocale } from "@/lib/i18n";
 import { LOCALE_HEADER, PATH_HEADER, forwardedForFrom } from "@/lib/request";
 import { localizePath, resolvePath } from "@/lib/routes";
 import { resolveSite } from "@/lib/resolve";
+import { safeGa4Id } from "@/lib/theme";
 import {
   SESSION_COOKIE,
   SESSION_HEADER,
@@ -33,7 +36,13 @@ import {
 } from "@/lib/session";
 
 /** Internal headers the proxy owns; client copies are always dropped. */
+/** The request's CSP nonce, for pages that render their own <Script>. */
+export const NONCE_HEADER = "x-nonce";
+const REPORT_ONLY = "content-security-policy-report-only";
+
 const INTERNAL_HEADERS = [
+  NONCE_HEADER,
+  REPORT_ONLY,
   SESSION_HEADER,
   PATH_HEADER,
   LOCALE_HEADER,
@@ -121,6 +130,29 @@ export async function proxy(request: NextRequest) {
     return res;
   }
 
+  // TEC-1286: a nonce per request; Next reads it from the request's CSP
+  // header and stamps its own scripts. Report-only until violations are
+  // reviewed in Sentry.
+  const nonce = newNonce();
+  const sentry = sentryConfig();
+  const cspReportOnly = sitePolicy({
+    nonce,
+    ga4:
+      embed || site.preview
+        ? null
+        : safeGa4Id(site.config.analytics?.ga4_measurement_id),
+    reportUri: sentryReportUri(
+      sentry?.dsn,
+      sentry?.environment,
+      sentry?.release,
+    ),
+    dev: process.env.NODE_ENV !== "production",
+  });
+  const withCsp = (h: Headers) => {
+    h.set(NONCE_HEADER, nonce);
+    h.set(REPORT_ONLY, cspReportOnly);
+  };
+
   if (embed) {
     const frame = (res: NextResponse) => {
       for (const [k, v] of Object.entries(
@@ -128,6 +160,7 @@ export async function proxy(request: NextRequest) {
       ))
         res.headers.set(k, v);
       res.headers.delete("X-Frame-Options");
+      res.headers.set("Content-Security-Policy-Report-Only", cspReportOnly);
       return res;
     };
     const suppliedKey = request.nextUrl.searchParams.get("key");
@@ -177,6 +210,7 @@ export async function proxy(request: NextRequest) {
     const headers = new Headers(request.headers);
     for (const h of INTERNAL_HEADERS) headers.delete(h);
     headers.set(EMBED_HEADER, "1");
+    withCsp(headers);
     headers.set(PATH_HEADER, request.nextUrl.pathname + request.nextUrl.search);
     headers.set(SESSION_HEADER, state.session.t);
     return frame(NextResponse.next({ request: { headers } }));
@@ -200,6 +234,7 @@ export async function proxy(request: NextRequest) {
 
   const headers = new Headers(request.headers);
   for (const h of INTERNAL_HEADERS) headers.delete(h);
+  withCsp(headers);
   headers.set(PATH_HEADER, internalPath + request.nextUrl.search);
   if (pathLocale && site.locales.includes(pathLocale))
     headers.set(LOCALE_HEADER, pathLocale);
@@ -276,6 +311,7 @@ export async function proxy(request: NextRequest) {
       sessionCookieOptions(site),
     );
   }
+  response.headers.set("Content-Security-Policy-Report-Only", cspReportOnly);
   return response;
 }
 
