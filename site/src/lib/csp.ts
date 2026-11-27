@@ -92,3 +92,18 @@ export function sentryReportUri(
     return "";
   }
 }
+
+/**
+ * The enforced policy with the request's nonce attached so Next finds it.
+ * Next copies every proxy response header onto the request and reads the
+ * nonce from `content-security-policy` before the report-only header,
+ * looking for a directive that starts with "script-src". The enforced
+ * policy only frames (frame-ancestors, base-uri, form-action), so the nonce
+ * rides on `script-src-attr`: browsers apply it to inline event-handler
+ * attributes only, which a nonce never allows (React and Next render none),
+ * and scripts stay governed by the report-only policy until it is enforced.
+ */
+export function withNonce(enforced: string, nonce: string): string {
+  const base = enforced.trim().replace(/;\s*$/, "");
+  return `${base}; script-src-attr 'nonce-${nonce}'`;
+}
