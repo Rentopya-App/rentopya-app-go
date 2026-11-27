@@ -154,6 +154,21 @@ export function useSitePreview(enabled: boolean) {
   });
 }
 
+/** Revokes every earlier preview link and fetches a fresh one (TEC-1289). */
+export function useRevokeSitePreviews() {
+  const { slug } = useTenant();
+  const { t } = useLocale();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => siteService.revokePreviews(slug),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: siteKeys.preview(slug) });
+      appToast.success(t("site.preview.revoked"));
+    },
+    onError: () => appToast.error(t("site.preview.revoke_failed")),
+  });
+}
+
 export function useRenewSiteKey() {
   const { slug } = useTenant();
   const { t } = useLocale();

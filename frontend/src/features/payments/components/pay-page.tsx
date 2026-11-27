@@ -12,7 +12,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { AppWordmark } from "@/components/brand";
+import { OrganizationMark } from "@/components/brand";
 import { Loading } from "@/components/common/loading";
 import { LocaleSwitch } from "@/components/layout/locale-switch";
 import { ThemeSwitch } from "@/components/layout/theme-switch";
@@ -217,7 +217,13 @@ export function PayPage({ token }: { token: string }) {
       </div>
       <div className="flex w-full max-w-md flex-col gap-6">
         <div className="self-center">
-          <AppWordmark />
+          {/* The firm the customer pays, not the platform (TEC-1284). */}
+          {query.data ? (
+            <OrganizationMark
+              name={query.data.organization_name}
+              logoUrl={query.data.organization_logo_url}
+            />
+          ) : null}
         </div>
         {body}
       </div>

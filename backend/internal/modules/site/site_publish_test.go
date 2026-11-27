@@ -188,7 +188,7 @@ func TestPreviewToken(t *testing.T) {
 	// The same signature on another site's id.
 	parts := strings.Split(pa.Token, ".")
 	bSite, _ := previewOf(subB+".sites.test", pb.Token)
-	forged := strings.Join([]string{parts[0], bSite.SiteUUID.String(), parts[2], parts[3]}, ".")
+	forged := strings.Join([]string{parts[0], bSite.SiteUUID.String(), parts[2], parts[3], parts[4]}, ".")
 	for name, c := range map[string][2]string{
 		"A's token on B": {subB + ".sites.test", pa.Token}, "B's token on A": {subA + ".sites.test", pb.Token},
 		"tampered": {subA + ".sites.test", tampered}, "garbage": {subA + ".sites.test", "sp1.x.y.z"}, "forged": {subB + ".sites.test", forged},
@@ -202,6 +202,14 @@ func TestPreviewToken(t *testing.T) {
 		t.Fatalf("expired token = %d", ans.code)
 	}
 	e.svc.SetClock(time.Now)
+	// Revoking the previews (TEC-1289) invalidates every link issued before.
+	e.must(e.svc.RevokePreviews(context.Background(), e.a.id))
+	if _, ans := previewOf(subA+".sites.test", pa.Token); ans.code != http.StatusUnauthorized {
+		t.Fatalf("revoked token = %d", ans.code)
+	}
+	if _, ans := previewOf(subB+".sites.test", pb.Token); ans.code != http.StatusOK {
+		t.Fatalf("another organization's preview revoked = %d", ans.code)
+	}
 	// Another signing secret (another deployment) does not verify.
 	e.svc.SetPreviewSecret(strings.Repeat("q", 32))
 	if _, ans := previewOf(subA+".sites.test", pa.Token); ans.code != http.StatusUnauthorized {

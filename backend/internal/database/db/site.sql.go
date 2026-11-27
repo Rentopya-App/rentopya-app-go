@@ -13,7 +13,7 @@ import (
 )
 
 const getSiteAssetKeys = `-- name: GetSiteAssetKeys :one
-SELECT s.organization_id, s.enabled, s.published_revision,
+SELECT s.organization_id, s.enabled, s.published_revision, s.preview_epoch,
     s.logo_object_key, s.favicon_object_key, s.cover_object_key,
     v.logo_object_key AS published_logo_object_key, v.favicon_object_key AS published_favicon_object_key,
     v.cover_object_key AS published_cover_object_key,
@@ -31,6 +31,7 @@ type GetSiteAssetKeysRow struct {
 	OrganizationID            int64              `json:"organization_id"`
 	Enabled                   bool               `json:"enabled"`
 	PublishedRevision         pgtype.Int4        `json:"published_revision"`
+	PreviewEpoch              int32              `json:"preview_epoch"`
 	LogoObjectKey             pgtype.Text        `json:"logo_object_key"`
 	FaviconObjectKey          pgtype.Text        `json:"favicon_object_key"`
 	CoverObjectKey            pgtype.Text        `json:"cover_object_key"`
@@ -53,6 +54,7 @@ func (q *Queries) GetSiteAssetKeys(ctx context.Context, argUuid uuid.UUID) (GetS
 		&i.OrganizationID,
 		&i.Enabled,
 		&i.PublishedRevision,
+		&i.PreviewEpoch,
 		&i.LogoObjectKey,
 		&i.FaviconObjectKey,
 		&i.CoverObjectKey,
@@ -116,7 +118,7 @@ func (q *Queries) GetSitePublicAPIKeyID(ctx context.Context, arg GetSitePublicAP
 
 const getSiteSettings = `-- name: GetSiteSettings :one
 
-SELECT s.id, s.uuid, s.organization_id, s.enabled, s.subdomain, s.default_locale, s.config, s.api_key_id, s.logo_object_key, s.favicon_object_key, s.cover_object_key, s.version, s.updated_by, s.created_at, s.updated_at, s.published_revision, s.lead_retention_months, k.uuid AS api_key_uuid,
+SELECT s.id, s.uuid, s.organization_id, s.enabled, s.subdomain, s.default_locale, s.config, s.api_key_id, s.logo_object_key, s.favicon_object_key, s.cover_object_key, s.version, s.updated_by, s.created_at, s.updated_at, s.published_revision, s.lead_retention_months, s.preview_epoch, k.uuid AS api_key_uuid,
     v.uuid AS published_uuid, v.config AS published_config,
     v.logo_object_key AS published_logo_object_key, v.favicon_object_key AS published_favicon_object_key,
     v.cover_object_key AS published_cover_object_key, v.published_at
@@ -144,6 +146,7 @@ type GetSiteSettingsRow struct {
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 	PublishedRevision         pgtype.Int4        `json:"published_revision"`
 	LeadRetentionMonths       int32              `json:"lead_retention_months"`
+	PreviewEpoch              int32              `json:"preview_epoch"`
 	ApiKeyUuid                pgtype.UUID        `json:"api_key_uuid"`
 	PublishedUuid             pgtype.UUID        `json:"published_uuid"`
 	PublishedConfig           []byte             `json:"published_config"`
@@ -181,6 +184,7 @@ func (q *Queries) GetSiteSettings(ctx context.Context, organizationID int64) (Ge
 		&i.UpdatedAt,
 		&i.PublishedRevision,
 		&i.LeadRetentionMonths,
+		&i.PreviewEpoch,
 		&i.ApiKeyUuid,
 		&i.PublishedUuid,
 		&i.PublishedConfig,
@@ -233,7 +237,7 @@ INSERT INTO site_settings (
     $5, $6, $7
 )
 ON CONFLICT (organization_id) DO NOTHING
-RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months
+RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months, preview_epoch
 `
 
 type InsertSiteSettingsParams struct {
@@ -277,6 +281,7 @@ func (q *Queries) InsertSiteSettings(ctx context.Context, arg InsertSiteSettings
 		&i.UpdatedAt,
 		&i.PublishedRevision,
 		&i.LeadRetentionMonths,
+		&i.PreviewEpoch,
 	)
 	return i, err
 }
@@ -529,7 +534,7 @@ func (q *Queries) PublishSiteDraft(ctx context.Context, arg PublishSiteDraftPara
 const resolveSiteByOrganization = `-- name: ResolveSiteByOrganization :one
 SELECT s.id, s.uuid, s.organization_id, s.enabled, s.subdomain, s.default_locale, s.config,
     s.logo_object_key, s.favicon_object_key, s.cover_object_key, s.version, s.updated_at,
-    s.published_revision,
+    s.published_revision, s.preview_epoch,
     v.config AS published_config, v.logo_object_key AS published_logo_object_key,
     v.favicon_object_key AS published_favicon_object_key, v.cover_object_key AS published_cover_object_key,
     v.published_at,
@@ -561,6 +566,7 @@ type ResolveSiteByOrganizationRow struct {
 	Version                   int32              `json:"version"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 	PublishedRevision         pgtype.Int4        `json:"published_revision"`
+	PreviewEpoch              int32              `json:"preview_epoch"`
 	PublishedConfig           []byte             `json:"published_config"`
 	PublishedLogoObjectKey    pgtype.Text        `json:"published_logo_object_key"`
 	PublishedFaviconObjectKey pgtype.Text        `json:"published_favicon_object_key"`
@@ -600,6 +606,7 @@ func (q *Queries) ResolveSiteByOrganization(ctx context.Context, organizationID 
 		&i.Version,
 		&i.UpdatedAt,
 		&i.PublishedRevision,
+		&i.PreviewEpoch,
 		&i.PublishedConfig,
 		&i.PublishedLogoObjectKey,
 		&i.PublishedFaviconObjectKey,
@@ -625,7 +632,7 @@ func (q *Queries) ResolveSiteByOrganization(ctx context.Context, organizationID 
 const resolveSiteBySubdomain = `-- name: ResolveSiteBySubdomain :one
 SELECT s.id, s.uuid, s.organization_id, s.enabled, s.subdomain, s.default_locale, s.config,
     s.logo_object_key, s.favicon_object_key, s.cover_object_key, s.version, s.updated_at,
-    s.published_revision,
+    s.published_revision, s.preview_epoch,
     v.config AS published_config, v.logo_object_key AS published_logo_object_key,
     v.favicon_object_key AS published_favicon_object_key, v.cover_object_key AS published_cover_object_key,
     v.published_at,
@@ -657,6 +664,7 @@ type ResolveSiteBySubdomainRow struct {
 	Version                   int32              `json:"version"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 	PublishedRevision         pgtype.Int4        `json:"published_revision"`
+	PreviewEpoch              int32              `json:"preview_epoch"`
 	PublishedConfig           []byte             `json:"published_config"`
 	PublishedLogoObjectKey    pgtype.Text        `json:"published_logo_object_key"`
 	PublishedFaviconObjectKey pgtype.Text        `json:"published_favicon_object_key"`
@@ -698,6 +706,7 @@ func (q *Queries) ResolveSiteBySubdomain(ctx context.Context, subdomain string) 
 		&i.Version,
 		&i.UpdatedAt,
 		&i.PublishedRevision,
+		&i.PreviewEpoch,
 		&i.PublishedConfig,
 		&i.PublishedLogoObjectKey,
 		&i.PublishedFaviconObjectKey,
@@ -755,6 +764,20 @@ func (q *Queries) RestoreSiteDraft(ctx context.Context, arg RestoreSiteDraftPara
 	var version int32
 	err := row.Scan(&version)
 	return version, err
+}
+
+const revokeSitePreviews = `-- name: RevokeSitePreviews :one
+UPDATE site_settings SET preview_epoch = preview_epoch + 1
+WHERE organization_id = $1
+RETURNING preview_epoch
+`
+
+// TEC-1289: invalidates every preview link issued so far.
+func (q *Queries) RevokeSitePreviews(ctx context.Context, organizationID int64) (int32, error) {
+	row := q.db.QueryRow(ctx, revokeSitePreviews, organizationID)
+	var preview_epoch int32
+	err := row.Scan(&preview_epoch)
+	return preview_epoch, err
 }
 
 const setBranchShowOnline = `-- name: SetBranchShowOnline :one
@@ -879,7 +902,7 @@ SET logo_object_key = CASE WHEN $1::text = 'logo' THEN $2::text ELSE logo_object
     version = version + 1
 WHERE organization_id = $4
   AND version = $5
-RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months
+RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months, preview_epoch
 `
 
 type SetSiteDraftImageParams struct {
@@ -918,6 +941,7 @@ func (q *Queries) SetSiteDraftImage(ctx context.Context, arg SetSiteDraftImagePa
 		&i.UpdatedAt,
 		&i.PublishedRevision,
 		&i.LeadRetentionMonths,
+		&i.PreviewEpoch,
 	)
 	return i, err
 }
@@ -929,7 +953,7 @@ SET api_key_id = $1,
     version = version + 1
 WHERE organization_id = $3
   AND version = $4
-RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months
+RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months, preview_epoch
 `
 
 type SetSiteKeyParams struct {
@@ -966,6 +990,7 @@ func (q *Queries) SetSiteKey(ctx context.Context, arg SetSiteKeyParams) (SiteSet
 		&i.UpdatedAt,
 		&i.PublishedRevision,
 		&i.LeadRetentionMonths,
+		&i.PreviewEpoch,
 	)
 	return i, err
 }
@@ -1034,7 +1059,7 @@ SET enabled = $1,
     version = version + 1
 WHERE organization_id = $7
   AND version = $8
-RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months
+RETURNING id, uuid, organization_id, enabled, subdomain, default_locale, config, api_key_id, logo_object_key, favicon_object_key, cover_object_key, version, updated_by, created_at, updated_at, published_revision, lead_retention_months, preview_epoch
 `
 
 type UpdateSiteSettingsParams struct {
@@ -1080,6 +1105,7 @@ func (q *Queries) UpdateSiteSettings(ctx context.Context, arg UpdateSiteSettings
 		&i.UpdatedAt,
 		&i.PublishedRevision,
 		&i.LeadRetentionMonths,
+		&i.PreviewEpoch,
 	)
 	return i, err
 }

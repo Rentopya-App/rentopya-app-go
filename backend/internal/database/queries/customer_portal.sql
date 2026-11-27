@@ -5,7 +5,7 @@
 
 -- name: GetPortalOrganization :one
 -- A live organization by its slug (the portal URL names it).
-SELECT o.id, o.uuid, o.slug, o.name, o.status, o.access_starts_at, o.access_ends_at
+SELECT o.id, o.uuid, o.slug, o.name, o.status, o.access_starts_at, o.access_ends_at, o.logo_object_key
 FROM organizations o
 WHERE o.slug = sqlc.arg(slug)
   AND o.deleted_at IS NULL;

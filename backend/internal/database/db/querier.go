@@ -2567,6 +2567,8 @@ type Querier interface {
 	RevokePublicAPIKey(ctx context.Context, arg RevokePublicAPIKeyParams) (int64, error)
 	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) (int64, error)
 	RevokeRefreshTokenByUUIDForUser(ctx context.Context, arg RevokeRefreshTokenByUUIDForUserParams) (int64, error)
+	// TEC-1289: invalidates every preview link issued so far.
+	RevokeSitePreviews(ctx context.Context, organizationID int64) (int32, error)
 	RevokeStorageLink(ctx context.Context, argUuid uuid.UUID) (StorageLink, error)
 	RevokeSupportGrant(ctx context.Context, arg RevokeSupportGrantParams) (SupportGrant, error)
 	// Resend: a new token (the old link stops working) and a fresh expiry.

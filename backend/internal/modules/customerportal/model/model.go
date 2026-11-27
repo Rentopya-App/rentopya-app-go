@@ -90,6 +90,9 @@ type StartResult struct {
 type Organization struct {
 	Slug string `json:"slug"`
 	Name string `json:"name"`
+	// LogoURL is the organization's logo for the portal header
+	// (GET /v1/public/organizations/{uuid}/logo), or null (TEC-1284).
+	LogoURL *string `json:"logo_url"`
 }
 
 // Session is the signed-in customer as the portal shows it.

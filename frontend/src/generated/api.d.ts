@@ -1331,6 +1331,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/organizations/{uuid}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Organization logo for customer-facing pages
+         * @description No auth. The logo of an active organization for its pay link and customer portal pages (TEC-1284). 404 without a logo or for an inactive organization. Cached publicly for an hour.
+         */
+        get: operations["getPublicOrganizationLogo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/invitations/{token}": {
         parameters: {
             query?: never;
@@ -8900,6 +8920,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/site/preview-token/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke every preview link
+         * @description `tenant.site.read` + `tenant.site.manage`. Raises the site's preview epoch, which every preview token is signed with: all links issued so far stop working at once (TEC-1289). New links work again.
+         */
+        post: operations["postTenantSitePreviewRevoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/site/preview-token": {
         parameters: {
             query?: never;
@@ -8911,7 +8951,7 @@ export interface paths {
         put?: never;
         /**
          * Preview link of the site draft
-         * @description `tenant.site.read`. A signed token (30 minutes) bound to this organization's site. `url` opens the site's own
+         * @description `tenant.site.read`. A signed token (30 minutes) bound to this organization's site and its preview epoch (revocable with `…/preview-token/revoke`). `url` opens the site's own
          *     address with `?preview=`; the site then renders the draft (also while the site is off or unpublished), shows a
          *     preview banner, never books, and may be framed by the panel only. `assets` are the draft images for the
          *     panel. A site that was never saved is stored first with its defaults (switched off).
@@ -27001,6 +27041,8 @@ export interface components {
              * @description Lets the branded site check that a link belongs to its organization (TEC-1297).
              */
             organization_uuid: string;
+            /** @description The organization's logo for the pay page (GET /v1/public/organizations/{uuid}/logo); null without one. */
+            organization_logo_url?: string | null;
             reference: string;
             product_title: string;
             /** Format: date-time */
@@ -27585,6 +27627,8 @@ export interface components {
         CustomerPortalOrganization: {
             slug: string;
             name: string;
+            /** @description The organization's logo for the portal header (GET /v1/public/organizations/{uuid}/logo); null without one. */
+            logo_url?: string | null;
         };
         EnvelopeCustomerPortalInfo: {
             /** @enum {boolean} */
@@ -36396,6 +36440,33 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicOrganizationLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Logo image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/webp": string;
+                    "image/svg+xml": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -50323,6 +50394,32 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    postTenantSitePreviewRevoke: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
         };
     };
     postTenantSitePreviewToken: {

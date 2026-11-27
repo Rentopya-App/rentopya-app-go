@@ -77,6 +77,7 @@ func RegisterRoutes(mux httpkit.Mux, h *handler.Handler, tokens *jwt.Manager, lo
 	route("GET /v1/tenant/site/versions", h.Versions, read)
 	route("POST /v1/tenant/site/versions/{revisionUuid}/restore", h.Restore, read, manage, feature)
 	route("POST /v1/tenant/site/preview-token", h.PreviewToken, read, feature)
+	route("POST /v1/tenant/site/preview-token/revoke", h.RevokePreviews, read, manage)
 	route("POST /v1/tenant/site/renew-key", h.RenewKey, read, manage, feature)
 	// One literal route per image kind (the isolation test enumerates route
 	// literals; the kind is not a record id).

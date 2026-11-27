@@ -2229,6 +2229,26 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /v1/public/organizations/{uuid}/logo:
+    get:
+      tags: [Organizations]
+      operationId: getPublicOrganizationLogo
+      summary: Organization logo for customer-facing pages
+      description: "No auth. The logo of an active organization for its pay link and customer portal pages (TEC-1284). 404 without a logo or for an inactive organization. Cached publicly for an hour."
+      security: []
+      parameters:
+        - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Logo image
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+            image/svg+xml: { schema: { type: string, format: binary } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /v1/invitations/{token}:
     get:
       tags: [Organizations]
@@ -14114,13 +14134,28 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
 
+  /v1/tenant/site/preview-token/revoke:
+    post:
+      tags: [Tenant]
+      operationId: postTenantSitePreviewRevoke
+      summary: Revoke every preview link
+      description: "`tenant.site.read` + `tenant.site.manage`. Raises the site's preview epoch, which every preview token is signed with: all links issued so far stop working at once (TEC-1289). New links work again."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XOrganization"
+      responses:
+        "204": { description: Revoked }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+
   /v1/tenant/site/preview-token:
     post:
       tags: [Tenant]
       operationId: postTenantSitePreviewToken
       summary: Preview link of the site draft
       description: |
-        `tenant.site.read`. A signed token (30 minutes) bound to this organization's site. `url` opens the site's own
+        `tenant.site.read`. A signed token (30 minutes) bound to this organization's site and its preview epoch (revocable with `…/preview-token/revoke`). `url` opens the site's own
         address with `?preview=`; the site then renders the draft (also while the site is off or unpublished), shows a
         preview banner, never books, and may be framed by the panel only. `assets` are the draft images for the
         panel. A site that was never saved is stored first with its defaults (switched off).
@@ -37527,6 +37562,10 @@ components:
       properties:
         organization_name: { type: string }
         organization_uuid: { type: string, format: uuid, description: "Lets the branded site check that a link belongs to its organization (TEC-1297)." }
+        organization_logo_url:
+          type: [string, "null"]
+          description: "The organization's logo for the pay page (GET /v1/public/organizations/{uuid}/logo); null without one."
+
         reference: { type: string }
         product_title: { type: string }
         starts_at: { type: string, format: date-time }
@@ -38172,6 +38211,9 @@ components:
       properties:
         slug: { type: string }
         name: { type: string }
+        logo_url:
+          type: [string, "null"]
+          description: "The organization's logo for the portal header (GET /v1/public/organizations/{uuid}/logo); null without one."
 
     EnvelopeCustomerPortalInfo:
       type: object

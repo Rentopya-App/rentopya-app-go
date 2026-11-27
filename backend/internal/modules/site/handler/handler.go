@@ -169,6 +169,18 @@ func (h *Handler) PreviewToken(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, out)
 }
 
+// RevokePreviews serves POST /v1/tenant/site/preview-token/revoke: every
+// preview link issued so far stops working (TEC-1289).
+func (h *Handler) RevokePreviews(w http.ResponseWriter, r *http.Request) {
+	scope := orgctx.Must(r.Context())
+	if err := h.svc.RevokePreviews(r.Context(), scope.ID); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	h.record(r, "site.previews_revoked", nil)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // RenewKey serves POST /v1/tenant/site/renew-key.
 func (h *Handler) RenewKey(w http.ResponseWriter, r *http.Request) {
 	scope := orgctx.Must(r.Context())

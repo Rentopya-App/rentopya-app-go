@@ -3,6 +3,7 @@
 import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { OrganizationMark } from "@/components/brand";
 import { LocaleSwitch } from "@/components/layout/locale-switch";
 import { ThemeSwitch } from "@/components/layout/theme-switch";
 import { Button } from "@/components/ui/button";
@@ -16,12 +17,15 @@ import { useLocale } from "@/providers/locale-provider";
  */
 export function PortalShell({
   organizationName,
+  organizationLogoUrl,
   orgSlug,
   children,
   onSignOut,
   signingOut,
 }: {
   organizationName?: string;
+  /** The organization's logo (TEC-1284), shown before its name. */
+  organizationLogoUrl?: string | null;
   /** Organization of the portal: signed-in customers can turn on web push. */
   orgSlug?: string;
   children: ReactNode;
@@ -33,13 +37,22 @@ export function PortalShell({
     <div className="bg-muted min-h-svh">
       <header className="bg-background/95 sticky top-0 z-10 border-b backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-2 px-4">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
-              {organizationName ?? "…"}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {t("customer_portal.title")}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            {organizationLogoUrl ? (
+              <OrganizationMark
+                name={organizationName}
+                logoUrl={organizationLogoUrl}
+                className="h-8 max-w-[120px]"
+              />
+            ) : null}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">
+                {organizationName ?? "…"}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {t("customer_portal.title")}
+              </p>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <LocaleSwitch />

@@ -292,7 +292,7 @@ func (s *Service) Info(ctx context.Context, slug string) (PortalInfo, error) {
 	if err != nil {
 		return PortalInfo{}, err
 	}
-	out := PortalInfo{Organization: model.Organization{Slug: org.Slug, Name: org.Name}}
+	out := PortalInfo{Organization: model.Organization{Slug: org.Slug, Name: org.Name, LogoURL: logoURL(org.Uuid, org.LogoObjectKey.String)}}
 	out.Channels.SMS = s.otp.HasActiveAccount(ctx, org.ID)
 	out.Channels.Email = s.otp.EmailAvailable()
 	if s.sites != nil {
@@ -403,4 +403,13 @@ func clip(v string, n int) string {
 		return v
 	}
 	return strings.ToValidUTF8(v[:n], "")
+}
+
+// logoURL is the public logo path of an organization, or nil without one.
+func logoURL(org uuid.UUID, objectKey string) *string {
+	if objectKey == "" {
+		return nil
+	}
+	u := "/v1/public/organizations/" + org.String() + "/logo"
+	return &u
 }

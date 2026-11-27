@@ -425,6 +425,7 @@
   "actions.site.updated": "Branded site settings saved",
   "actions.site.published": "Branded site published",
   "actions.site.restored": "Branded site revision restored to the draft",
+  "actions.site.previews_revoked": "Branded site preview links revoked",
   "actions.site.key_renewed": "Branded site key renewed",
   "actions.site.image_updated": "Branded site image uploaded",
   "actions.site.image_removed": "Branded site image removed",

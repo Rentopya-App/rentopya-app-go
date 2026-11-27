@@ -137,7 +137,7 @@ func (q *Queries) GetPortalOTPBinding(ctx context.Context, arg GetPortalOTPBindi
 
 const getPortalOrganization = `-- name: GetPortalOrganization :one
 
-SELECT o.id, o.uuid, o.slug, o.name, o.status, o.access_starts_at, o.access_ends_at
+SELECT o.id, o.uuid, o.slug, o.name, o.status, o.access_starts_at, o.access_ends_at, o.logo_object_key
 FROM organizations o
 WHERE o.slug = $1
   AND o.deleted_at IS NULL
@@ -151,6 +151,7 @@ type GetPortalOrganizationRow struct {
 	Status         string             `json:"status"`
 	AccessStartsAt pgtype.Timestamptz `json:"access_starts_at"`
 	AccessEndsAt   pgtype.Timestamptz `json:"access_ends_at"`
+	LogoObjectKey  pgtype.Text        `json:"logo_object_key"`
 }
 
 // Customer portal (TEC-715, docs/design/customer-portal.md): sign-in
@@ -169,6 +170,7 @@ func (q *Queries) GetPortalOrganization(ctx context.Context, slug string) (GetPo
 		&i.Status,
 		&i.AccessStartsAt,
 		&i.AccessEndsAt,
+		&i.LogoObjectKey,
 	)
 	return i, err
 }

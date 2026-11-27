@@ -74,7 +74,8 @@ SELECT l.id, l.uuid, l.token, l.purpose, l.amount, l.currency, l.status, l.expir
     l.integration_account_id,
     r.id AS reservation_id, r.uuid AS reservation_uuid, r.reference AS reservation_reference,
     r.starts_at AS reservation_starts_at, r.ends_at AS reservation_ends_at,
-    p.title AS product_title, o.name AS organization_name, o.uuid AS organization_uuid
+    p.title AS product_title, o.name AS organization_name, o.uuid AS organization_uuid,
+    o.logo_object_key AS organization_logo_object_key
 FROM payment_links l
 JOIN reservations r ON r.organization_id = l.organization_id AND r.id = l.reservation_id
 JOIN rental_products p ON p.organization_id = r.organization_id AND p.id = r.rental_product_id

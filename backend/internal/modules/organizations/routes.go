@@ -77,6 +77,8 @@ func RegisterRoutes(
 
 	// Organization logo for any signed-in user (sidebar, switcher, lists).
 	route("GET /v1/organizations/{uuid}/logo", h.StreamLogo)
+	// The same logo on customer-facing pages, no sign-in (active organizations).
+	mux.HandleFunc("GET /v1/public/organizations/{uuid}/logo", h.PublicLogo)
 
 	// Invitation accept flow: public preview / registration, signed-in accept.
 	mux.HandleFunc("GET /v1/invitations/{token}", h.PreviewInvitation)
