@@ -16,18 +16,19 @@ const exp = (secondsFromNow: number, now: number) =>
 
 test("preview tokens are forwarded only in the API's shape", () => {
   const now = 1_800_000_000_000;
-  const good = `sp1.${SITE}.${exp(600, now)}.${MAC}`;
+  const good = `sp2.${SITE}.${exp(600, now)}.0.${MAC}`;
   assert.equal(previewToken(good), good);
   assert.equal(previewToken(`  ${good} `), good);
   for (const bad of [
     "",
     null,
     undefined,
-    "sp2." + good.slice(4),
-    `sp1.not-a-uuid.${exp(600, now)}.${MAC}`,
-    `sp1.${SITE}.soon.${MAC}`,
-    `sp1.${SITE}.${exp(600, now)}.${MAC}<script>`,
-    `sp1.${SITE}.${exp(600, now)}.${MAC};Path=/`,
+    "sp1." + good.slice(4),
+    `sp2.${SITE}.${exp(600, now)}.${MAC}`,
+    `sp2.not-a-uuid.${exp(600, now)}.0.${MAC}`,
+    `sp2.${SITE}.soon.0.${MAC}`,
+    `sp2.${SITE}.${exp(600, now)}.0.${MAC}<script>`,
+    `sp2.${SITE}.${exp(600, now)}.0.${MAC};Path=/`,
     `${good}.extra`,
   ]) {
     assert.equal(previewToken(bad), "", String(bad));
@@ -37,19 +38,22 @@ test("preview tokens are forwarded only in the API's shape", () => {
 test("the preview cookie lives until the token expires, at most 30 minutes", () => {
   const now = 1_800_000_000_000;
   assert.equal(
-    previewCookieMaxAge(`sp1.${SITE}.${exp(600, now)}.${MAC}`, now),
+    previewCookieMaxAge(`sp2.${SITE}.${exp(600, now)}.0.${MAC}`, now),
     600,
   );
   assert.equal(
-    previewCookieMaxAge(`sp1.${SITE}.${exp(86400, now)}.${MAC}`, now),
+    previewCookieMaxAge(`sp2.${SITE}.${exp(86400, now)}.0.${MAC}`, now),
     1800,
   );
   assert.equal(
-    previewCookieMaxAge(`sp1.${SITE}.${exp(-5, now)}.${MAC}`, now),
+    previewCookieMaxAge(`sp2.${SITE}.${exp(-5, now)}.0.${MAC}`, now),
     0,
   );
   assert.equal(previewCookieMaxAge("garbage", now), 0);
-  const opts = previewCookieOptions(`sp1.${SITE}.${exp(600, now)}.${MAC}`, now);
+  const opts = previewCookieOptions(
+    `sp2.${SITE}.${exp(600, now)}.0.${MAC}`,
+    now,
+  );
   // Sent inside the panel's cross-site frame, never to scripts.
   assert.equal(opts.httpOnly, true);
   assert.equal(opts.secure, true);
