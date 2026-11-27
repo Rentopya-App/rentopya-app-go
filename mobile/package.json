@@ -90,5 +90,14 @@
     "openapi-typescript": {
       "typescript": "$typescript"
     }
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "@react-native-masked-view/masked-view"
+        ]
+      }
+    }
   }
 }
