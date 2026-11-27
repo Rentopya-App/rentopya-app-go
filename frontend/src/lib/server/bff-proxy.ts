@@ -85,6 +85,7 @@ function wantsBinaryStream(path: string) {
     path.includes("platform/storage/objects/preview") ||
     path.startsWith("public/storage/") ||
     path.startsWith("public/media/") ||
+    (path.startsWith("public/organizations/") && path.endsWith("/logo")) ||
     (isPublicDocumentPath(path) && path.endsWith("/pdf")) ||
     (path.startsWith("customer/") && path.endsWith("/pdf"))
   );
