@@ -500,6 +500,36 @@ func (h *Handler) StreamLogo(w http.ResponseWriter, r *http.Request) {
 	_, _ = copyBody(w, rc)
 }
 
+// PublicLogo serves GET /v1/public/organizations/{uuid}/logo: the logo of
+// an active organization for its customer-facing pages (pay link, customer
+// portal), without sign-in. Logos are public by nature.
+func (h *Handler) PublicLogo(w http.ResponseWriter, r *http.Request) {
+	id, ok := parsePathUUID(w, r, "uuid", "organization uuid is invalid")
+	if !ok {
+		return
+	}
+	if h.mgmt == nil || h.storage == nil {
+		response.NotFound(w, r, "logo not found")
+		return
+	}
+	key, err := h.mgmt.PublicLogoObjectKey(r.Context(), id)
+	if err != nil {
+		response.NotFound(w, r, "logo not found")
+		return
+	}
+	rc, _, err := h.storage.Download(r.Context(), key)
+	if err != nil {
+		response.NotFound(w, r, "logo not found")
+		return
+	}
+	defer func() { _ = rc.Close() }()
+	w.Header().Set("Content-Type", storage.MIMEFromLogoKey(key))
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	_, _ = copyBody(w, rc)
+}
+
 func (h *Handler) actor(r *http.Request) orgusecase.Actor {
 	p := authctx.MustPrincipal(r.Context())
 	name := ""

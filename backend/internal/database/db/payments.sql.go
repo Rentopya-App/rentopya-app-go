@@ -551,7 +551,8 @@ SELECT l.id, l.uuid, l.token, l.purpose, l.amount, l.currency, l.status, l.expir
     l.integration_account_id,
     r.id AS reservation_id, r.uuid AS reservation_uuid, r.reference AS reservation_reference,
     r.starts_at AS reservation_starts_at, r.ends_at AS reservation_ends_at,
-    p.title AS product_title, o.name AS organization_name, o.uuid AS organization_uuid
+    p.title AS product_title, o.name AS organization_name, o.uuid AS organization_uuid,
+    o.logo_object_key AS organization_logo_object_key
 FROM payment_links l
 JOIN reservations r ON r.organization_id = l.organization_id AND r.id = l.reservation_id
 JOIN rental_products p ON p.organization_id = r.organization_id AND p.id = r.rental_product_id
@@ -568,24 +569,25 @@ type GetPaymentLinkPublicParams struct {
 }
 
 type GetPaymentLinkPublicRow struct {
-	ID                   int64              `json:"id"`
-	Uuid                 uuid.UUID          `json:"uuid"`
-	Token                string             `json:"token"`
-	Purpose              string             `json:"purpose"`
-	Amount               pgtype.Numeric     `json:"amount"`
-	Currency             string             `json:"currency"`
-	Status               string             `json:"status"`
-	ExpiresAt            pgtype.Timestamptz `json:"expires_at"`
-	PaidAt               pgtype.Timestamptz `json:"paid_at"`
-	IntegrationAccountID int64              `json:"integration_account_id"`
-	ReservationID        int64              `json:"reservation_id"`
-	ReservationUuid      uuid.UUID          `json:"reservation_uuid"`
-	ReservationReference string             `json:"reservation_reference"`
-	ReservationStartsAt  pgtype.Timestamptz `json:"reservation_starts_at"`
-	ReservationEndsAt    pgtype.Timestamptz `json:"reservation_ends_at"`
-	ProductTitle         string             `json:"product_title"`
-	OrganizationName     string             `json:"organization_name"`
-	OrganizationUuid     uuid.UUID          `json:"organization_uuid"`
+	ID                        int64              `json:"id"`
+	Uuid                      uuid.UUID          `json:"uuid"`
+	Token                     string             `json:"token"`
+	Purpose                   string             `json:"purpose"`
+	Amount                    pgtype.Numeric     `json:"amount"`
+	Currency                  string             `json:"currency"`
+	Status                    string             `json:"status"`
+	ExpiresAt                 pgtype.Timestamptz `json:"expires_at"`
+	PaidAt                    pgtype.Timestamptz `json:"paid_at"`
+	IntegrationAccountID      int64              `json:"integration_account_id"`
+	ReservationID             int64              `json:"reservation_id"`
+	ReservationUuid           uuid.UUID          `json:"reservation_uuid"`
+	ReservationReference      string             `json:"reservation_reference"`
+	ReservationStartsAt       pgtype.Timestamptz `json:"reservation_starts_at"`
+	ReservationEndsAt         pgtype.Timestamptz `json:"reservation_ends_at"`
+	ProductTitle              string             `json:"product_title"`
+	OrganizationName          string             `json:"organization_name"`
+	OrganizationUuid          uuid.UUID          `json:"organization_uuid"`
+	OrganizationLogoObjectKey pgtype.Text        `json:"organization_logo_object_key"`
 }
 
 // What the public pay page shows: organization name, reservation
@@ -612,6 +614,7 @@ func (q *Queries) GetPaymentLinkPublic(ctx context.Context, arg GetPaymentLinkPu
 		&i.ProductTitle,
 		&i.OrganizationName,
 		&i.OrganizationUuid,
+		&i.OrganizationLogoObjectKey,
 	)
 	return i, err
 }

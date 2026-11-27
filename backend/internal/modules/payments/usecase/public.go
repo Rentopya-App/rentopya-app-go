@@ -60,7 +60,8 @@ func (s *Service) PublicLink(ctx context.Context, token string, verify bool) (pa
 		}
 	}
 	out := paymodel.PublicLink{
-		OrganizationName: row.OrganizationName, OrganizationUUID: row.OrganizationUuid, Reference: row.ReservationReference, ProductTitle: row.ProductTitle,
+		OrganizationName: row.OrganizationName, OrganizationUUID: row.OrganizationUuid,
+		OrganizationLogoURL: PublicLogoURL(row.OrganizationUuid, row.OrganizationLogoObjectKey.String), Reference: row.ReservationReference, ProductTitle: row.ProductTitle,
 		StartsAt: row.ReservationStartsAt.Time.UTC(), EndsAt: row.ReservationEndsAt.Time.UTC(), Amount: m(row.Amount),
 		Currency: row.Currency, ExpiresAt: row.ExpiresAt.Time.UTC(),
 	}
@@ -323,4 +324,14 @@ func (s *Service) Webhook(ctx context.Context, providerCode string, header http.
 		return paymodel.WebhookResult{}, verr
 	}
 	return paymodel.WebhookResult{Status: status, Duplicate: !job.Inserted}, nil
+}
+
+// PublicLogoURL is the customer-facing logo path of an organization, or nil
+// without a logo.
+func PublicLogoURL(org uuid.UUID, objectKey string) *string {
+	if objectKey == "" {
+		return nil
+	}
+	u := "/v1/public/organizations/" + org.String() + "/logo"
+	return &u
 }
