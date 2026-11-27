@@ -2969,6 +2969,7 @@ type SiteSetting struct {
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 	PublishedRevision   pgtype.Int4        `json:"published_revision"`
 	LeadRetentionMonths int32              `json:"lead_retention_months"`
+	PreviewEpoch        int32              `json:"preview_epoch"`
 }
 
 type SiteSettingVersion struct {
