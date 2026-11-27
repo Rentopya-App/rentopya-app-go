@@ -190,7 +190,7 @@ func (s *Service) PublicMedia(ctx context.Context, site, id uuid.UUID, preview s
 	}
 	config := row.PublishedConfig
 	if preview != "" {
-		if !s.verifyPreview(preview, site) {
+		if !s.verifyPreview(preview, site, row.PreviewEpoch) {
 			return nil, "", ErrNotFound
 		}
 		config = row.DraftConfig

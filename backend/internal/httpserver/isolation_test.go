@@ -72,6 +72,7 @@ var isolationAllowlist = map[string]string{
 	"POST /v1/tenant/segments":                       "body has no foreign references (code, name)",
 	"POST /v1/tenant/roles":                          "body names permission slugs only; role isolation is the {uuid} cases",
 	"PUT /v1/tenant/settings":                        "settings document of the caller's organization; versions are the {version} cases",
+	"POST /v1/tenant/site/preview-token/revoke":      "raises the caller's organization's preview epoch; no ids (TEC-1289)",
 	"PUT /v1/tenant/site/leads/settings":             "retention months of the caller's organization only (a number, no references; TEC-1287)",
 	"POST /v1/tenant/notifications/read-all":         "marks the caller's rows of the current organization (notifications scope test)",
 	"POST /v1/tenant/branches/import":                "imports match natural keys inside the organization (adapter tests); the job is the {uuid} cases",

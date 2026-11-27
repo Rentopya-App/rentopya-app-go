@@ -1,6 +1,12 @@
 "use client";
 
-import { ExternalLink, Monitor, RefreshCw, Smartphone } from "lucide-react";
+import {
+  ExternalLink,
+  Monitor,
+  RefreshCw,
+  ShieldOff,
+  Smartphone,
+} from "lucide-react";
 import { useState } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
@@ -14,10 +20,15 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useSitePreview } from "@/features/site/hooks/use-site";
+import { permissions } from "@/config/permissions";
+import {
+  useRevokeSitePreviews,
+  useSitePreview,
+} from "@/features/site/hooks/use-site";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
 
 type Device = "desktop" | "mobile";
 
@@ -40,6 +51,8 @@ export function SitePreviewFrame({
 }) {
   const { t } = useLocale();
   const preview = useSitePreview(enabled);
+  const revoke = useRevokeSitePreviews();
+  const { can } = usePermission();
   const [device, setDevice] = useState<Device>("desktop");
   const [nonce, setNonce] = useState(0);
   const settledVersion = useDebounce(version, 800);
@@ -79,6 +92,22 @@ export function SitePreviewFrame({
             <RefreshCw className="size-4" />
             {t("site.preview.reload")}
           </Button>
+          {can(permissions.tenant.site.manage) ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={revoke.isPending}
+              onClick={() => {
+                revoke.mutate(undefined, {
+                  onSuccess: () => setNonce((n) => n + 1),
+                });
+              }}
+            >
+              <ShieldOff className="size-4" />
+              {t("site.preview.revoke")}
+            </Button>
+          ) : null}
           {url ? (
             <Button type="button" size="sm" variant="outline" asChild>
               <a href={url} target="_blank" rel="noreferrer">

@@ -57,6 +57,12 @@ export const siteService = {
       { body: {} },
     );
   },
+  /** Every preview link issued so far stops working (TEC-1289). */
+  revokePreviews(slug: string) {
+    return tenantRequest<void>(slug, "POST", `${BASE}/preview-token/revoke`, {
+      body: {},
+    });
+  },
   renewKey(slug: string, version: number) {
     return tenantRequest<SiteSettings>(slug, "POST", `${BASE}/renew-key`, {
       body: { version },

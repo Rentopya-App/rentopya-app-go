@@ -4,7 +4,9 @@
  * proxy keeps the token in an httpOnly cookie for the next navigations and
  * resolves the host with it: the API then answers the draft, and only for
  * a valid, unexpired token of this host's site. The site never trusts the
- * token itself; it only checks the shape before forwarding it.
+ * token itself; it only checks the shape before forwarding it
+ * (`sp2.{site}.{expiry}.{epoch}.{mac}`; the epoch lets the panel revoke
+ * every earlier link, TEC-1289).
  *
  * Pure helpers (no Next imports) so node --test can run them.
  */
@@ -19,7 +21,7 @@ export const PREVIEW_HEADER = "x-rtp-preview";
 export const PREVIEW_PARAM = "preview";
 
 const TOKEN_RE =
-  /^sp1\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.\d{1,12}\.[A-Za-z0-9_-]{20,100}$/;
+  /^sp2\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.\d{1,12}\.\d{1,10}\.[A-Za-z0-9_-]{20,100}$/;
 
 /** The token when it has the API's shape, else "" (never forwarded). */
 export function previewToken(raw: string | null | undefined): string {

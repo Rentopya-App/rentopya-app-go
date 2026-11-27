@@ -118,7 +118,7 @@ test("library media: only this site's mapped UUIDs, preview via draft=1", () => 
   const preview = {
     site_uuid: site,
     media: {
-      [media]: `/v1/public/site/media/${site}/${media}?preview=sp1.x.1.abc`,
+      [media]: `/v1/public/site/media/${site}/${media}?preview=sp2.x.1.0.abc`,
     },
   };
   assert.equal(

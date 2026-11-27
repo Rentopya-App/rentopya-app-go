@@ -187,7 +187,7 @@ LIMIT 1;
 -- site, or the draft to a valid preview token.
 SELECT s.id, s.uuid, s.organization_id, s.enabled, s.subdomain, s.default_locale, s.config,
     s.logo_object_key, s.favicon_object_key, s.cover_object_key, s.version, s.updated_at,
-    s.published_revision,
+    s.published_revision, s.preview_epoch,
     v.config AS published_config, v.logo_object_key AS published_logo_object_key,
     v.favicon_object_key AS published_favicon_object_key, v.cover_object_key AS published_cover_object_key,
     v.published_at,
@@ -209,7 +209,7 @@ WHERE s.subdomain = sqlc.arg(subdomain)
 -- organization; TEC-731). Same shape as ResolveSiteBySubdomain.
 SELECT s.id, s.uuid, s.organization_id, s.enabled, s.subdomain, s.default_locale, s.config,
     s.logo_object_key, s.favicon_object_key, s.cover_object_key, s.version, s.updated_at,
-    s.published_revision,
+    s.published_revision, s.preview_epoch,
     v.config AS published_config, v.logo_object_key AS published_logo_object_key,
     v.favicon_object_key AS published_favicon_object_key, v.cover_object_key AS published_cover_object_key,
     v.published_at,
@@ -229,7 +229,7 @@ WHERE s.organization_id = sqlc.arg(organization_id)
 -- name: GetSiteAssetKeys :one
 -- The image keys of a site by its public uuid (asset stream): the draft
 -- and the published snapshot. The caller picks by the preview token.
-SELECT s.organization_id, s.enabled, s.published_revision,
+SELECT s.organization_id, s.enabled, s.published_revision, s.preview_epoch,
     s.logo_object_key, s.favicon_object_key, s.cover_object_key,
     v.logo_object_key AS published_logo_object_key, v.favicon_object_key AS published_favicon_object_key,
     v.cover_object_key AS published_cover_object_key,
@@ -293,3 +293,9 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND deleted_at IS NULL
   AND extra_type <> 'delivery'
 RETURNING uuid, code, name, status, show_online;
+
+-- name: RevokeSitePreviews :one
+-- TEC-1289: invalidates every preview link issued so far.
+UPDATE site_settings SET preview_epoch = preview_epoch + 1
+WHERE organization_id = sqlc.arg(organization_id)
+RETURNING preview_epoch;
