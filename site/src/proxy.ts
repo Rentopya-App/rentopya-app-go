@@ -10,7 +10,7 @@ import {
 
 import { ApiError } from "@/lib/api";
 import { sentryConfig } from "@/lib/app-env";
-import { newNonce, sentryReportUri, sitePolicy } from "@/lib/csp";
+import { newNonce, sentryReportUri, sitePolicy, withNonce } from "@/lib/csp";
 import {
   PREVIEW_COOKIE,
   PREVIEW_HEADER,
@@ -148,6 +148,11 @@ export async function proxy(request: NextRequest) {
     ),
     dev: process.env.NODE_ENV !== "production",
   });
+  const stampNonce = (res: NextResponse) => {
+    const enforced = res.headers.get("Content-Security-Policy");
+    if (enforced)
+      res.headers.set("Content-Security-Policy", withNonce(enforced, nonce));
+  };
   const withCsp = (h: Headers) => {
     h.set(NONCE_HEADER, nonce);
     h.set(REPORT_ONLY, cspReportOnly);
@@ -161,6 +166,7 @@ export async function proxy(request: NextRequest) {
         res.headers.set(k, v);
       res.headers.delete("X-Frame-Options");
       res.headers.set("Content-Security-Policy-Report-Only", cspReportOnly);
+      stampNonce(res);
       return res;
     };
     const suppliedKey = request.nextUrl.searchParams.get("key");
@@ -284,6 +290,7 @@ export async function proxy(request: NextRequest) {
   )) {
     response.headers.set(k, v);
   }
+  stampNonce(response);
   // Sealed state and payment tokens never leave in a Referer or a cache.
   if (
     request.nextUrl.searchParams.has("s") ||

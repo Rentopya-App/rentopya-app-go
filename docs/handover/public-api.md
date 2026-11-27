@@ -110,3 +110,21 @@ Pazar yerleri Public API'yi kullanmaz; kanal yöneticisi (`modules/channels`, pa
 | Özellik | `public_api` | `channel.yolcu360`, `channel.obilet` |
 
 Açık: Yolcu360 bağlantı yönü, ürün kodlarını kimin ürettiği, müsaitlik biçimi, kesinleşme noktası, yeniden deneme / iptal kuralları yazılı teyit bekliyor (TEC-680). Obilet'in araç kiralama tedarikçi yolları ve alan adları varsayımlı (`platform/channels/obilet/obilet.go`; TEC-681). İkisinde de test yolu `yolcu360_fake` / `obilet_fake` (`scenario`: ok / outage / reject).
+
+## Ödenmemiş public rezervasyonlar: kapasite ve bildirimler (TEC-1282)
+
+Bir bot ya da kötü niyetli biri site veya public API üzerinden rezervasyon açtığında neyin ne kadar tutulduğu ve kime ne gittiği, firmanın kanal protokolüne göre değişir (`reservations/usecase/create.go` → `waitingStatus`):
+
+| Protokol (kanal ayarı) | Başlangıç durumu | Kapasite | Ne zaman bırakılır | Giden bildirimler |
+|---|---|---|---|---|
+| `auto`, ön ödeme var | `awaiting_payment` | Araç opsiyonla **tutulur** | Ödeme penceresi (`reservation.payment_hold_minutes`, varsayılan **30 dk**) dolunca her dakikalık tarama `expired` yapar ve opsiyonu bırakır | Müşteriye `reservation.payment_pending` hemen (SMS + e-posta, kural açıksa), pencere uzunsa son 120 dk'da hatırlatma; süre dolunca `reservation.cancelled` |
+| `auto`, ön ödeme yok | `confirmed` | **Kalıcı** tutulur | Yalnızca personel iptal edince | Müşteriye `reservation.confirmed` |
+| `staff`, online kanal | `request` | **Tutulmaz** (personel onayında anlık fiyatla ayrılır) | — | Onay yetkisi olan personele `reservation.approval_waiting` (push) |
+| `channel` | `confirmed` | Kalıcı | Personel iptal edince | Müşteriye `reservation.confirmed` |
+
+Sonuçlar:
+
+- **Kapasite tutma:** en riskli kombinasyon "auto + ön ödeme yok" ya da `channel` protokolüdür. Bu durumlarda sahte rezervasyonlar personel iptal edene kadar filoyu tutar. "auto + ön ödeme" en fazla 30 dakikalık (ayarlanabilir) opsiyon tutar. `staff` protokolü hiç kapasite tutmaz.
+- **SMS maliyeti:** müşteri bildirimleri formda yazılan telefona gider. Bir sahte rezervasyon, "auto + ön ödeme" protokolünde en fazla 2-3 SMS'e yol açar (ödeme bekleniyor, varsa hatırlatma, iptal). Bunu sınırlayan katmanlar: oturum ve IP başına 20 rezervasyon / 10 dk, ardından firma başına saatlik tavan (`public_reservations_per_hour`, varsayılan 60). Tavan, bir firmanın saatlik SMS maliyetinin üst sınırını da belirler.
+- Bildirim kuralları firma ayarlarından kapatılabilir. Örneğin `reservation.payment_pending` için SMS kanalı kapatılabilir.
+- **Turnstile:** Cloudflare hesabı gelince site formları ve rezervasyon onayı Turnstile ile korunacak. O zaman KVKK aydınlatma metninde Cloudflare alt işleyen olarak anılmalı.
